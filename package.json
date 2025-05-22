@@ -1,0 +1,20 @@
+{
+    "name": "langstar-root",
+    "private": true,
+    "scripts": {
+      "lnagstar-dev": "run-script-os",
+      "lnagstar-dev:win32": "concurrently \"npm run dev --prefix ui\" \"python server/app.py\"",
+      "lnagstar-dev:darwin": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
+      "lnagstar-dev:linux": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
+  
+      "install": "run-script-os",
+      "install:win32": "concurrently \"npm install --prefix ui\" \"pip install -r server\\requirements.txt\"",
+      "install:darwin": "concurrently \"npm install --prefix ui\" \"pip install -r server/requirements.txt\"",
+      "install:linux": "concurrently \"npm install --prefix ui\" \"pip install -r server/requirements.txt\""
+    },
+    "devDependencies": {
+      "concurrently": "^8.2.0",
+      "run-script-os": "^1.1.6"
+    }
+  }
+  

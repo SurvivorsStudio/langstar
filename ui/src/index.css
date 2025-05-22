@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.react-flow__node {
+  transition: all 0.1s ease-in-out;
+}
+
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background-color: #3b82f6;
+  border: 2px solid white;
+}
+
+.react-flow__edge-path {
+  stroke: #94a3b8;
+  stroke-width: 2;
+  transition: stroke 0.2s;
+}
+
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+.react-flow__controls {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  width: 32px;
+  height: 32px;
+}
+
+.react-flow__minimap {
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Merge Node 스타일 */
+.flow__node-mergeNode { /* 'react-' 접두사 제거 */
+  background: #ede9fe; /* 연한 보라색 배경 (Tailwind violet-100) */
+  border: 1px solid #c4b5fd; /* 보라색 테두리 (Tailwind violet-300) */
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: #5b21b6; /* 진한 보라색 텍스트 (Tailwind violet-700) */
+}
+
+/* Merge Node가 선택되었을 때의 스타일 (기존 selected 스타일과 동일하게 적용) */
+.flow__node-mergeNode.selected { /* 'react-' 접두사 제거 */
+  box-shadow: 0 0 0 2px #3b82f6; /* 파란색 강조 효과 (Tailwind blue-500) */
+}
