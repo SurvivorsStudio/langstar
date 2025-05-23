@@ -3,7 +3,7 @@
     "private": true,
     "scripts": {
         "langstar-dev": "run-script-os",
-        "langstar-dev:win32": "concurrently \"npm run dev --prefix ui\" \"python server/app.py\"",
+        "langstar-dev:win32": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
         "langstar-dev:darwin": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
         "langstar-dev:linux": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
         "install": "run-script-os",
