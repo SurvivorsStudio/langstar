@@ -77,10 +77,10 @@ export interface FlowState {
   getNodeById: (nodeId: string) => Node<NodeData> | undefined;
   setNodeOutput: (nodeId: string, output: any) => void;
   setEdgeOutput: (edgeId: string, output: any) => void;
-  executeNode: (nodeId: string) => Promise<void>;
+  executeNode: (nodeId: string, chatId?: string) => Promise<void>; // chatId 파라미터 추가
   setNodeExecuting: (nodeId: string, isExecuting: boolean) => void;
   updateEdgeLabel: (edgeId: string, label: string) => void;
-  runWorkflow: () => Promise<void>;
+  runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
   viewport: Viewport; // viewport 상태 추가
@@ -601,7 +601,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
-  executeNode: async (nodeId: string) => {
+  executeNode: async (nodeId: string, chatId?: string) => { // chatId 파라미터 추가
     const node = get().nodes.find(n => n.id === nodeId);
     if (!node) return;
 
@@ -757,6 +757,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           console.log(`[AgentNode ${nodeId}] API로 전송될 User Prompt:`, userPromptForAPI);
 
           let memoryTypeForAPI: string | undefined = undefined;
+          let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
           if (memoryGroup) { // memoryGroup is the ID of the selected group
             const groupsNode = get().nodes.find(n => n.type === 'groupsNode');
             if (groupsNode && groupsNode.data.config?.groups) {
@@ -773,6 +774,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   memoryTypeForAPI = 'ConversationBufferMemory'; 
                   console.log(`[AgentNode ${nodeId}] Memory Type for group '${selectedGroupDetails.name}' (ID: ${selectedGroupDetails.id}) was undefined in store. Using default '${memoryTypeForAPI}' (as per GroupsSettings.tsx display).`);
                 }
+                memoryGroupNameForAPI = selectedGroupDetails.name; // 메모리 그룹 이름 저장
                 console.log(`[AgentNode ${nodeId}] 선택된 Memory Group: ${selectedGroupDetails.name}, Memory Type: ${memoryTypeForAPI}`);
               } else {
                 console.log(`[AgentNode ${nodeId}] Selected group ID ${memoryGroup} is not a memory type or not found.`);
@@ -808,10 +810,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             system_prompt: systemPromptForAPI,
             user_prompt: userPromptForAPI,
             memory_group: memoryGroup ? memoryGroup : undefined, 
+            memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송
             memory_type: memoryTypeForAPI, // This sends the actual memory type string
             return_key: finalAgentOutputVariable // API에 Output Variable 값을 "return_key"로 전달
-          };
+          } as any; // chat_id를 동적으로 추가하기 위해 any 타입으로 캐스팅
+
+          if (chatId) {
+            payload.chat_id = chatId; // chatId가 있으면 페이로드에 추가
+          }
           console.log(`[AgentNode ${nodeId}] API 요청 페이로드:`, JSON.stringify(payload, null, 2));
 
           try {
@@ -933,7 +940,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
-  runWorkflow: async () => {
+  runWorkflow: async (chatId?: string) => { // chatId 파라미터 추가
     const { nodes, executeNode, getNodeById, setWorkflowRunning } = get();
 
     setWorkflowRunning(true);
@@ -970,7 +977,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
       
       console.log(`⚙️ 노드 실행 중: ${nodeToExecute.data.label} (ID: ${currentNodeId}, 타입: ${nodeToExecute.type})`);
-      await executeNode(currentNodeId); // executeNode는 노드 실행 및 출력 전파를 처리합니다.
+      await executeNode(currentNodeId, chatId); // executeNode 호출 시 chatId 전달
       visitedInThisRun.add(currentNodeId);
 
       const executedNode = getNodeById(currentNodeId); // 실행 후 최신 노드 정보 가져오기
