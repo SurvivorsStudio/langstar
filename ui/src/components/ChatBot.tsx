@@ -10,6 +10,7 @@ interface Message {
 
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null); // State for the unique chat ID
   // flowStore에서 endNode의 output을 가져옵니다.
   // 필요한 상태와 액션을 모두 가져옵니다.
   const { 
@@ -90,7 +91,7 @@ const ChatBot: React.FC = () => {
 
       // 3. runWorkflow 실행
       console.log('[ChatBot] Starting workflow execution...');
-      await runWorkflow(); // 워크플로 실행
+      await runWorkflow(chatId ?? undefined); // 워크플로 실행, chatId가 null이면 undefined 전달
       console.log('[ChatBot] Workflow execution initiated.');
 
       // 4. 워크플로 완료 기다리기 (isWorkflowRunning 상태 폴링)
@@ -154,7 +155,12 @@ const ChatBot: React.FC = () => {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          const newUuid = crypto.randomUUID();
+          setChatId(newUuid);
+          console.log(`[ChatBot] New Chat ID generated: ${newUuid}`);
+          setIsOpen(true);
+        }}
         className="fixed bottom-6 right-6 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors"
       >
         <MessageSquare size={24} />
@@ -167,7 +173,25 @@ const ChatBot: React.FC = () => {
       <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
         <h3 className="font-semibold">Workflow Assistant</h3>
         <button
-          onClick={() => setIsOpen(false)}
+          onClick={async () => {
+            setIsOpen(false);
+            // API 호출 (챗봇 닫힐 때)
+            console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
+            try {
+              // 여기에 API 호출 로직을 추가하세요. 예:
+              // const response = await fetch('/api/chatbot/event', {
+              //   method: 'POST',
+              //   body: JSON.stringify({ chatId: chatId, event: 'closed' }),
+              //   headers: { 'Content-Type': 'application/json' },
+              // });
+              // if (!response.ok) {
+              //   throw new Error('API call failed on close');
+              // }
+              // console.log('[ChatBot] Close event API call successful');
+            } catch (error) {
+              console.error('[ChatBot] Error calling API on close:', error);
+            }
+          }}
           className="text-white hover:text-gray-200 transition-colors"
         >
           <X size={20} />
