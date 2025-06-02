@@ -71,7 +71,9 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       } else if (nodeType === 'promptNode' || nodeType === 'systemPromptNode') {
         if (activeTab === 'settings') currentTabIsValid = false; // Original settings tab is gone
         newDefaultTab = 'input_data';
-      } else if (['agentNode', 'conditionNode', 'groupsNode', 'embeddingNode', 'ragNode', 'mergeNode'].includes(nodeType)) { // mergeNode 추가
+      } else if (
+        nodeType && ['agentNode', 'conditionNode', 'groupsNode', 'embeddingNode', 'ragNode', 'mergeNode'].includes(nodeType)
+      ) {
         if (activeTab === 'code') currentTabIsValid = false; // Code tab is gone
         newDefaultTab = 'input_data';
       }
