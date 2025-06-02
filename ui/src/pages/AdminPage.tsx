@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../assets/common/langstar_logo.png';
 import { PlusCircle, Settings, ChevronRight, Database, Key, Trash2, ChevronLeft, ChevronDown, Loader2, Save } from 'lucide-react';
-import { useFlowStore } from '../store/flowStore';
+import { useFlowStore, DEFAULT_PROJECT_NAME } from '../store/flowStore';
 
 const mockRagConfigs = [
   {
@@ -86,6 +86,8 @@ const AdminPage: React.FC = () => {
     port: '443',
     embeddingModel: 'OpenAI Ada 002'
   });
+
+  const defaultProjectName = DEFAULT_PROJECT_NAME;
 
   React.useEffect(() => {
     // AdminPage가 마운트되거나 activeMenu가 'chatflows'로 변경될 때 워크플로 목록을 가져옵니다.
@@ -200,7 +202,6 @@ const AdminPage: React.FC = () => {
   const handleNewWorkflow = () => {
     // 새 워크플로를 위한 상태 초기화 (선택 사항)
     const store = useFlowStore.getState();
-    const defaultProjectName = store.DEFAULT_PROJECT_NAME || 'New Workflow'; // flowStore에 DEFAULT_PROJECT_NAME이 없다면 기본값 사용
     let newProjectName = defaultProjectName;
     let counter = 1;
     // 이미 존재하는 프로젝트 이름과 중복되지 않도록 처리

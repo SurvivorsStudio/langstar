@@ -282,7 +282,7 @@ const DB_NAME = 'WorkflowDatabase';
 const WORKFLOWS_STORE_NAME = 'WorkflowsStore';
 const AI_CONNECTIONS_STORE_NAME = 'AIConnectionsStore'; // AI 연결 정보 저장소 이름
 const DB_VERSION = 2; // 데이터베이스 스키마 변경 시 이 버전을 올려야 합니다. (새로운 저장소 추가)
-const DEFAULT_PROJECT_NAME = 'New Workflow'; // 기본 프로젝트 이름 상수화
+export const DEFAULT_PROJECT_NAME = 'New Workflow'; // 기본 프로젝트 이름 상수화
 
 // IndexedDB 열기/초기화 헬퍼 함수
 const openDB = (): Promise<IDBDatabase> => {
