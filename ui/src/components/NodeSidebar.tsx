@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react';
 import { NodeCategory, nodeCategories } from '../data/nodeCategories';
@@ -99,7 +99,6 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                     className="flex items-center p-2 hover:bg-gray-50 rounded-md cursor-pointer mb-2"
                     draggable
                     onDragStart={(event) => handleNodeDragStart(event, node.type, node.label)}
-                    onClick={() => handleAddNode(node.type, node.label)}
                   >
                     <div className="w-8 h-8 flex items-center justify-center mr-3">
                       {node.icon}

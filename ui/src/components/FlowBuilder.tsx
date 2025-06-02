@@ -51,6 +51,29 @@ const FlowBuilder: React.FC = () => {
     reactFlowInstance.fitView();
   };
 
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    const data = event.dataTransfer.getData('application/reactflow');
+    if (!data || !reactFlowBounds) return;
+
+    const { type, label } = JSON.parse(data);
+    const position = reactFlowInstance.project({
+      x: event.clientX - reactFlowBounds.left,
+      y: event.clientY - reactFlowBounds.top,
+    });
+    addNode({
+      type,
+      position,
+      data: { label, code: '', config: {} }
+    });
+  }, [addNode, reactFlowInstance]);
+
   return (
     <div className="flex h-full w-full">
       {showNodeSidebar && (
@@ -70,6 +93,8 @@ const FlowBuilder: React.FC = () => {
           fitView
           snapToGrid
           snapGrid={[15, 15]}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
         >
           <Background color="#aaa" gap={15} variant={BackgroundVariant.Lines} />
           <Controls showInteractive={false} />
