@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
   useReactFlow,
+  Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -27,7 +29,7 @@ const FlowBuilder: React.FC = () => {
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  const onNodeClick = useCallback((_, node) => {
+  const onNodeClick = useCallback((_: unknown, node: Node) => {
     setSelectedNode(node.id);
     setShowInspector(true);
   }, []);
@@ -69,7 +71,7 @@ const FlowBuilder: React.FC = () => {
           snapToGrid
           snapGrid={[15, 15]}
         >
-          <Background color="#aaa" gap={15} variant={LayoutGrid} />
+          <Background color="#aaa" gap={15} variant={BackgroundVariant.Lines} />
           <Controls showInteractive={false} />
           <MiniMap nodeStrokeWidth={3} zoomable pannable />
           <Panel position="top-left" className="ml-4 mt-4">
