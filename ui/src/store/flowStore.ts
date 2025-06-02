@@ -26,7 +26,7 @@ export interface NodeData {
     variables?: Array<{
       name: string;
       type: string;
-      defaultValue: string;
+      defaultValue: any;
       selectVariable: string;
     }>;
     repetitions?: number;
@@ -201,25 +201,24 @@ const generateStartNodeOutput = (node: Node<NodeData>): TransformedStartNodeOutp
   const inputVariables = config.variables || [];
 
   const processedVariables: TransformedStartNodeVariable[] = inputVariables.map(variable => {
-    let processedDefaultValue = variable.defaultValue;
-
+    let processedDefaultValue: any = variable.defaultValue;
     switch (variable.type) {
       case 'int':
-        processedDefaultValue = parseInt(variable.defaultValue, 10) || 0;
+        processedDefaultValue = typeof variable.defaultValue === 'number' ? variable.defaultValue : parseInt(variable.defaultValue, 10) || 0;
         break;
       case 'float':
-        processedDefaultValue = parseFloat(variable.defaultValue) || 0.0;
+        processedDefaultValue = typeof variable.defaultValue === 'number' ? variable.defaultValue : parseFloat(variable.defaultValue) || 0.0;
         break;
       case 'list':
         try {
-          processedDefaultValue = JSON.parse(variable.defaultValue || '[]');
+          processedDefaultValue = Array.isArray(variable.defaultValue) ? variable.defaultValue : JSON.parse(variable.defaultValue || '[]');
         } catch {
           processedDefaultValue = [];
         }
         break;
       case 'dict':
         try {
-          processedDefaultValue = JSON.parse(variable.defaultValue || '{}');
+          processedDefaultValue = typeof variable.defaultValue === 'object' && !Array.isArray(variable.defaultValue) ? variable.defaultValue : JSON.parse(variable.defaultValue || '{}');
         } catch {
           processedDefaultValue = {};
         }
@@ -378,27 +377,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const uniqueLabel = getUniqueNodeName(get().nodes, data.label);
     const defaultConfig = type === 'startNode' ? {
       className: '',
-      classType: 'TypedDict',
+      classType: 'TypedDict' as 'TypedDict',
       variables: []
     } : type === 'loopNode' ? {
       repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
       template: '# Enter your prompt template here\n\nSystem: You are a helpful AI assistant.\n\nUser: {user_input}\n\nAssistant:',
-      outputVariable: 'user_input' // agentNode의 기본 userPromptInputKey와 맞춤
-    } : type === 'agentNode' ? { // agentNode에 대한 기본 설정 추가
-      model: '', // 사용자가 UI에서 모델을 선택해야 함
-      userPromptInputKey: 'user_input', // 입력에서 사용자 프롬프트를 찾을 기본 키
-      systemPromptInputKey: 'system_message', // 시스템 프롬프트를 찾을 기본 키
+      outputVariable: 'user_input'
+    } : type === 'agentNode' ? {
+      model: '',
+      userPromptInputKey: 'user_input',
+      systemPromptInputKey: 'system_message',
       memoryGroup: '',
-      tools: [], // 이 부분은 addNode 시점에서는 빈 배열로 초기화됩니다.
-                 // 사용자가 UI를 통해 GroupsNode에서 정의된 Tool들을 선택하면,
-                 // 해당 Tool들의 ID 배열이 여기에 저장됩니다.
-      agentOutputVariable: 'agent_response' // Agent Node의 API 응답이 저장될 기본 키
-    } : type === 'mergeNode' ? { // mergeNode에 대한 기본 설정 추가
+      tools: [],
+      agentOutputVariable: 'agent_response'
+    } : type === 'mergeNode' ? {
       mergeMappings: []
-    } : type === 'endNode' ? { // endNode에 대한 기본 설정 추가
-      receiveKey: '' // 기본으로 선택된 키 없음
-    } : {}; // 다른 노드 타입은 빈 객체로 시작
+    } : type === 'endNode' ? {
+      receiveKey: ''
+    } : {};
 
     const newNode: Node<NodeData> = {
       id,
@@ -1240,143 +1237,104 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   deleteAIConnection: async (connectionId: string) => {
-    // 이 함수는 아래 useFlowStore.setState 외부에서 정의된 deleteWorkflow와 유사하게 구현됩니다.
-  },
-}));
-
-// 워크플로 삭제 함수를 스토어 외부에 정의하거나, 스토어 액션으로 포함할 수 있습니다.
-// 여기서는 스토어 액션으로 추가합니다.
-useFlowStore.setState(state => ({
-  ...state,
-  deleteWorkflow: async (projectName: string) => {
-    state.isLoading = true; // 또는 isDeleting 같은 별도 상태 사용
-    state.loadError = null;
-    console.log(`FlowStore: Deleting workflow "${projectName}" from IndexedDB...`);
-
-    try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      const request = store.delete(projectName);
-
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log(`FlowStore: Workflow "${projectName}" deleted successfully.`);
-          state.fetchAvailableWorkflows(); // 삭제 후 목록 새로고침
-          resolve();
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          console.error('FlowStore: Error deleting workflow:', error);
-          // state.loadError = error?.message || 'Failed to delete workflow'; // 에러 상태 업데이트
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.error('FlowStore: Failed to initiate delete operation or open DB:', error);
-      // state.loadError = (error as Error).message || 'Failed to delete workflow'; // 에러 상태 업데이트
-      throw error;
-    } finally {
-      // state.isLoading = false; // 로딩 상태 해제
-    }
-  }
-}));
-
-useFlowStore.setState(state => ({
-  ...state,
-  renameWorkflow: async (oldName: string, newName: string) => {
-    if (!newName || newName.trim() === "") {
-      console.error("FlowStore: New project name cannot be empty.");
-      throw new Error("New project name cannot be empty.");
-    }
-    if (oldName === newName) {
-      console.log("FlowStore: Old and new names are the same. No action taken.");
-      return; // 이름이 같으면 아무 작업도 하지 않음
-    }
-    if (state.availableWorkflows.includes(newName)) {
-      console.error(`FlowStore: Project name "${newName}" already exists.`);
-      throw new Error(`Project name "${newName}" already exists.`);
-    }
-
-    // state.isLoading = true; // 또는 isRenaming 같은 별도 상태 사용
-    // state.loadError = null;
-    console.log(`FlowStore: Renaming workflow from "${oldName}" to "${newName}"...`);
-
-    try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-
-      const getRequest = store.get(oldName);
-
-      return new Promise<void>((resolve, reject) => {
-        getRequest.onsuccess = () => {
-          const workflowData = getRequest.result;
-          if (workflowData) {
-            const updatedWorkflowData = { ...workflowData, projectName: newName, lastModified: new Date().toISOString() };
-            const putRequest = store.put(updatedWorkflowData);
-            putRequest.onsuccess = () => {
-              const deleteRequest = store.delete(oldName);
-              deleteRequest.onsuccess = () => {
-                console.log(`FlowStore: Workflow renamed from "${oldName}" to "${newName}" successfully.`);
-                state.fetchAvailableWorkflows(); // 이름 변경 후 목록 새로고침
-                resolve();
-              };
-              deleteRequest.onerror = (event) => reject((event.target as IDBRequest).error || 'Failed to delete old workflow data');
-            };
-            putRequest.onerror = (event) => reject((event.target as IDBRequest).error || 'Failed to save new workflow data');
-          } else {
-            reject(new Error(`Workflow "${oldName}" not found.`));
-          }
-        };
-        getRequest.onerror = (event) => reject((event.target as IDBRequest).error || `Failed to get workflow "${oldName}"`);
-      });
-    } catch (error) {
-      console.error('FlowStore: Failed to initiate rename operation or open DB:', error);
-      throw error;
-    } finally {
-      // state.isLoading = false;
-    }
-  }
-}));
-
-// AI Connection 삭제 함수
-useFlowStore.setState(state => ({
-  ...state,
-  deleteAIConnection: async (connectionId: string) => {
-    useFlowStore.setState({ isLoadingAIConnections: true, loadErrorAIConnections: null });
+    set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
     console.log(`FlowStore: Deleting AI connection ID ${connectionId}...`);
-
     try {
       const db = await openDB();
       const transaction = db.transaction(AI_CONNECTIONS_STORE_NAME, 'readwrite');
       const store = transaction.objectStore(AI_CONNECTIONS_STORE_NAME);
       const request = store.delete(connectionId);
-
       return new Promise<void>((resolve, reject) => {
         request.onsuccess = () => {
           console.log('FlowStore: AI connection deleted successfully.');
-          useFlowStore.getState().fetchAIConnections(); // 목록 새로고침
+          get().fetchAIConnections();
           resolve();
         };
         request.onerror = (event) => {
           const error = (event.target as IDBRequest).error;
-          useFlowStore.setState({ loadErrorAIConnections: error?.message || 'Failed to delete AI connection', isLoadingAIConnections: false });
+          set({ loadErrorAIConnections: error?.message || 'Failed to delete AI connection', isLoadingAIConnections: false });
           console.error('FlowStore: Error deleting AI connection:', error);
           reject(error);
         };
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      useFlowStore.setState({ loadErrorAIConnections: errorMessage, isLoadingAIConnections: false });
+      set({ loadErrorAIConnections: errorMessage, isLoadingAIConnections: false });
       console.error('FlowStore: Failed to initiate delete AI connection operation:', error);
       throw error;
     }
-  }
-}));
+  },
 
-// 애플리케이션 시작 시 또는 스토어가 처음 사용될 때 저장된 워크플로 목록을 가져올 수 있습니다.
-// 예: App.tsx 등에서 useEffect를 사용하여 호출
-// useEffect(() => {
-//   useFlowStore.getState().fetchAvailableWorkflows();
-// }, []);
+  deleteWorkflow: async (projectName: string) => {
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
+      const request = store.delete(projectName);
+      return new Promise<void>((resolve, reject) => {
+        request.onsuccess = () => {
+          // 삭제 후 워크플로우 목록 새로고침
+          get().fetchAvailableWorkflows();
+          resolve();
+        };
+        request.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          set({ loadError: error?.message || 'Failed to delete workflow' });
+          reject(error);
+        };
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadError: errorMessage });
+      throw error;
+    }
+  },
+
+  renameWorkflow: async (oldName: string, newName: string) => {
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
+      const getRequest = store.get(oldName);
+      return new Promise<void>((resolve, reject) => {
+        getRequest.onsuccess = () => {
+          const data = getRequest.result;
+          if (!data) {
+            set({ loadError: `Workflow '${oldName}' not found.` });
+            return reject(new Error(`Workflow '${oldName}' not found.`));
+          }
+          // 이름 변경
+          data.projectName = newName;
+          const addRequest = store.add(data);
+          addRequest.onsuccess = () => {
+            // 기존 워크플로우 삭제
+            const deleteRequest = store.delete(oldName);
+            deleteRequest.onsuccess = () => {
+              get().fetchAvailableWorkflows();
+              resolve();
+            };
+            deleteRequest.onerror = (event) => {
+              const error = (event.target as IDBRequest).error;
+              set({ loadError: error?.message || 'Failed to delete old workflow after rename' });
+              reject(error);
+            };
+          };
+          addRequest.onerror = (event) => {
+            const error = (event.target as IDBRequest).error;
+            set({ loadError: error?.message || 'Failed to add renamed workflow' });
+            reject(error);
+          };
+        };
+        getRequest.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          set({ loadError: error?.message || 'Failed to get workflow for rename' });
+          reject(error);
+        };
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadError: errorMessage });
+      throw error;
+    }
+  },
+}));
