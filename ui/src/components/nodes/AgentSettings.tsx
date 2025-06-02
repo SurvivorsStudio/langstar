@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { X, ChevronDown, AlertCircle } from 'lucide-react';
+import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
 
 // Mock AI connections - in a real app, this would come from your store or API
 const mockAIConnections = [
@@ -36,11 +36,17 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const node = nodes.find(n => n.id === nodeId);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   
   // 이전 노드에서 사용 가능한 입력 키 및 연결 상태 가져오기
   const [availableInputKeys, setAvailableInputKeys] = useState<string[]>([]);
   const [isSourceConnected, setIsSourceConnected] = useState<boolean>(false);
   const [hasValidSourceOutput, setHasValidSourceOutput] = useState<boolean>(false);
+
+  const DEFAULT_TOP_K = 40;
+  const DEFAULT_TOP_P = 1;
+  const DEFAULT_TEMPERATURE = 0.7;
+  const DEFAULT_MAX_TOKENS = 1000;
 
   useEffect(() => {
     const incomingEdge = edges.find(edge => edge.target === nodeId);
@@ -91,6 +97,51 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     });
   };
 
+  const handleMaxTokensChange = (value: string) => {
+    const numValue = parseInt(value, 10);
+    updateNodeData(nodeId, {
+      ...node?.data,
+      config: {
+        ...node?.data.config,
+        maxTokens: isNaN(numValue) ? undefined : numValue,
+      },
+    });
+  };
+
+  const handleTopKChange = (value: string) => {
+    const numValue = parseInt(value, 10);
+    updateNodeData(nodeId, {
+      ...node?.data,
+      config: {
+        ...node?.data.config,
+        topK: isNaN(numValue) ? undefined : numValue,
+      },
+    });
+  };
+
+  const handleTopPChange = (value: string) => {
+    const numValue = parseInt(value, 10); // Or parseFloat if it should be a float
+    updateNodeData(nodeId, {
+      ...node?.data,
+      config: {
+        ...node?.data.config,
+        topP: isNaN(numValue) ? undefined : numValue,
+      },
+    });
+  };
+
+  const handleTemperatureChange = (value: string) => {
+    const floatValue = parseFloat(value);
+    updateNodeData(nodeId, {
+      ...node?.data,
+      config: {
+        ...node?.data.config,
+        temperature: isNaN(floatValue) ? undefined : floatValue,
+      },
+    });
+  };
+
+
   const handleSystemPromptInputKeyChange = (value: string) => {
     updateNodeData(nodeId, {
       ...node?.data,
@@ -118,6 +169,16 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
         ...node?.data.config,
         agentOutputVariable: value
       }
+    });
+  };
+
+  const handleStreamChange = (checked: boolean) => {
+    updateNodeData(nodeId, {
+      ...node?.data,
+      config: {
+        ...node?.data.config,
+        stream: checked,
+      },
     });
   };
 
@@ -174,33 +235,75 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
         {/* Output Variable Section - Placed at the top */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
-            Output Variable
-          </label>
-          <div className="relative">
-            <select
-              value={node?.data.config?.agentOutputVariable || ''}
-              onChange={(e) => handleAgentOutputVariableChange(e.target.value)}
-              className={`w-full px-3 py-2 border ${
-                // 이전 노드가 연결되지 않았거나, 유효한 출력이 없을 때 약간 흐리게 표시
-                (!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-              } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-            >
-              <option value="">Select output variable (required)</option>
-              {/* 현재 설정된 값이자 기본값 (availableInputKeys에 없다면 'New/Default'로 표시) */}
-              {node?.data.config?.agentOutputVariable &&
-               node.data.config.agentOutputVariable !== "" && 
-               !availableInputKeys.includes(node.data.config.agentOutputVariable) && (
-                <option key={node.data.config.agentOutputVariable} value={node.data.config.agentOutputVariable}>
-                  {node.data.config.agentOutputVariable} (New/Default)
-                </option>
+          <div className="flex items-center justify-between">
+            <label htmlFor="agentOutputVariable" className="block text-sm font-medium text-gray-600">
+              Output Variable
+            </label>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="streamToggle"
+                checked={node?.data.config?.stream || false}
+                onChange={(e) => handleStreamChange(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="streamToggle" className="ml-2 text-sm text-gray-600">
+                Stream
+              </label>
+            </div>
+          </div>
+          <div className="relative"> 
+            <div className="flex items-center space-x-2">
+              {isEditingOutputVariable ? (
+                <>
+                  <input
+                    type="text"
+                    id="agentOutputVariableInput"
+                    value={node?.data.config?.agentOutputVariable || ''}
+                    onChange={(e) => handleAgentOutputVariableChange(e.target.value)}
+                    placeholder="Enter output variable name"
+                    className={`flex-grow px-3 py-2 border ${
+                      (!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
+                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  />
+                  <button 
+                    onClick={() => setIsEditingOutputVariable(false)} 
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0"
+                    aria-label="Confirm output variable"
+                  >
+                    <Check size={18} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <select
+                    id="agentOutputVariable"
+                    value={node?.data.config?.agentOutputVariable || ''}
+                    onChange={(e) => handleAgentOutputVariableChange(e.target.value)}
+                    className={`flex-grow px-3 py-2 border ${
+                      (!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
+                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  >
+                    <option value="">Select output variable (required)</option>
+                    {node?.data.config?.agentOutputVariable &&
+                     node.data.config.agentOutputVariable !== "" && 
+                     !availableInputKeys.includes(node.data.config.agentOutputVariable) && (
+                      <option key={node.data.config.agentOutputVariable} value={node.data.config.agentOutputVariable}>
+                        {node.data.config.agentOutputVariable} (New/Default)
+                      </option>
+                    )}
+                    {availableInputKeys.map((variable) => (
+                      <option key={variable} value={variable}>
+                        {variable} (Overwrite)
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                    <Pencil size={18} />
+                  </button>
+                </>
               )}
-              {availableInputKeys.map((variable) => (
-                <option key={variable} value={variable}>
-                  {variable} (Overwrite)
-                </option>
-              ))}
-            </select>
+            </div>
             {!isSourceConnected && (
               <div className="flex items-center mt-1 text-amber-500 text-xs">
                 <AlertCircle size={12} className="mr-1" />
@@ -376,6 +479,70 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
               )}
             </div>
           )}
+        </div>
+
+        {/* Separator */}
+        <hr className="my-4 border-gray-300" />
+
+        {/* Top K Section */}
+        <div className="space-y-2">
+          <label htmlFor="topK" className="block text-sm font-medium text-gray-600">
+            Top K
+          </label>
+          <input
+            type="number"
+            id="topK"
+            value={node?.data.config?.topK ?? DEFAULT_TOP_K}
+            onChange={(e) => handleTopKChange(e.target.value)}
+            placeholder="e.g., 40"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+
+        {/* Top P Section */}
+        <div className="space-y-2">
+          <label htmlFor="topP" className="block text-sm font-medium text-gray-600">
+            Top P
+          </label>
+          <input
+            type="number" // Consider "text" or "number" with step="0.01" if it's a float
+            id="topP"
+            value={node?.data.config?.topP ?? DEFAULT_TOP_P}
+            onChange={(e) => handleTopPChange(e.target.value)}
+            placeholder="e.g., 1 (usually 0-1 float)"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+
+        {/* Temperature Section */}
+        <div className="space-y-2">
+          <label htmlFor="temperature" className="block text-sm font-medium text-gray-600">
+            Temperature
+          </label>
+          <input
+            type="number"
+            id="temperature"
+            value={node?.data.config?.temperature ?? DEFAULT_TEMPERATURE}
+            onChange={(e) => handleTemperatureChange(e.target.value)}
+            placeholder="e.g., 0.7 (usually 0-1)"
+            step="0.1" // Optional: for fine-grained control with number input arrows
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+        
+        {/* Max Token Size Section */}
+        <div className="space-y-2">
+          <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-600">
+            Max Token Size
+          </label>
+          <input
+            type="number"
+            id="maxTokens"
+            value={node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS}
+            onChange={(e) => handleMaxTokensChange(e.target.value)}
+            placeholder="e.g., 1000"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
         </div>
       </div>
 

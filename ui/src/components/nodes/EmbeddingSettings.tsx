@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Pencil, Check } from 'lucide-react';
 
 interface EmbeddingSettingsProps {
   nodeId: string;
@@ -9,6 +9,7 @@ interface EmbeddingSettingsProps {
 const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
   const { nodes, edges, updateNodeData } = useFlowStore();
   const node = nodes.find(n => n.id === nodeId);
+  const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   const incomingEdge = edges.find(edge => edge.target === nodeId);
   const sourceOutput = incomingEdge?.data?.output || null;
   const hasValidOutput = sourceOutput && Object.keys(sourceOutput).length > 0;
@@ -43,19 +44,19 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
     });
   };
 
-  const handleOutputColumnChange = (value: string) => {
+  const handleOutputVariableChange = (value: string) => {
     updateNodeData(nodeId, {
       ...node?.data,
       config: {
         ...node?.data.config,
-        outputColumn: value
+        outputVariable: value
       }
     });
   };
 
   // Mock embedding generation
   const generateEmbedding = () => {
-    if (!sourceOutput || !node?.data.config?.inputColumn || !node?.data.config?.outputColumn) return;
+    if (!sourceOutput || !node?.data.config?.inputColumn || !node?.data.config?.outputVariable) return;
 
     const result = { ...sourceOutput };
     result[node.data.config.outputColumn] = [1, 2, 3, 4]; // Mock embedding result
@@ -66,6 +67,68 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
     <div className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-gray-700">Embedding Settings</h3>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-600">
+            Output Variable
+          </label>
+          <div className="relative"> {/* Container for input/select and warnings */}
+            <div className="flex items-center space-x-2">
+              {isEditingOutputVariable ? (
+                <>
+                  <input
+                    type="text"
+                    id="embeddingOutputVariableInput"
+                    value={node?.data.config?.outputVariable || ''}
+                    onChange={(e) => handleOutputVariableChange(e.target.value)}
+                    placeholder="Enter output variable name"
+                    className={`flex-grow px-3 py-2 border ${
+                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
+                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                    // Disable if no source and no current value, and no available variables to choose from
+                    disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable} 
+                  />
+                  <button
+                    onClick={() => setIsEditingOutputVariable(false)}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0"
+                    aria-label="Confirm output column"
+                  >
+                    <Check size={18} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <select
+                    id="embeddingOutputVariableSelect"
+                    value={node?.data.config?.outputVariable || ''}
+                    onChange={(e) => handleOutputVariableChange(e.target.value)}
+                    className={`flex-grow px-3 py-2 border ${
+                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
+                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                    disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
+                  >
+                    <option value="">Select output variable</option>
+                    {node?.data.config?.outputVariable && 
+                     !availableVariables.includes(node.data.config.outputVariable) && (
+                      <option value={node.data.config.outputVariable}>
+                        {node.data.config.outputVariable} (Custom)
+                      </option>
+                    )}
+                    {availableVariables.map((variable) => (
+                      <option key={variable} value={variable}>
+                        {variable}
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                    <Pencil size={18} />
+                  </button>
+                </>
+              )}
+            </div>
+             {/* Warning messages can go here if needed, similar to other components */}
+          </div>
+        </div>
         
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600">
@@ -116,27 +179,6 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
             </div>
           )}
         </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
-            Output Column
-          </label>
-          <select
-            value={node?.data.config?.outputColumn || ''}
-            onChange={(e) => handleOutputColumnChange(e.target.value)}
-            className={`w-full px-3 py-2 border ${
-              !hasValidOutput ? 'bg-gray-50 text-gray-400' : 'bg-white'
-            } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-            disabled={!hasValidOutput}
-          >
-            <option value="">Select output column</option>
-            {availableVariables.map((variable) => (
-              <option key={variable} value={variable}>
-                {variable}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       <div className="bg-blue-50 p-4 rounded-lg">
@@ -144,7 +186,7 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
         <pre className="text-xs text-blue-600 bg-white p-3 rounded border border-blue-100">
 {`{
   "input_column": "Hello",
-  "output_column": [1, 2, 3, 4],
+  "output_variable": [1, 2, 3, 4],
   "model": "cohere-embed"
 }`}
         </pre>
