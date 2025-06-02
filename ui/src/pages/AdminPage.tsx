@@ -623,7 +623,17 @@ const AdminPage: React.FC = () => {
                   {filteredAIConnections.map((connection) => (
                     <div
                       key={connection.id}
-                      onClick={() => { setSelectedAIConnectionId(connection.id); setAiConnectionForm({ ...connection, apiKey: connection.apiKey || '' }); }}
+                      onClick={() => {
+                        setSelectedAIConnectionId(connection.id);
+                        setAiConnectionForm({
+                          name: connection.name,
+                          provider: connection.provider,
+                          model: connection.model,
+                          apiKey: connection.apiKey || '',
+                          temperature: connection.temperature ?? 0.7,
+                          maxTokens: connection.maxTokens ?? 2048,
+                        });
+                      }}
                       className="bg-white p-6 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div className="flex items-start justify-between">
