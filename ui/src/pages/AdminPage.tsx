@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../assets/common/langstar_logo.png';
 import { PlusCircle, Settings, ChevronRight, Database, Key, Trash2, ChevronLeft, ChevronDown, Loader2, Save } from 'lucide-react';
-import { useFlowStore, DEFAULT_PROJECT_NAME } from '../store/flowStore';
+import { useFlowStore, DEFAULT_PROJECT_NAME, initialNodes, initialEdges } from '../store/flowStore';
 
 const mockRagConfigs = [
   {
@@ -214,7 +214,7 @@ const AdminPage: React.FC = () => {
     // nodes, edges, viewport를 초기 상태로 설정합니다.
     // flowStore.ts에 정의된 initialNodes, initialEdges를 사용하거나, 직접 초기값을 지정합니다.
     // Viewport의 초기값도 설정합니다.
-    useFlowStore.setState({ nodes: store.initialNodes || [], edges: store.initialEdges || [], viewport: { x: 0, y: 0, zoom: 1 }, lastSaved: null });
+    useFlowStore.setState({ nodes: initialNodes, edges: initialEdges, viewport: { x: 0, y: 0, zoom: 1 }, lastSaved: null });
     navigate(`/flow/${encodeURIComponent(newProjectName)}`);
   };
 

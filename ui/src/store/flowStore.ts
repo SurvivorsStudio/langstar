@@ -109,7 +109,7 @@ export interface FlowState {
   deleteAIConnection: (connectionId: string) => Promise<void>;
 }
 
-const initialNodes: Node<NodeData>[] = [
+export const initialNodes: Node<NodeData>[] = [
   {
     id: 'start',
     type: 'startNode',
@@ -128,7 +128,7 @@ const initialNodes: Node<NodeData>[] = [
   }
 ];
 
-const initialEdges: Edge[] = [];
+export const initialEdges: Edge[] = [];
 
 const getCircularReplacer = () => {
   const seen = new WeakSet();
