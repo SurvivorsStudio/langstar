@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFlowStore } from '../../store/flowStore';
+import { useFlowStore } from '../store/flowStore';
 import { Edge } from 'reactflow';
 
 interface ConditionSettingsProps {
