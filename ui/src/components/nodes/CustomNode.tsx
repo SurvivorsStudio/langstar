@@ -363,8 +363,8 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
         </div>
       )}
       
-      {/* 노드 데이터에 코드가 있는 경우, 코드 미리보기 표시 (최대 3줄) */}
-      {data.code && (
+      {/* Start 노드는 code 미리보기 영역을 표시하지 않음 */}
+      {data.code && !isStartNode && (
         <div className="mt-2 text-xs bg-gray-100 p-2 rounded max-h-20 overflow-y-auto font-mono">
           {data.code.split('\n').slice(0, 3).join('\n')}
           {data.code.split('\n').length > 3 && '...'}
