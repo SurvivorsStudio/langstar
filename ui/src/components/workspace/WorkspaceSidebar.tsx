@@ -1,5 +1,6 @@
 import React from 'react';
 import { Database, Key, ChevronRight, ChevronDown } from 'lucide-react';
+import langstarLogo from '../../assets/common/langstar_logo.png';
 
 interface AdminSidebarProps {
   activeMenu: string;
@@ -17,6 +18,9 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
   setSelectedAIType,
 }) => (
   <div className="w-64 bg-white border-r border-gray-200">
+    <div className="flex flex-row items-start py-4">
+      <img src={langstarLogo} alt="LangStar Logo" className="w-40 h-auto ml-4" />
+    </div>
     <nav className="p-4">
       <div className="space-y-1">
         <button
