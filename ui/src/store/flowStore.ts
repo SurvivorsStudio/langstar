@@ -125,6 +125,20 @@ export const initialNodes: Node<NodeData>[] = [
         variables: []
       }
     },
+  },
+  {
+    id: 'end',
+    type: 'endNode',
+    position: { x: 100, y: 300 },
+    data: {
+      label: 'End',
+      description: 'End point of the workflow',
+      output: null,
+      isExecuting: false,
+      config: {
+        receiveKey: ''
+      }
+    },
   }
 ];
 
