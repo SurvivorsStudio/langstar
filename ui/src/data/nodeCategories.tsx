@@ -23,18 +23,6 @@ export const nodeCategories: NodeCategory[] = [
     title: 'Workflow Nodes',
     nodes: [
       {
-        type: 'startNode',
-        label: 'Start',
-        description: 'Starting point of the workflow',
-        icon: <Play size={20} />
-      },
-      {
-        type: 'endNode',
-        label: 'End',
-        description: 'End of workflow',
-        icon: <Square size={20} />
-      },
-      {
         type: 'promptNode',
         label: 'Prompt',
         description: 'Define a prompt template for LLM interaction',
