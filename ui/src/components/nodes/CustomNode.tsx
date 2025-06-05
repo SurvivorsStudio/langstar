@@ -25,9 +25,9 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const isGroupsNode = type === 'groupsNode';
 
   // GroupsNode일 경우, 설정에서 그룹 목록 가져오기
-  const groups = data.config?.groups || [];
-  const memoryGroups = groups.filter(g => g.type === 'memory');
-  const toolsGroups = groups.filter(g => g.type === 'tools');
+  const groups: any[] = data.config?.groups || [];
+  const memoryGroups = groups.filter((g: any) => g.type === 'memory');
+  const toolsGroups = groups.filter((g: any) => g.type === 'tools');
 
   /**
    * 조건 노드의 유효성 검사 상태를 계산합니다.
@@ -66,7 +66,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       'startNode': 'bg-gray-50 border-gray-200',
       'endNode': 'bg-red-50 border-red-200',
       'groupsNode': 'bg-white border-gray-200',
-    }[data.nodeType] || 'bg-white border-gray-200';
+    }[(data.nodeType as string)] || 'bg-white border-gray-200';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
     if (isConditionNode && hasValidationError) {
@@ -89,7 +89,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       'startNode': 'text-gray-600 bg-gray-100',
       'endNode': 'text-red-600 bg-red-100',
       'groupsNode': 'text-gray-600 bg-gray-100',
-    }[data.nodeType] || 'text-gray-600 bg-gray-100';
+    }[(data.nodeType as string)] || 'text-gray-600 bg-gray-100';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
     if (isConditionNode && hasValidationError) {
@@ -165,8 +165,8 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
    * @returns {boolean} 이름이 존재하면 true, 그렇지 않으면 false.
    */
   const checkNameExists = (name: string, type: 'memory' | 'tools'): boolean => {
-    const existingGroups = groups.filter(g => g.type === type);
-    return existingGroups.some(g => g.name.toLowerCase() === name.toLowerCase());
+    const existingGroups = groups.filter((g: any) => g.type === type);
+    return existingGroups.some((g: any) => g.name.toLowerCase() === name.toLowerCase());
   };
 
   /**
@@ -283,7 +283,8 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       
       {/* 노드 우측 상단 버튼 (실행, 삭제) */}
       <div className="absolute -top-2 -right-2 flex gap-2">
-        {!isGroupsNode && (
+        {/* End 노드는 실행(재생) 버튼도 숨김 */}
+        {!isGroupsNode && !isEndNode && (
           <button
             onClick={handleExecute}
             disabled={isExecuting || (isConditionNode && hasValidationError)}
@@ -297,12 +298,15 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
             )}
           </button>
         )}
-        <button
-          onClick={handleDelete}
-          className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-sm transition-colors"
-        >
-          <X size={14} />
-        </button>
+        {/* Start/End 노드는 삭제 버튼 숨김 */}
+        {!(isStartNode || isEndNode) && (
+          <button
+            onClick={handleDelete}
+            className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-sm transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
       
       {/* 노드 아이콘 및 이름 표시 영역 */}
