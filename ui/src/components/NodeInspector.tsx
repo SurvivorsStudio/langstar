@@ -95,23 +95,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
     }
   };
 
-  const handleSave = () => {
-    if (currentNode) {
-      updateNodeData(nodeId, {
-        ...currentNode.data,
-        code,
-        label: nodeName.trim() || currentNode.data.label
-      });
-    }
-  };
-
-  const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this node?')) {
-      removeNode(nodeId);
-      onClose();
-    }
-  };
-
   if (!currentNode) return null;
 
   const isConditionNode = currentNode.type === 'conditionNode';
@@ -304,21 +287,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
             </div>
           </div>
         )}
-      </div>
-      
-      <div className="px-4 py-3 border-t border-gray-200 flex justify-between">
-        <button
-          onClick={handleDelete}
-          className="px-3 py-1.5 border border-red-300 text-red-600 rounded hover:bg-red-50 text-sm"
-        >
-          Delete
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-        >
-          Save Changes
-        </button>
       </div>
     </div>
   );
