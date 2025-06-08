@@ -17,6 +17,8 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const [isEditing, setIsEditing] = useState(false);
   // 편집 중인 노드 이름 상태
   const [nodeName, setNodeName] = useState(data.label);
+  // 재생 버튼 hover 상태 관리
+  const [isPlayHovered, setIsPlayHovered] = useState(false);
 
   // 노드 타입에 따른 플래그
   const isStartNode = type === 'startNode';
@@ -28,6 +30,12 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const groups: any[] = data.config?.groups || [];
   const memoryGroups = groups.filter((g: any) => g.type === 'memory');
   const toolsGroups = groups.filter((g: any) => g.type === 'tools');
+
+  // 노드에 입력(타겟)으로 연결된 엣지가 있는지 여부
+  const hasIncomingEdge = edges.some(edge => edge.target === id);
+
+  // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
+  const hasConnection = edges.some(edge => edge.source === id);
 
   /**
    * 조건 노드의 유효성 검사 상태를 계산합니다.
@@ -285,18 +293,39 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       <div className="absolute -top-2 -right-2 flex gap-2">
         {/* End 노드는 실행(재생) 버튼도 숨김 */}
         {!isGroupsNode && !isEndNode && (
-          <button
-            onClick={handleExecute}
-            disabled={isExecuting || (isConditionNode && hasValidationError)}
-            className="p-1 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={hasValidationError ? "Fix validation errors before executing" : "Execute Node"}
+          <div
+            className="relative overflow-visible"
+            onMouseEnter={() => setIsPlayHovered(true)}
+            onMouseLeave={() => setIsPlayHovered(false)}
           >
-            {isExecuting ? (
-              <Loader className="w-4 h-4 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4" />
+            <button
+              onClick={handleExecute}
+              disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
+              className={`p-1 rounded-full shadow-sm transition-colors disabled:cursor-not-allowed 
+                ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
+                  ? 'bg-gray-300 hover:bg-gray-400 text-white' 
+                  : 'bg-green-500 hover:bg-green-600 text-white'}`}
+              title={
+                !hasConnection
+                  ? '노드를 연결해주세요'
+                  : hasValidationError
+                    ? 'Fix validation errors before executing'
+                    : 'Execute Node'
+              }
+            >
+              {isExecuting ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 text-white" />
+              )}
+            </button>
+            {/* 비활성화 & hover 시 툴팁 */}
+            {!hasConnection && isPlayHovered && (
+              <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 text-white text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
+                Please connect the nodes
+              </div>
             )}
-          </button>
+          </div>
         )}
         {/* Start/End 노드는 삭제 버튼 숨김 */}
         {!(isStartNode || isEndNode) && (
