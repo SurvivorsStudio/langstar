@@ -100,6 +100,16 @@ const WorkspacePage: React.FC = () => {
       fetchAvailableWorkflows();
     } else if (activeMenu === 'ai-language' || activeMenu === 'ai-embedding') {
       fetchAIConnections();
+      // 폼과 선택된 항목 초기화
+      setSelectedAIConnectionId(null);
+      setAiConnectionForm({
+        name: '',
+        provider: 'OpenAI',
+        model: '',
+        apiKey: '',
+        temperature: 0.7,
+        maxTokens: 2048,
+      });
     }
   }, [activeMenu, fetchAvailableWorkflows, fetchAIConnections]);
 
