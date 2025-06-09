@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle, Pencil, Check } from 'lucide-react';
 
@@ -7,7 +7,18 @@ interface EmbeddingSettingsProps {
 }
 
 const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
-  const { nodes, edges, updateNodeData } = useFlowStore();
+  const {nodes, edges, updateNodeData, aiConnections, fetchAIConnections, } = useFlowStore(state => ({
+      nodes: state.nodes,
+      edges: state.edges,
+      updateNodeData: state.updateNodeData,
+      aiConnections: state.aiConnections,
+      fetchAIConnections: state.fetchAIConnections,
+      }));
+  // 컴포넌트 마운트 시 AI 연결 정보 로드
+  useEffect(() => {
+    fetchAIConnections();
+  }, [fetchAIConnections]);
+
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   const incomingEdge = edges.find(edge => edge.target === nodeId);
@@ -17,12 +28,10 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
   // Get available variables from source node output
   const availableVariables = hasValidOutput ? Object.keys(sourceOutput) : [];
 
-  // Mock embedding models - in a real app, this would come from your store or API
-  const mockEmbeddingModels = [
-    { id: '1', name: 'OpenAI Ada 002', provider: 'OpenAI', status: 'active' },
-    { id: '2', name: 'Cohere Embed', provider: 'Cohere', status: 'active' },
-    { id: '3', name: 'GTE-Large', provider: 'Hugging Face', status: 'active' }
-  ];
+  // store에서 가져온 AI 연결 중 embedding 모델(active)만 필터링
+  const mockEmbeddingModels = aiConnections.filter(
+      conn => conn.type === 'embedding' && conn.status === 'active'
+  );
 
   const handleModelChange = (value: string) => {
     updateNodeData(nodeId, {
@@ -140,9 +149,9 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
             <option value="">Select a model</option>
-            {mockEmbeddingModels.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name} ({model.provider})
+            {mockEmbeddingModels.map(conn => (
+              <option key={conn.id} value={conn.model}>
+                {conn.name} ({conn.provider})
               </option>
             ))}
           </select>

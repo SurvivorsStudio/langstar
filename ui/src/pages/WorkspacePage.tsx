@@ -78,7 +78,28 @@ const WorkspacePage: React.FC = () => {
     apiKey: '',
     temperature: 0.7,
     maxTokens: 2048,
+    status: 'draft' as 'active' | 'draft' | 'archived',  // ← 여기에 draft 기본값 추가
   });
+
+  //상태 값 관련
+  React.useEffect(() => {
+    // 기존에 저장된 연결을 편집할 때, 해당 데이터로 폼을 채워줍니다.
+    if (selectedAIConnectionId && selectedAIConnectionId !== 'new') {
+      const conn = aiConnections.find(c => c.id === selectedAIConnectionId);
+      if (conn) {
+        setAiConnectionForm({
+          name: conn.name,
+          provider: conn.provider,
+          model: conn.model,
+          apiKey: conn.apiKey || '',
+          temperature: conn.temperature ?? 0.7,
+          maxTokens: conn.maxTokens ?? 2048,
+          status: conn.status,  // ← 여기서 기존에 저장된 status 값을 폼에 반영
+        });
+      }
+    }
+  }, [selectedAIConnectionId, aiConnections]);
+
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({
     aiKeys: false
   });
@@ -109,6 +130,7 @@ const WorkspacePage: React.FC = () => {
         apiKey: '',
         temperature: 0.7,
         maxTokens: 2048,
+        status: 'draft' as 'active' | 'draft' | 'archived',
       });
     }
   }, [activeMenu, fetchAvailableWorkflows, fetchAIConnections]);
@@ -182,7 +204,7 @@ const WorkspacePage: React.FC = () => {
         apiKey: aiConnectionForm.apiKey,
         temperature: activeMenu === 'ai-language' ? finalTempValue : undefined,
         maxTokens: activeMenu === 'ai-language' ? finalMaxTokensValue : undefined,
-        status: 'active' as 'active', // 기본 상태
+        status: aiConnectionForm.status,
       };
 
       if (selectedAIConnectionId === 'new') {
@@ -198,7 +220,7 @@ const WorkspacePage: React.FC = () => {
   };
 
   const handleNewAIConnection = () => {
-    setAiConnectionForm({ name: '', provider: 'OpenAI', model: '', apiKey: '', temperature: 0.7, maxTokens: 2048 });
+    setAiConnectionForm({ name: '', provider: 'OpenAI', model: '', apiKey: '', temperature: 0.7, maxTokens: 2048, status: 'draft' as 'active' | 'draft' | 'archived', });
     setSelectedAIConnectionId('new');
   };
 

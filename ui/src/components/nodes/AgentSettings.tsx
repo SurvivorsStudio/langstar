@@ -1,38 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useFlowStore } from '../../store/flowStore';
 import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
-
+import { useFlowStore } from '../../store/flowStore';
 // Mock AI connections - in a real app, this would come from your store or API
-const mockAIConnections = [
-  {
-    id: '1',
-    name: 'OpenAI GPT-4',
-    provider: 'OpenAI',
-    model: 'gpt-4',
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Claude 3',
-    provider: 'Anthropic',
-    model: 'claude-3-opus',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Gemini Pro',
-    provider: 'Google',
-    model: 'gemini-pro',
-    status: 'active',
-  }
-];
 
 interface AgentSettingsProps {
   nodeId: string;
 }
 
 const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
-  const { nodes, edges, updateNodeData, getNodeById } = useFlowStore();
+  const {
+    nodes,
+    edges,
+    updateNodeData,
+    getNodeById,
+    aiConnections,
+    fetchAIConnections,
+  } = useFlowStore(state => ({
+    nodes: state.nodes,
+    edges: state.edges,
+    updateNodeData: state.updateNodeData,
+    getNodeById: state.getNodeById,
+    aiConnections: state.aiConnections,
+    fetchAIConnections: state.fetchAIConnections,
+  }));
+
   const node = nodes.find(n => n.id === nodeId);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -47,6 +38,11 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const DEFAULT_TOP_P = 1;
   const DEFAULT_TEMPERATURE = 0.7;
   const DEFAULT_MAX_TOKENS = 1000;
+
+  // 컴포넌트 마운트 시 한 번만: AI 연결 정보 로드
+  useEffect(() => {
+    fetchAIConnections();
+  }, [fetchAIConnections]);
 
   useEffect(() => {
     const incomingEdge = edges.find(edge => edge.target === nodeId);
@@ -226,7 +222,14 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   };
 
   // Filter active AI connections
-  const activeConnections = mockAIConnections.filter(conn => conn.status === 'active');
+  // 스토어에서 가져온 AI 연결 중 언어 모델(active)만 필터링
+  const activeConnections = aiConnections.filter(
+      conn => conn.type === 'language' && conn.status === 'active'
+  );
+
+  // 스토어에서 가져온 AI 연결 중 임베딩 모델(active)만 필터링
+  const activeEmbeddingConnections = aiConnections
+      .filter(conn => conn.type === 'embedding' && conn.status === 'active');
 
   return (
     <div className="space-y-6">
