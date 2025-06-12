@@ -99,6 +99,7 @@ export interface FlowState {
   deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
 
+  getWorkflowAsJSONString: () => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
   // AI Connections 관련 상태 및 함수
   aiConnections: AIConnection[];
   isLoadingAIConnections: boolean;
@@ -1169,6 +1170,34 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       console.error('FlowStore: Error opening DB for fetching AI connections list:', error);
     }
   },
+    getWorkflowAsJSONString: () => {
+    const { projectName, nodes, edges, viewport } = useFlowStore.getState();
+
+    // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
+    // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
+    const nodesToSave = nodes.map(node => {
+      const { icon, ...restOfData } = node.data;
+      return {
+        ...node,
+        data: restOfData,
+      };
+    });
+
+    const workflowData = {
+      projectName,
+      nodes: nodesToSave,
+      edges,
+      viewport,
+      lastModified: new Date().toISOString(),
+    };
+
+    try {
+      return JSON.stringify(workflowData, getCircularReplacer(), 2);
+    } catch (error) {
+      console.error("Error serializing workflow to JSON:", error);
+      return null;
+    }
+  },
 
   addAIConnection: async (connectionData: Omit<AIConnection, 'id' | 'lastModified'>) => {
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
@@ -1205,6 +1234,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+
+  
 
   updateAIConnection: async (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => {
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
@@ -1351,4 +1382,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+
+  
 }));
