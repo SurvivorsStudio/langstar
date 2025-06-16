@@ -394,6 +394,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       className: '',
       classType: 'TypedDict' as 'TypedDict',
       variables: []
+    } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
+      outputVariable: 'python_function_output',
+      // code는 newNode 생성 시 data에 직접 설정합니다.
     } : type === 'loopNode' ? {
       repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
@@ -412,12 +415,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       receiveKey: ''
     } : {};
 
+    // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
+    const initialNodeData = { ...data };
+    if (type === 'functionNode' && !initialNodeData.code) {
+      initialNodeData.code =
+        '# Write your Python code here\n' +
+        '# Input data from the previous node is in the `input_params` dictionary.\n' +
+        '# Example: value = input_params.get("some_key")\n' +
+        '# To return data, assign it to a dictionary named `result`.\n' +
+        '# This `result` dictionary will be the output of this node.\n' +
+        '# Example: result = {"my_custom_output": value * 2}\n' +
+        'result = {}';
+    }
+
     const newNode: Node<NodeData> = {
       id,
       type,
       position,
       data: {
-        ...data,
+        ...initialNodeData, // 기본 코드가 포함될 수 있는 initialNodeData 사용
         label: uniqueLabel,
         output: null,
         inputData: null, // inputData 초기화
@@ -681,9 +697,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             output = { error: 'Failed to connect to start node API', details: (apiError as Error).message };
           }
           break;
-        case 'functionNode':
-          output = { result: 'Function executed', input };
+        case 'functionNode': { // Custom Python Function Node
+          const pythonCode = node.data.code || '';
+          // config에서 outputVariable을 가져오거나 기본값을 사용합니다.
+          // addNode에서 기본값이 설정되므로, || 'python_function_output'는 추가적인 안전장치입니다.
+          const outputVariable = node.data.config?.outputVariable || 'python_function_output';
+
+          if (!pythonCode.trim()) {
+            output = { error: 'Python code is empty' };
+            break;
+          }
+
+          try {
+            const payload = {
+              py_code: pythonCode, // API가 'py_code' 키로 Python 코드를 받도록 변경
+              param: input,       // 이전 노드의 출력을 'param'으로 전송
+              return_key: outputVariable // 백엔드가 이 키를 사용하여 결과를 반환할 수 있음
+            };
+            const response = await fetch('http://localhost:8000/workflow/node/pythonnode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+            output = await response.json(); // API의 응답 전체를 output으로 사용
+          } catch (apiError) {
+            console.error('FunctionNode (Python API) call failed:', apiError);
+            output = { error: 'Failed to execute Python function via API', details: (apiError as Error).message };
+          }
           break;
+        }
         case 'agentNode': { // Node ID를 로그에 포함시키기 위해 nodeId 변수 사용
           console.log(`[AgentNode ${nodeId}] 실행 시작. 입력 데이터:`, JSON.parse(JSON.stringify(input || {})));
           const agentConfig = node.data.config || {};

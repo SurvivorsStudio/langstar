@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Dict, Any
 import datetime
 import uuid
+import ast
 
 app = FastAPI()
 
@@ -35,6 +36,35 @@ def prompt_node(data: PromptNodeInput):
     data.param[data.return_key] = rendered
     print( data.param )
     return data.param
+
+@app.post('/workflow/node/pythonnode')
+def prompt_node(msg: dict = Body(...)): 
+    python_code = msg['py_code'] 
+    param = msg.get("param", {})
+    
+    parsed = ast.parse(python_code)
+    func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
+    
+    if not func_def:
+        return {"error": "No function found in python_code."}
+
+    # 함수 이름 
+    function_name = func_def.name
+    # 인풋 리스트 ( 향후 사용 ) 
+    # param_names = [arg.arg for arg in func_def.args.args]
+
+    exec_globals = {}
+    
+    try:
+        # 사용자 코드를 실행하여 함수 정의
+        exec(python_code, exec_globals)
+        func = exec_globals[function_name]
+       
+        result = func(param)
+        return result
+    
+    except Exception as e:
+        return {"error": str(e)}
     
 
 @app.post('/workflow/node/startnode')
@@ -331,136 +361,139 @@ def react_to_python_langgraph(create_node_json) :
     python_code = class_state = create_state(result)
     python_code += """
     
-    def return_next_node( my_node, next_node_list, return_value  ):
-    
-        updates = {}
-        for next_node in next_node_list : 
-            next_name = next_node['node_name']
-            next_type = next_node['node_type']
-            
-            # merge node 
-            if next_type == 'mergeNode':
-                if next_name not in updates:
-                    updates[next_name] = {my_node : return_value}
-                else : 
-                    updates[next_name][my_node] = return_value
-                    
-            # 일반 노드 
+def return_next_node( my_node, next_node_list, return_value  ):
+
+    updates = {}
+    for next_node in next_node_list : 
+        next_name = next_node['node_name']
+        next_type = next_node['node_type']
+        
+        # merge node 
+        if next_type == 'mergeNode':
+            if next_name not in updates:
+                updates[next_name] = {my_node : return_value}
             else : 
-                if next_name not in updates:
-                    updates[next_name] = return_value
-                    
-        return updates
+                updates[next_name][my_node] = return_value
+                
+        # 일반 노드 
+        else : 
+            if next_name not in updates:
+                updates[next_name] = return_value
+                
+    return updates
     
     
     """
     
     start_node_code = """
+
+def node_**startNode**(state):
+    my_name = "**startNode**" 
+    node_name = my_name
+    node_config = my_name + "_Config"
+
+
+    # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config] 
+
+    # 다음 노드에 전달하는 값 
+    return_value = { **node_config['config'], **node_input } 
     
-    def node_**startNode**(state):
-        my_name = "**startNode**" 
-        node_name = my_name
-        node_config = my_name + "_Config"
+    # 전달하고자 하는 타겟 node 리스트 
+    next_node_list = node_config.get('next_node', []) 
+
     
-    
-        # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
-        state_dict  = state.model_dump()
-        node_input  = state_dict[my_name] 
-        node_config = state_dict[node_config] 
-    
-        # 다음 노드에 전달하는 값 
-        return_value = { **node_config['config'], **node_input } 
-        
-        # 전달하고자 하는 타겟 node 리스트 
-        next_node_list = node_config.get('next_node', []) 
-    
-        
-        return return_next_node( node_name, next_node_list, return_value ) 
+    return return_next_node( node_name, next_node_list, return_value ) 
         
     """
     
     prompt_node_code = """
     
-    def node_**promptNode**(state):
-        my_name = "**promptNode**" 
-        node_name = my_name
-        node_config = my_name + "_Config"
+def node_**promptNode**(state):
+    my_name = "**promptNode**" 
+    node_name = my_name
+    node_config = my_name + "_Config"
+
+    # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config]
     
-        # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
-        state_dict  = state.model_dump()
-        node_input  = state_dict[my_name] 
-        node_config = state_dict[node_config]
-        
-        # prompt 생성 
-        template = PromptTemplate(
-            template=node_config['config']['template'],
-            input_variables=list(node_input.keys())
-        )
+    # prompt 생성 
+    template = PromptTemplate(
+        template=node_config['config']['template'],
+        input_variables=list(node_input.keys())
+    )
+
+    prompt = template.format(**node_input)
+    output_value = node_config['outputVariable']
     
-        prompt = template.format(**node_input)
-        output_value = node_config['outputVariable']
-        
+
+    # 다음 노드에 전달하는 값 
+    return_value = node_input.copy() 
+    return_value.update( { output_value : prompt } ) 
+
+    # 전달하고자 하는 타겟 node 리스트 
+    next_node_list = node_config.get('next_node', []) 
     
-        # 다음 노드에 전달하는 값 
-        return_value = node_input.copy() 
-        return_value.update( { output_value : prompt } ) 
-    
-        # 전달하고자 하는 타겟 node 리스트 
-        next_node_list = node_config.get('next_node', []) 
-        
-        return return_next_node( node_name, next_node_list, return_value ) 
+    return return_next_node( node_name, next_node_list, return_value ) 
     
     """
     
     merge_node_code = """
     
-    def node_**mergeNode**(state):
-        my_name = "**mergeNode**" 
-        node_name = my_name
-        node_config = my_name + "_Config"
-    
-        # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
-        state_dict  = state.model_dump()
-        node_input  = state_dict[my_name] 
-        node_config = state_dict[node_config]
-    
-                    
-        # 다음 노드에 전달하는 값 
-        return_value = {} 
-        for key, value  in node_config['config'].items():
-            match_node  = value['node_name'] 
-            match_value = value['node_value'] 
-            return_value[key]  = node_input[match_node][match_value]
-    
-    
-        # 전달하고자 하는 타겟 node 리스트 
-        next_node_list = node_config.get('next_node', []) 
-    
-        return return_next_node( node_name, next_node_list, return_value )   
+def node_**mergeNode**(state):
+    my_name = "**mergeNode**" 
+    node_name = my_name
+    node_config = my_name + "_Config"
+
+    # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config]
+
+                
+    # 다음 노드에 전달하는 값 
+    return_value = {} 
+    for key, value  in node_config['config'].items():
+        match_node  = value['node_name'] 
+        match_value = value['node_value'] 
+        return_value[key]  = node_input[match_node][match_value]
+
+
+    # 전달하고자 하는 타겟 node 리스트 
+    next_node_list = node_config.get('next_node', []) 
+
+    return return_next_node( node_name, next_node_list, return_value )   
         
     """
     
     end_node_code = """
     
-    def node_**endNode**( state ) : 
-        my_name = "**endNode**" 
-        node_name = my_name
-        node_config = my_name + "_Config"
-    
-        # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
-        state_dict  = state.model_dump()
-        node_input  = state_dict[my_name] 
-        node_config = state_dict[node_config]['config']['receiveKey']
-    
-        # 다음 노드에 전달하는 값 
-        return_value = {} 
+def node_**endNode**( state ) : 
+    my_name = "**endNode**" 
+    node_name = my_name
+    node_config = my_name + "_Config"
+
+    # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config]['config']['receiveKey']
+
+    # 다음 노드에 전달하는 값 
+    return_value = {} 
+    if len(node_config) == 1 and node_config[0] == '': 
+        return_value = node_input
+    else : 
         for key in node_config: 
             return_value[key] = node_input[key] 
-    
-        # 결과값 전달
-        next_node_list = [ {'node_name': 'response', 'node_type': 'responseNode'} ]
-            
-        return return_next_node( node_name, next_node_list, return_value ) 
+
+    # 결과값 전달
+    next_node_list = [ {'node_name': 'response', 'node_type': 'responseNode'} ]
+        
+    return return_next_node( node_name, next_node_list, return_value ) 
 
     """
 
