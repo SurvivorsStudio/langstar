@@ -1,5 +1,5 @@
 import React, { memo, useState } from 'react';
-import { EdgeProps, getBezierPath } from 'reactflow';
+import { EdgeProps, getBezierPath, EdgeLabelRenderer } from 'reactflow';
 import { ChevronRight, X, Trash2 } from 'lucide-react';
 import OutputInspector from '../OutputInspector';
 import { useFlowStore } from '../../store/flowStore';
@@ -25,7 +25,7 @@ const CustomEdge = ({
   const centerX = (sourceX + targetX) / 2;
   const centerY = (sourceY + targetY) / 2;
 
-  const [edgePath] = getBezierPath({
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -33,6 +33,9 @@ const CustomEdge = ({
     targetY,
     targetPosition,
   });
+
+  const conditionDescription = data?.conditionDescription;
+  const isConditionEdge = sourceNode?.type === 'conditionNode';
 
   const output = data?.output || 'No output yet';
   const outputPreview = typeof output === 'object' ? JSON.stringify(output, null, 2) : String(output);
@@ -72,6 +75,28 @@ const CustomEdge = ({
         markerEnd="url(#arrow)"
       />
 
+      {isConditionEdge && conditionDescription && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY - 35}px)`, // Y 위치 조정
+              background: 'rgba(239, 246, 255, 0.9)', // Tailwind blue-50 with opacity
+              padding: '3px 8px',
+              borderRadius: '12px',
+              fontSize: '10px',
+              fontWeight: 600, // semibold
+              color: '#1e40af', // Tailwind blue-800
+              border: '1px solid rgba(219, 234, 254, 0.9)', // Tailwind blue-200 with opacity
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+            }}
+            className="nodrag nopan"
+          >
+            {conditionDescription}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+
       <foreignObject
         width={200}
         height={100}
@@ -101,10 +126,6 @@ const CustomEdge = ({
             className="bg-white shadow-md rounded-md p-2 text-xs border border-gray-200 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setShowInspector(true)}
           >
-            <div className="font-medium text-gray-700 mb-1 flex items-center justify-between">
-              <span>Output</span>
-              <ChevronRight size={14} className="text-gray-400" />
-            </div>
             <pre className="text-gray-600 whitespace-pre-wrap break-words">
               {outputPreview.length > 200 ? outputPreview.slice(0, 200) + '...' : outputPreview}
             </pre>

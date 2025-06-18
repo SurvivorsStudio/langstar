@@ -37,28 +37,56 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
   const hasConnection = edges.some(edge => edge.source === id);
 
+  // ConditionSettings.tsx의 getConditionTextFromLabel와 유사한 로직
+  // 실제 프로덕션에서는 이 함수를 유틸리티로 분리하여 공유하는 것이 좋습니다.
+  const getConditionTextFromEdgeLabel = (label: string = ''): string => {
+    const match = label.match(/^(if|elif|else)\s+(.*)/i); // "if condition", "elif condition"
+    if (match && match[2]) {
+      return match[2]; // condition_text 부분
+    }
+    if (label.toLowerCase() === 'else') {
+      return ''; // 'else'는 조건 텍스트가 없음
+    }
+    // 접두사(if, elif)가 있지만 공백이 없는 레거시 또는 직접 입력 케이스 처리
+    if (label.toLowerCase().startsWith('if ')) return label.substring(3);
+    if (label.toLowerCase().startsWith('elif ')) return label.substring(5);
+    
+    // 위 패턴에 해당하지 않으면, 전체를 조건 텍스트로 간주 (예: className['value'] > 10)
+    return label;
+  };
+
   /**
    * 조건 노드의 유효성 검사 상태를 계산합니다.
    * 시작 노드의 className을 기반으로 조건문의 형식을 검사합니다.
    * @returns {boolean} 유효성 에러가 있으면 true, 그렇지 않으면 false.
    */
   const hasValidationError = React.useMemo(() => {
-    // 조건 노드가 아니면 유효성 검사를 수행하지 않음
     if (!isConditionNode) return false;
 
-    // 시작 노드를 찾아 className 가져오기
     const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || '';
-
-    // 현재 노드에서 나가는 엣지(연결선) 필터링
     const nodeEdges = edges.filter(edge => edge.source === id);
 
-    // 각 엣지의 레이블(조건문)이 올바른 형식인지 검사
+    if (nodeEdges.length === 0) return false; // 연결된 엣지가 없으면 에러 아님
+
+    // className이 정의되지 않았고, 조건 엣지가 있다면 에러
+    // (ConditionSettings.tsx의 validateCondition 첫 번째 검사와 유사)
+    if (!className) {
+      return true; 
+    }
+
     return nodeEdges.some(edge => {
-      const condition = edge.data?.label || '';
-      // 정규 표현식: className['property_name'] 형식
-      const conditionRegex = new RegExp(`^${className}\\['[\\w_]+'\\]`);
-      return !conditionRegex.test(condition);
+      const fullLabel = edge.data?.label || '';
+      if (fullLabel.toLowerCase().trim() === 'else') {
+        return false; // 'else' 조건은 형식 검사에서 제외 (항상 유효)
+      }
+      const conditionText = getConditionTextFromEdgeLabel(fullLabel);
+      
+      // 순수 조건 텍스트가 비어있다면 (예: "if "만 있고 실제 조건이 없는 경우) 유효하지 않음
+      if (!conditionText.trim()) return true; 
+
+      const conditionRegex = new RegExp(`^${className}\\['[\\w_]+'\\]`); // className['propertyName'] 형식 검사
+      return !conditionRegex.test(conditionText); // 패턴에 맞지 않으면 true (에러)
     });
   }, [isConditionNode, id, nodes, edges]);
   /**

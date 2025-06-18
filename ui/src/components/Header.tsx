@@ -110,10 +110,10 @@ const Header: React.FC = () => {
             }
           }}
           className="hidden sm:flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm"
-          title="Export Workflow as JSON"
+          title="Export Workflow as Python"
         >
           <FileJson className="h-4 w-4 mr-1" />
-          Export JSON
+          Export Python
         </button>
         <button
           onClick={async () => {
