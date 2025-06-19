@@ -1,5 +1,3 @@
-
-
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.prompts import PromptTemplate
@@ -8,8 +6,50 @@ from typing import Dict, Any
 import datetime
 import uuid
 import ast
+import signal
+import sys
+import os
+from contextlib import asynccontextmanager
+import logging
+
+# 커스텀 로거 설정
+class ColoredFormatter(logging.Formatter):
+    """에러 시 색상을 변경하는 커스텀 포매터"""
+    
+    COLORS = {
+        'ERROR': '\033[91m',    # 빨간색
+        'WARNING': '\033[93m',  # 노란색
+        'INFO': '\033[92m',     # 초록색
+        'DEBUG': '\033[94m',    # 파란색
+        'RESET': '\033[0m'      # 리셋
+    }
+    
+    def format(self, record):
+        # 에러 레벨에 따라 색상 적용
+        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        record.levelname = f"{color}{record.levelname}{self.COLORS['RESET']}"
+        return super().format(record)
+
+# 로거 설정
+logger = logging.getLogger("uvicorn")
+handler = logging.StreamHandler()
+handler.setFormatter(ColoredFormatter('%(levelname)s: %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 app = FastAPI()
+
+# 안전한 종료를 위한 시그널 핸들러
+def signal_handler(signum, frame):
+    print("\n" + "="*50)
+    print("🛑 Shutting down server safely...")
+    print("="*50)
+    # sys.exit(0) 대신 os._exit(0) 사용하여 깔끔하게 종료
+    os._exit(0)
+
+# SIGINT (Ctrl+C)와 SIGTERM 시그널 등록
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,6 +58,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 앱 시작 시 즉시 실행되는 메시지
+sys.stdout.write("\n" + "="*60 + "\n")
+sys.stdout.write("🚀 LangStar server has started!\n")
+sys.stdout.write("="*60 + "\n\n")
+sys.stdout.flush()
 
 class PromptNodeInput(BaseModel):
     prompt: str
