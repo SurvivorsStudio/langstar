@@ -2,17 +2,38 @@
     "name": "langstar-root",
     "private": true,
     "scripts": {
+        "dev": "npm run langstar-dev",
         "langstar-dev": "run-script-os",
-        "langstar-dev:win32": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
-        "langstar-dev:darwin": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
-        "langstar-dev:linux": "concurrently \"npm run dev --prefix ui\" \"uvicorn server.app:app --reload\"",
+        "langstar-dev:win32": "scripts\\dev.bat",
+        "langstar-dev:darwin": "chmod +x scripts/dev.sh && scripts/dev.sh",
+        "langstar-dev:linux": "chmod +x scripts/dev.sh && scripts/dev.sh",
         "install": "run-script-os",
-        "install:win32": "concurrently \"cd ui && npm install\" \"pip install -r server/requirements.txt\"",
-        "install:darwin": "concurrently \"npm install --prefix ui\" \"pip install -r server/requirements.txt\"",
-        "install:linux": "concurrently \"npm install --prefix ui\" \"pip install -r server/requirements.txt\""
+        "install:win32": "concurrently \"cd ui && npm install\" \"npm run setup-python:win32\"",
+        "install:darwin": "concurrently \"npm install --prefix ui\" \"npm run setup-python:darwin\"",
+        "install:linux": "concurrently \"npm install --prefix ui\" \"npm run setup-python:linux\"",
+        "setup-python:win32": "scripts\\setup-python.bat",
+        "setup-python:darwin": "chmod +x scripts/setup-python.sh && scripts/setup-python.sh",
+        "setup-python:linux": "chmod +x scripts/setup-python.sh && scripts/setup-python.sh",
+        "server-dev": "run-script-os",
+        "server-dev:win32": "server\\venv\\Scripts\\activate && uvicorn server.app:app --reload",
+        "server-dev:darwin": "source server/venv/bin/activate && uvicorn server.app:app --reload",
+        "server-dev:linux": "source server/venv/bin/activate && uvicorn server.app:app --reload",
+        "check-python": "python3.12 --version",
+        "stop-dev": "run-script-os",
+        "stop-dev:win32": "taskkill /F /IM node.exe /T && taskkill /F /IM python.exe /T",
+        "stop-dev:darwin": "pkill -f \"uvicorn server.app:app\" && pkill -f \"vite\" && pkill -f \"node.*dev\"",
+        "stop-dev:linux": "pkill -f \"uvicorn server.app:app\" && pkill -f \"vite\" && pkill -f \"node.*dev\"",
+        "clean-ports": "run-script-os",
+        "clean-ports:win32": "netstat -ano | findstr :8000 && netstat -ano | findstr :5173",
+        "clean-ports:darwin": "lsof -ti:8000 | xargs kill -9 2>/dev/null || true && lsof -ti:5173 | xargs kill -9 2>/dev/null || true",
+        "clean-ports:linux": "lsof -ti:8000 | xargs kill -9 2>/dev/null || true && lsof -ti:5173 | xargs kill -9 2>/dev/null || true"
     },
     "devDependencies": {
         "concurrently": "^8.2.0",
         "run-script-os": "^1.1.6"
+    },
+    "engines": {
+        "node": ">=16.0.0",
+        "python": ">=3.11.0"
     }
 }
