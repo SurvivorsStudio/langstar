@@ -42,7 +42,7 @@ app = FastAPI()
 # 안전한 종료를 위한 시그널 핸들러
 def signal_handler(signum, frame):
     print("\n" + "="*50)
-    print("🛑 Shutting down server safely...")
+    print("Shutting down server safely...")
     print("="*50)
     # sys.exit(0) 대신 os._exit(0) 사용하여 깔끔하게 종료
     os._exit(0)
@@ -61,7 +61,7 @@ app.add_middleware(
 
 # 앱 시작 시 즉시 실행되는 메시지
 sys.stdout.write("\n" + "="*60 + "\n")
-sys.stdout.write("🚀 LangStar server has started!\n")
+sys.stdout.write("LangStar server has started!\n")
 sys.stdout.write("="*60 + "\n\n")
 sys.stdout.flush()
 
