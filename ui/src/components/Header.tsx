@@ -21,17 +21,9 @@ const Header: React.FC = () => {
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
   const [editableModalContent, setEditableModalContent] = useState<string>('');
 
-
   return (
     <header className="bg-white border-b border-gray-200 py-2 px-4 flex items-center justify-between shadow-sm">
       <div className="flex items-center">
-        <button
-          onClick={() => navigate('/admin')}
-          className="mr-4 p-1.5 text-gray-600 hover:bg-gray-100 rounded-md flex items-center"
-          title="Back to Admin"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center text-white mr-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
