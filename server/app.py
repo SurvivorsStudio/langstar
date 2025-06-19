@@ -219,6 +219,7 @@ def agent_node(msg: dict = Body(...)):
 #####################################
 import textwrap
 import ast 
+import re
 
 def create_state(config_json) : 
     code_lines = [
@@ -272,6 +273,96 @@ def create_function_node(function_name, py_code, func_exec):
     
 """
     return function_node_code.strip()
+
+
+
+
+def create_branch( function_name, condition_config ) :
+
+    tmp_function_name = "tmp_" + function_name
+
+    tmp_param = re.search(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\[", condition_config[0]['condition'])
+    tmp_param = tmp_param.group(1)
+
+    code = f"def {tmp_function_name}({tmp_param}) :"
+    for row in condition_config : 
+        # print( row ) 
+        condition = row['condition']
+        description = row['description']
+        
+        code += f"""
+    {condition} : 
+        return "{description}"
+"""
+    # print( code )
+    indented_code = textwrap.indent(code, "    ")
+    # print( indented_code ) 
+
+    function_node_code = f"""
+    
+def node_branch_{function_name}(state):
+    my_name = "{function_name}"
+    node_name = my_name
+    node_config = my_name + "_Config"
+
+    state_dict  = state.model_dump()
+
+{indented_code}
+
+    # 함수 실행
+    input_param = state_dict[node_name] 
+    return {tmp_function_name}( input_param ) 
+    
+"""
+    
+    return function_node_code 
+    
+    
+
+
+
+def create_condition_node( function_name, condition_config ) :
+
+    tmp_function_name = "tmp_" + function_name
+
+    tmp_param = re.search(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\[", condition_config[0]['condition'])
+    tmp_param = tmp_param.group(1)
+
+    code = f"def {tmp_function_name}({tmp_param}) :"
+    for row in condition_config : 
+        # print( row ) 
+        condition = row['condition']
+        next_node_list   = row['next_node']
+        
+        code += f"""
+    {condition} : 
+        return return_next_node( node_name, {next_node_list}, {tmp_param} ) 
+"""
+
+    
+    indented_code = textwrap.indent(code, "    ")
+    
+    
+    function_node_code = f"""
+    
+def node_{function_name}(state):
+    my_name = "{function_name}"
+    node_name = my_name
+    
+
+    state_dict  = state.model_dump()
+
+{indented_code}
+
+    # 함수 실행
+    input_param = state_dict[node_name] 
+    return {tmp_function_name}( input_param ) 
+    
+"""
+    
+    return function_node_code 
+    
+    
         
     
 
@@ -401,6 +492,32 @@ def react_to_python_langgraph(create_node_json) :
             temp_config[config_id]['node_name'] = node_name
 
             
+            result.append( temp_config.copy() )
+            result.append( {node_name : {}} ) 
+
+        elif node['type'] == 'conditionNode': 
+            node_id   = node['id']
+            node_type = node['type']
+            node_name = node['data']['label']
+            
+            conditions_config_list = node['data']['config']['conditions']
+
+            config_id = node_name + "_Config"
+
+            temp_config = {}
+            temp_config[config_id] = { 'config' : [] } 
+            
+            for row in conditions_config_list : 
+                temp_config[config_id]['config'].append( { 
+                    'targetNodeLabel' :  row['targetNodeLabel'] ,
+                    'condition'       :  row['condition'] ,
+                    'description'     :  row['description']
+                } ) 
+
+            temp_config[config_id]['node_type'] = node_type
+            temp_config[config_id]['next_node'] = edge_relation[node_name]
+            temp_config[config_id]['node_name'] = node_name
+
             result.append( temp_config.copy() )
             result.append( {node_name : {}} ) 
 
@@ -555,6 +672,15 @@ def node_**endNode**( state ) :
             func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
             function_name = func_def.name            
             python_code += create_function_node(node_name, py_code, function_name) + "\n" + "\n"
+
+        elif node['type'] == 'conditionNode': 
+            # 분기 node는 노드가 아님 (엣지에 가까움 ) 
+            condition_config = []
+            for row in  node['data']['config']['conditions'] :
+                row['next_node'] = [node_id_to_node_label[row['targetNodeId']]]
+                condition_config.append( row  )
+            python_code += create_branch( node_name, condition_config )
+            python_code += create_condition_node( node_name, condition_config )
         
 
 
@@ -581,6 +707,19 @@ def node_**endNode**( state ) :
         elif node['type'] == 'functionNode': 
             python_code += tmp_create_node.replace( "**tmp_node**", node_name ) 
 
+        elif node['type'] == 'conditionNode': 
+            # 노드 생성
+            python_code += tmp_create_node.replace( "**tmp_node**", node_name ) 
+
+            # 노드 연결
+            node_branch = {} 
+            for condition_config in node['data']['config']['conditions'] : 
+                key   = condition_config['description'] 
+                value = "_" + condition_config['targetNodeLabel']
+                node_branch[key] = value
+            node_branch = str(node_branch)
+            python_code += f"""graph.add_conditional_edges("_{node_name}", node_branch_{node_name}, {node_branch}  )""" 
+
 
     python_code += "\n"
     
@@ -595,11 +734,15 @@ def node_**endNode**( state ) :
                 python_code += """graph.add_edge(START, "_**tmp_node**")\n""".replace( "**tmp_node**", source_node_name) 
                 cnt = 1
             python_code += """graph.add_edge("_**source**", "_**target**")\n""".replace( "**source**", source_node_name ).replace( "**target**", target_node_name) 
+
+        elif node_id_to_node_label[source_node_id]['node_type'] == 'conditionNode' : 
+            # 엣지 생성은 노드에서 미리 사전에 생성함 
+            pass 
             
         else : 
             python_code += """graph.add_edge("_**source**", "_**target**")\n""".replace( "**source**", source_node_name ).replace( "**target**", target_node_name) 
     
-    
+    # 엔드 노드를 찾아서 마무리로 한번 더 연결
     for node in create_node_json['edges'] : 
         source_node_id = node['source']
         target_node_id = node['target']
