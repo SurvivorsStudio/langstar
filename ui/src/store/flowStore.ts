@@ -77,9 +77,11 @@ export interface FlowState {
   getNodeById: (nodeId: string) => Node<NodeData> | undefined;
   setNodeOutput: (nodeId: string, output: any) => void;
   setEdgeOutput: (edgeId: string, output: any) => void;
-  executeNode: (nodeId: string, chatId?: string) => Promise<void>; // chatId 파라미터 추가
+  executeNode: (nodeId: string, chatId?: string) => Promise<void>;
+  updateEdgeLabel: (edgeId: string, label: string) => void; // 추가
+  updateEdgeDescription: (edgeId: string, description: string) => void; // 추가
+  updateEdgeData: (edgeId: string, data: Partial<Edge['data']>) => void; // 엣지 데이터 업데이트 통합
   setNodeExecuting: (nodeId: string, isExecuting: boolean) => void;
-  updateEdgeLabel: (edgeId: string, label: string) => void;
   runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
@@ -99,6 +101,7 @@ export interface FlowState {
   deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
 
+  getWorkflowAsJSONString: () => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
   // AI Connections 관련 상태 및 함수
   aiConnections: AIConnection[];
   isLoadingAIConnections: boolean;
@@ -270,17 +273,50 @@ const processPromptTemplate = (template: string, input: Record<string, any>, out
   return output;
 };
 
-const evaluateCondition = (condition: string, input: Record<string, any>, className: string): boolean => {
+// Helper to prepare a condition string from an edge label for evaluation
+const prepareConditionForEvaluation = (edgeLabel: string | undefined, defaultArgumentName: string): { body: string } => {
+  const label = (edgeLabel || '').trim();
+  const lowerLabel = label.toLowerCase();
+
+  if (lowerLabel === 'else') {
+    return { body: 'return true;' };
+  }
+
+  let coreCondition = label;
+  if (lowerLabel.startsWith('if ')) {
+    coreCondition = label.substring(3).trim();
+  } else if (lowerLabel.startsWith('elif ')) {
+    coreCondition = label.substring(5).trim();
+  }
+
+  // If, after stripping, coreCondition is empty (e.g. "if " was the label), it's an invalid if/elif.
+  if (!coreCondition && (lowerLabel.startsWith('if ') || lowerLabel.startsWith('elif '))) {
+    console.warn(`Invalid condition: Label "${edgeLabel}" is an if/elif without an expression. Evaluating as false.`);
+    return { body: 'return false;' };
+  }
+  // If coreCondition is still empty (e.g. label was empty or just "if" without space), evaluate as false.
+  if (!coreCondition) {
+    console.warn(`Invalid condition: Label "${edgeLabel}" is empty or invalid. Evaluating as false.`);
+    return { body: 'return false;' };
+  }
+
+  // At this point, coreCondition is the expression part, e.g., "data['value'] > 0"
+  // The condition string must use the 'defaultArgumentName' for the input object.
+  return { body: `return ${coreCondition};` };
+};
+
+const evaluateCondition = (conditionBody: string, input: Record<string, any>, argumentName: string): boolean => {
   try {
-    const context = { [className]: input };
-    const evalFunction = new Function(className, `return ${condition};`);
+    // argumentName is the name of the first argument to the function (e.g., 'data').
+    // input is the value for that argument.
+    // conditionBody is the string of code to execute (e.g., "return data['value'] > 10;").
+    const evalFunction = new Function(argumentName, conditionBody);
     return evalFunction.call(null, input);
   } catch (error) {
-    console.error('Error evaluating condition:', error);
+    console.error(`Error evaluating condition body: "${conditionBody}" with argumentName "${argumentName}"`, error);
     return false;
   }
 };
-
 const generateEmbedding = (input: Record<string, any>, config: NodeData['config']): Record<string, any> => {
   if (!config?.inputColumn || !config?.outputColumn) {
     throw new Error('Input and output columns must be specified');
@@ -367,23 +403,31 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
   
   onConnect: (connection: Connection) => {
-    const sourceNode = get().nodes.find(node => node.id === connection.source);
+    const { nodes, edges } = get(); // Get current nodes and edges
+    const sourceNode = nodes.find(node => node.id === connection.source);
     const isConditionNode = sourceNode?.type === 'conditionNode';
-    const startNode = get().nodes.find(node => node.type === 'startNode');
+    const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || 'data';
+
+    let edgeData: any = { output: null };
+
+    if (isConditionNode) {
+      // Count existing outgoing edges from this source before adding the new one
+      const existingSourceEdgesCount = edges.filter(e => e.source === connection.source).length;
+      edgeData.label = `if ${className}['value'] > 0`; // Default 'if' condition label
+      edgeData.conditionOrderIndex = existingSourceEdgesCount; // 초기 순서 인덱스 설정
+      edgeData.conditionDescription = `Rule #${existingSourceEdgesCount + 1}`; // Default rule description
+    }
     
     set({
       edges: addEdge({ 
         ...connection, 
         animated: true,
-        data: { 
-          output: null,
-          label: isConditionNode ? `${className}['value'] > 0` : undefined
-        }
-      }, get().edges),
+        data: edgeData
+      }, edges), // Use the initially fetched edges
     });
   },
-  
+
   setProjectName: (name: string) => set({ projectName: name }),
   
   addNode: ({ type, position, data }) => {
@@ -393,6 +437,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       className: '',
       classType: 'TypedDict' as 'TypedDict',
       variables: []
+    } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
+      outputVariable: 'python_function_output',
+      // code는 newNode 생성 시 data에 직접 설정합니다.
     } : type === 'loopNode' ? {
       repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
@@ -411,12 +458,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       receiveKey: ''
     } : {};
 
+    // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
+    const initialNodeData = { ...data };
+    if (type === 'functionNode' && !initialNodeData.code) {
+      initialNodeData.code =
+        '# Write your Python code here\n' +
+        '# Input data from the previous node is in the `input_params` dictionary.\n' +
+        '# Example: value = input_params.get("some_key")\n' +
+        '# To return data, assign it to a dictionary named `result`.\n' +
+        '# This `result` dictionary will be the output of this node.\n' +
+        '# Example: result = {"my_custom_output": value * 2}\n' +
+        'result = {}';
+    }
+
     const newNode: Node<NodeData> = {
       id,
       type,
       position,
       data: {
-        ...data,
+        ...initialNodeData, // 기본 코드가 포함될 수 있는 initialNodeData 사용
         label: uniqueLabel,
         output: null,
         inputData: null, // inputData 초기화
@@ -547,15 +607,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         if (edge.source === nodeId) {
           const sourceNode = state.nodes.find(n => n.id === nodeId);
           if (sourceNode?.type === 'conditionNode') {
-            const condition = edge.data?.label || '';
-            const startNode = state.nodes.find(node => node.type === 'startNode');
-            const className = startNode?.data.config?.className || 'data';
-            const isTrue = evaluateCondition(condition, output, className);
-            return {
-              ...edge,
-              data: { ...edge.data, output: isTrue ? output : null }
-            };
+            // For edges originating from a ConditionNode, their `data.output`
+            // is already correctly set by the ConditionNode's execution logic
+            // (which uses `setEdgeOutput`). We must not overwrite it here.
+            // Therefore, we return the edge as is.
+            return edge;
           }
+          // For other node types, propagate the node's output to the edge's data.output
           return {
             ...edge,
             data: { ...edge.data, output }
@@ -599,12 +657,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   updateEdgeLabel: (edgeId: string, label: string) => {
+    get().updateEdgeData(edgeId, { label });
+  },
+
+  updateEdgeDescription: (edgeId: string, description: string) => {
+    get().updateEdgeData(edgeId, { conditionDescription: description });
+  },
+
+  updateEdgeData: (edgeId: string, dataToUpdate: Partial<Edge['data']>) => {
     set({
       edges: get().edges.map((edge) => {
         if (edge.id === edgeId) {
           return {
             ...edge,
-            data: { ...edge.data, label }
+            data: { ...edge.data, ...dataToUpdate }
           };
         }
         return edge;
@@ -680,9 +746,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             output = { error: 'Failed to connect to start node API', details: (apiError as Error).message };
           }
           break;
-        case 'functionNode':
-          output = { result: 'Function executed', input };
+        case 'functionNode': { // Custom Python Function Node
+          const pythonCode = node.data.code || '';
+          // config에서 outputVariable을 가져오거나 기본값을 사용합니다.
+          // addNode에서 기본값이 설정되므로, || 'python_function_output'는 추가적인 안전장치입니다.
+          const outputVariable = node.data.config?.outputVariable || 'python_function_output';
+
+          if (!pythonCode.trim()) {
+            output = { error: 'Python code is empty' };
+            break;
+          }
+
+          try {
+            const payload = {
+              py_code: pythonCode, // API가 'py_code' 키로 Python 코드를 받도록 변경
+              param: input,       // 이전 노드의 출력을 'param'으로 전송
+              return_key: outputVariable // 백엔드가 이 키를 사용하여 결과를 반환할 수 있음
+            };
+            const response = await fetch('http://localhost:8000/workflow/node/pythonnode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+            output = await response.json(); // API의 응답 전체를 output으로 사용
+          } catch (apiError) {
+            console.error('FunctionNode (Python API) call failed:', apiError);
+            output = { error: 'Failed to execute Python function via API', details: (apiError as Error).message };
+          }
           break;
+        }
         case 'agentNode': { // Node ID를 로그에 포함시키기 위해 nodeId 변수 사용
           console.log(`[AgentNode ${nodeId}] 실행 시작. 입력 데이터:`, JSON.parse(JSON.stringify(input || {})));
           const agentConfig = node.data.config || {};
@@ -877,21 +973,47 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           break;
         }
         case 'conditionNode': {
-          const edges = get().edges.filter(edge => edge.source === nodeId);
-          output = input;
+          const allOutgoingEdges = get().edges.filter(edge => edge.source === nodeId);
+          
+          // conditionOrderIndex를 기준으로 엣지 정렬
+          // conditionOrderIndex가 없는 경우를 대비해 기본값(Infinity) 사용
+          const sortedEdges = [...allOutgoingEdges].sort((a, b) => {
+            const orderA = a.data?.conditionOrderIndex ?? Infinity;
+            const orderB = b.data?.conditionOrderIndex ?? Infinity;
+            if (orderA !== orderB) {
+              return orderA - orderB;
+            }
+            // conditionOrderIndex가 같으면 id로 정렬하여 일관성 유지
+            return a.id.localeCompare(b.id);
+          });
+
+          let conditionMetInChain = false; // 해당 조건 체인에서 이미 참인 조건이 발생했는지 여부
+          const inputForBranch = input; // 조건 노드로 들어온 입력값
           
           const startNode = get().nodes.find(node => node.type === 'startNode');
-          const className = startNode?.data.config?.className || 'data';
+          const argumentNameForEval = startNode?.data.config?.className || 'data';
           
-          edges.forEach(edge => {
-            const condition = edge.data?.label || '';
-            const isTrue = evaluateCondition(condition, input, className);
+          for (const edge of sortedEdges) {
+            if (conditionMetInChain) {
+              // 이미 이 체인에서 참인 조건이 발생했으므로, 현재 엣지 및 이후 엣지들은 
+              // 평가하지 않고 output을 null로 설정합니다.
+              get().setEdgeOutput(edge.id, null);
+              continue;
+            }
+
+            // 아직 참인 조건을 만나지 못했으므로, 현재 엣지의 조건을 평가합니다.
+            const { body: conditionBodyForEval } = prepareConditionForEvaluation(edge.data?.label, argumentNameForEval);
+            const isTrue = evaluateCondition(conditionBodyForEval, inputForBranch, argumentNameForEval);
+            
             if (isTrue) {
-              get().setEdgeOutput(edge.id, input);
+              get().setEdgeOutput(edge.id, inputForBranch);
+              conditionMetInChain = true; // 참인 조건을 만났음을 표시
             } else {
               get().setEdgeOutput(edge.id, null);
             }
-          });
+          }
+          // ConditionNode 자체의 output은 들어온 input 그대로 설정하거나, 특별한 의미를 부여할 수 있음
+          output = input; 
           break;
         }
         case 'loopNode':
@@ -1169,6 +1291,61 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       console.error('FlowStore: Error opening DB for fetching AI connections list:', error);
     }
   },
+    getWorkflowAsJSONString: () => {
+    const { projectName, nodes, edges, viewport } = useFlowStore.getState();
+
+    // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
+    // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
+    const nodesToSave = nodes.map(currentNode => {
+      const { icon, ...restOfNodeData } = currentNode.data; // 노드의 data 필드 (icon 제외)
+      let finalNodeData = { ...restOfNodeData }; // 최종적으로 노드에 저장될 data 객체
+
+      // 만약 현재 노드가 conditionNode 타입이라면, config에 조건 정보를 추가합니다.
+      if (currentNode.type === 'conditionNode') {
+        const outgoingEdges = edges
+          .filter(edge => edge.source === currentNode.id)
+          .sort((a, b) => (a.data?.conditionOrderIndex ?? Infinity) - (b.data?.conditionOrderIndex ?? Infinity));
+
+        const conditionsSummary = outgoingEdges.map(edge => {
+          const targetNode = nodes.find(n => n.id === edge.target);
+          return {
+            edgeId: edge.id,
+            targetNodeId: edge.target,
+            targetNodeLabel: targetNode?.data.label || edge.target,
+            condition: edge.data?.label, // 예: "if data['value'] > 0", "else"
+            description: edge.data?.conditionDescription, // 예: "Rule #1"
+            orderIndex: edge.data?.conditionOrderIndex,
+          };
+        });
+
+        // 기존 config를 유지하면서 conditions 배열을 추가합니다.
+        finalNodeData.config = {
+          ...(finalNodeData.config || {}), // 기존 config 내용 보존
+          conditions: conditionsSummary,   // 조건 요약 정보 추가
+        };
+      }
+
+      return {
+        ...currentNode, // 노드의 나머지 속성들 (id, type, position 등)
+        data: finalNodeData, // 처리된 data 객체 할당
+      };
+    });
+
+    const workflowData = {
+      projectName,
+      nodes: nodesToSave,
+      edges,
+      viewport,
+      lastModified: new Date().toISOString(),
+    };
+
+    try {
+      return JSON.stringify(workflowData, getCircularReplacer(), 2);
+    } catch (error) {
+      console.error("Error serializing workflow to JSON:", error);
+      return null;
+    }
+  },
 
   addAIConnection: async (connectionData: Omit<AIConnection, 'id' | 'lastModified'>) => {
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
@@ -1205,6 +1382,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+
+  
 
   updateAIConnection: async (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => {
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
@@ -1351,4 +1530,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+
+  
 }));
