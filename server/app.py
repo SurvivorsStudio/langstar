@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel
 from typing import Dict, Any
-import datetime
+from datetime import datetime, timedelta
 import uuid
 import ast
 import signal
@@ -65,6 +65,11 @@ sys.stdout.write("LangStar server has started!\n")
 sys.stdout.write("="*60 + "\n\n")
 sys.stdout.flush()
 
+# 헬스 체크 엔드포인트
+@app.get('/health')
+def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 class PromptNodeInput(BaseModel):
     prompt: str
     param: Dict[str, Any]
@@ -125,11 +130,6 @@ def start_node(msg: dict = Body(...)):  # msg를 dict로 받음
 
 ##########################################################
 
-from fastapi import FastAPI, Body
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, Any
-
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
@@ -137,9 +137,7 @@ from langchain_aws import ChatBedrockConverse
 from langchain.tools import Tool
 import types
 
-from typing import Dict, Tuple
-from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Dict, Tuple, List, Optional
 from langchain.memory import ConversationBufferMemory
 
 
