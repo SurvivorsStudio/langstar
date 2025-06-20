@@ -7,8 +7,6 @@ interface AIConnection {
   provider: string;
   model: string;
   apiKey?: string;
-  temperature?: number;
-  maxTokens?: number;
   status: string;
   lastModified: string;
 }
@@ -80,8 +78,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
                 provider: connection.provider,
                 model: connection.model,
                 apiKey: connection.apiKey || '',
-                temperature: connection.temperature ?? 0.7,
-                maxTokens: connection.maxTokens ?? 2048,
+                status: connection.status,
               });
             }}
             className="bg-white p-6 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"

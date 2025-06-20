@@ -31,7 +31,7 @@ export interface NodeData {
     }>;
     repetitions?: number;
     template?: string;
-    model?: string;
+    model?: string | AIConnection | { connName: string; providerName: string; modelName: string; apiKey: string | undefined; };
     inputColumn?: string;
     outputColumn?: string;
     [key: string]: any;
@@ -71,7 +71,7 @@ export interface FlowState {
   onConnect: OnConnect;
   setProjectName: (name: string) => void;
   addNode: (nodeData: { type: string; position: { x: number; y: number }; data: NodeData }) => void;
-  updateNodeData: (nodeId: string, data: NodeData) => void;
+  updateNodeData: (nodeId: string, dataUpdate: Partial<NodeData>) => void;
   removeNode: (nodeId: string) => void;
   removeEdge: (edgeId: string) => void;
   getNodeById: (nodeId: string) => Node<NodeData> | undefined;
@@ -492,30 +492,34 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     return id;
   },
   
-  updateNodeData: (nodeId: string, data: NodeData) => {
-    const currentNode = get().nodes.find(node => node.id === nodeId);
-    if (!currentNode) return;
-
-    if (safeCompare(currentNode.data, data)) return;
-
+  updateNodeData: (nodeId: string, dataUpdate: Partial<NodeData>) => {
     set(state => {
+      const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
+      if (!nodeToUpdate) return state;
+
+      const newData = { ...nodeToUpdate.data, ...dataUpdate };
+
+      // config 객체는 얕은 복사되므로, 내부 속성도 병합해줘야 합니다.
+      if (dataUpdate.config) {
+        newData.config = { ...nodeToUpdate.data.config, ...dataUpdate.config };
+      }
+
+      if (safeCompare(nodeToUpdate.data, newData)) return state;
+
       const updatedNodes = state.nodes.map(node => {
         if (node.id === nodeId) {
-          // AgentNode 업데이트 시 전달받은 data.config.tools 값을 로깅합니다.
-          if (node.type === 'agentNode') {
-            console.log(`[FlowStore.updateNodeData] AgentNode (ID: ${nodeId}) 업데이트 중. 전달된 data.config.tools:`, JSON.parse(JSON.stringify(data.config?.tools !== undefined ? data.config.tools : 'undefined (tools 키 없음)')));
-          }
-          return { ...node, data };
+          return { ...node, data: newData };
         }
         return node;
       });
 
-      if (!safeCompare(currentNode.data.output, data.output)) {
+      // output이 변경되었는지 확인하고, 변경되었다면 연결된 엣지도 업데이트
+      if (!safeCompare(nodeToUpdate.data.output, newData.output)) {
         const updatedEdges = state.edges.map(edge => {
           if (edge.source === nodeId) {
             return {
               ...edge,
-              data: { ...edge.data, output: data.output }
+              data: { ...edge.data, output: newData.output }
             };
           }
           return edge;
@@ -684,7 +688,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     get().updateNodeData(nodeId, { ...node.data, inputData: null }); // 실행 전 inputData 초기화 (선택적)
     get().setNodeExecuting(nodeId, true);
-
+    
     const incomingEdge = get().edges.find(edge => edge.target === nodeId);
     const input = incomingEdge?.data?.output || {};
 
@@ -783,12 +787,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           console.log(`[AgentNode ${nodeId}] 실행 시작. 입력 데이터:`, JSON.parse(JSON.stringify(input || {})));
           const agentConfig = node.data.config || {};
           const {
-            model, // 필수: API 요청에 사용될 모델 이름
+            model: modelConnection, // 모델 객체
             systemPromptInputKey, // 설정에서 system_prompt를 가져올 input의 키 이름
             userPromptInputKey,   // 설정에서 user_prompt를 가져올 input의 키 이름
             memoryGroup,          // config에서 직접 가져올 memory_group 값
             tools,                // config에서 직접 가져올 tools 값 (예: 파이썬 코드 문자열 배열)
-            agentOutputVariable   // Agent Node의 API 응답이 저장될 키 이름 (사용자가 설정)
+            agentOutputVariable,   // Agent Node의 API 응답이 저장될 키 이름 (사용자가 설정)
+            topK,
+            topP,
+            temperature,
+            maxTokens,
           } = agentConfig;
 
           console.log(`[AgentNode ${nodeId}] Agent Node 설정 (config):`, JSON.parse(JSON.stringify(agentConfig)));
@@ -826,12 +834,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             console.log(`[AgentNode ${nodeId}] 선택된 Tool이 없습니다.`);
           }
 
-          // 필수 설정값 확인 (예시: model)
-          if (!model) {
-            console.error(`[AgentNode ${nodeId}] 오류: Agent model이 설정에 필요합니다.`);
-            output = { error: 'Agent model is required in configuration.' };
+          // 필수 설정값 확인 (model)
+          if (!modelConnection || typeof modelConnection !== 'object') {
+            console.error(`[AgentNode ${nodeId}] 오류: Agent model이 올바르게 설정되지 않았습니다.`);
+            output = { error: 'Agent model is not configured correctly.' };
             break;
           }
+
+          // API 페이로드에 맞게 모델 정보 변환
+          const modelForAPI = {
+            connName: (modelConnection as AIConnection).name,
+            providerName: (modelConnection as AIConnection).provider,
+            modelName: (modelConnection as AIConnection).model,
+            apiKey: (modelConnection as AIConnection).apiKey
+          };
+
+          const modelSetting = {
+            topK: topK ?? 40,
+            topP: topP ?? 1,
+            temperature: temperature ?? 0.7,
+            maxTokens: maxTokens ?? 1000,
+          };
 
           // Agent Output Variable 확인
           // addNode에서 기본값이 설정되므로, || 'agent_response'는 추가적인 안전장치입니다.
@@ -913,7 +936,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           const payload = {
-            model,
+            model: modelForAPI, // 변환된 모델 객체 사용
+            modelSetting, // 모델 설정 추가
             system_prompt: systemPromptForAPI,
             user_prompt: userPromptForAPI,
             memory_group: memoryGroup ? memoryGroup : undefined, 
@@ -1292,22 +1316,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
     getWorkflowAsJSONString: () => {
-    const { projectName, nodes, edges, viewport } = useFlowStore.getState();
+
+    const { projectName, nodes, edges, viewport, aiConnections } = get();
 
     // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
     // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
-    const nodesToSave = nodes.map(currentNode => {
+    const nodesToSave = nodes.map((currentNode: Node<NodeData>) => {
       const { icon, ...restOfNodeData } = currentNode.data; // 노드의 data 필드 (icon 제외)
       let finalNodeData = { ...restOfNodeData }; // 최종적으로 노드에 저장될 data 객체
 
       // 만약 현재 노드가 conditionNode 타입이라면, config에 조건 정보를 추가합니다.
       if (currentNode.type === 'conditionNode') {
         const outgoingEdges = edges
-          .filter(edge => edge.source === currentNode.id)
-          .sort((a, b) => (a.data?.conditionOrderIndex ?? Infinity) - (b.data?.conditionOrderIndex ?? Infinity));
+          .filter((edge: Edge) => edge.source === currentNode.id)
+          .sort((a: Edge, b: Edge) => (a.data?.conditionOrderIndex ?? Infinity) - (b.data?.conditionOrderIndex ?? Infinity));
 
-        const conditionsSummary = outgoingEdges.map(edge => {
-          const targetNode = nodes.find(n => n.id === edge.target);
+        const conditionsSummary = outgoingEdges.map((edge: Edge) => {
+          const targetNode = nodes.find((n: Node<NodeData>) => n.id === edge.target);
           return {
             edgeId: edge.id,
             targetNodeId: edge.target,
@@ -1323,6 +1348,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           ...(finalNodeData.config || {}), // 기존 config 내용 보존
           conditions: conditionsSummary,   // 조건 요약 정보 추가
         };
+      }
+
+      // Agent 노드일 경우, 연결된 모델의 상세 정보를 찾아 `config.model`에 채워 넣습니다.
+      if (currentNode.type === 'agentNode' && finalNodeData.config?.model && typeof finalNodeData.config.model === 'object') {
+        // AgentSettings에서 이미 AIConnection 객체 전체를 저장했다고 가정합니다.
+        const modelDetails = finalNodeData.config.model as AIConnection;
+
+        if (modelDetails) {
+          // 저장된 객체를 서버가 요구하는 최종 포맷으로 변환합니다.
+          const modelConfigForExport = {
+            connName: modelDetails.name,
+            providerName: modelDetails.provider,
+            modelName: modelDetails.model,
+            apiKey: modelDetails.apiKey
+          };
+          
+          // 변환된 객체로 기존 config.model을 대체합니다.
+          finalNodeData.config = {
+            ...finalNodeData.config,
+            model: modelConfigForExport,
+          };
+        }
       }
 
       return {
