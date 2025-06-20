@@ -7,8 +7,6 @@ interface AIConnectionFormProps {
     provider: string;
     model: string;
     apiKey: string;
-    temperature: number;
-    maxTokens: number;
     status: 'active' | 'draft' | 'archived';
   };
   setAiConnectionForm: (form: any) => void;
@@ -126,42 +124,6 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
 
           </div>
         </div>
-        {activeMenu === 'ai-language' && (
-          <div>
-            <h2 className="text-lg font-medium text-gray-800 mb-4">Advanced Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperature
-                </label>
-                <input
-                  name="temperature"
-                  value={aiConnectionForm.temperature}
-                  onChange={e => setAiConnectionForm({ ...aiConnectionForm, temperature: parseFloat(e.target.value) })}
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.7"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Tokens
-                </label>
-                <input
-                  name="maxTokens"
-                  value={aiConnectionForm.maxTokens}
-                  onChange={e => setAiConnectionForm({ ...aiConnectionForm, maxTokens: parseInt(e.target.value, 10) })}
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="2048"
-                />
-              </div>
-            </div>
-          </div>
-        )}
         <div className="pt-4 flex justify-end">
           <button
             onClick={handleSaveAIConnection}

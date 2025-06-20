@@ -1,7 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
-// Mock AI connections - in a real app, this would come from your store or API
+import type { AIConnection } from '../../store/flowStore';
+
+// Define an interface for the group objects for better type safety
+interface GroupData {
+  id: string;
+  name: string;
+  type: 'memory' | 'tools';
+  description?: string;
+  code?: string;
+  memoryType?: string;
+}
 
 interface AgentSettingsProps {
   nodeId: string;
@@ -66,8 +76,8 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   // Get all groups nodes and extract memory and tools groups
   const groupsNode = nodes.find(n => n.type === 'groupsNode');
-  const memoryGroups = groupsNode?.data.config?.groups?.filter(g => g.type === 'memory') || [];
-  const toolsGroups = groupsNode?.data.config?.groups?.filter(g => g.type === 'tools') || [];
+  const memoryGroups: GroupData[] = groupsNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'memory') || [];
+  const toolsGroups: GroupData[] = groupsNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'tools') || [];
 
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
@@ -84,11 +94,11 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   }, []);
 
   const handleModelChange = (value: string) => {
+    // Find the full connection object from activeConnections
+    const selectedConnection = aiConnections.find(conn => conn.id === value);
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
-        model: value
+        model: selectedConnection || undefined, // Store the entire object or undefined if not found
       }
     });
   };
@@ -96,9 +106,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const handleMaxTokensChange = (value: string) => {
     const numValue = parseInt(value, 10);
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         maxTokens: isNaN(numValue) ? undefined : numValue,
       },
     });
@@ -107,9 +115,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const handleTopKChange = (value: string) => {
     const numValue = parseInt(value, 10);
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         topK: isNaN(numValue) ? undefined : numValue,
       },
     });
@@ -118,9 +124,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const handleTopPChange = (value: string) => {
     const numValue = parseInt(value, 10); // Or parseFloat if it should be a float
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         topP: isNaN(numValue) ? undefined : numValue,
       },
     });
@@ -129,9 +133,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const handleTemperatureChange = (value: string) => {
     const floatValue = parseFloat(value);
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         temperature: isNaN(floatValue) ? undefined : floatValue,
       },
     });
@@ -140,9 +142,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const handleSystemPromptInputKeyChange = (value: string) => {
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         systemPromptInputKey: value // 'systemPromptNode' 대신 'systemPromptInputKey' 사용
       }
     });
@@ -150,9 +150,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const handleUserPromptInputKeyChange = (value: string) => {
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         userPromptInputKey: value // 'userPromptNode' 대신 'userPromptInputKey' 사용
       }
     });
@@ -160,9 +158,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const handleAgentOutputVariableChange = (value: string) => {
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         agentOutputVariable: value
       }
     });
@@ -170,9 +166,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const handleStreamChange = (checked: boolean) => {
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         stream: checked,
       },
     });
@@ -186,9 +180,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     const memoryTypeString = selectedGroup?.memoryType || '';
 
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         memoryGroup: groupId, // 여전히 그룹 ID는 저장해둘 수 있습니다 (UI 표시용 또는 다른 용도)
         memoryTypeString: memoryTypeString // 실제 memoryType 문자열을 저장
       } 
@@ -197,13 +189,11 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const toggleTool = (toolId: string) => {
     const newTools = currentTools.includes(toolId)
-      ? currentTools.filter(id => id !== toolId)
+      ? currentTools.filter((id: string) => id !== toolId)
       : [...currentTools, toolId];
 
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         tools: newTools // 'selectedTools' -> 'tools'로 변경
       }
     });
@@ -211,11 +201,9 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const removeTool = (event: React.MouseEvent, toolId: string) => {
     event.stopPropagation();
-    const newTools = currentTools.filter(id => id !== toolId);
+    const newTools = currentTools.filter((id: string) => id !== toolId);
     updateNodeData(nodeId, {
-      ...node?.data,
       config: {
-        ...node?.data.config,
         tools: newTools // 'selectedTools' -> 'tools'로 변경
       }
     });
@@ -230,6 +218,13 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   // 스토어에서 가져온 AI 연결 중 임베딩 모델(active)만 필터링
   const activeEmbeddingConnections = aiConnections
       .filter(conn => conn.type === 'embedding' && conn.status === 'active');
+
+  const selectedModelId =
+    node?.data.config?.model && typeof node.data.config.model === 'object'
+      ? (node.data.config.model as AIConnection).id
+      : (node?.data.config?.model as string) || '';
+
+  const selectedConnection = activeConnections.find(conn => conn.id === selectedModelId);
 
   return (
     <div className="space-y-6">
@@ -327,17 +322,29 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
             Model
           </label>
           <select
-            value={node?.data.config?.model || ''}
+            value={selectedModelId}
             onChange={(e) => handleModelChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
             <option value="">Select a model</option>
             {activeConnections.map((conn) => (
-              <option key={conn.id} value={conn.model}>
+              <option key={conn.id} value={conn.id}>
                 {conn.name} ({conn.model})
               </option>
             ))}
           </select>
+          {selectedConnection && (
+            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500 font-medium">Provider</span>
+                <span className="text-gray-800 font-mono bg-white px-1.5 py-0.5 border rounded-md">{selectedConnection.provider}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500 font-medium">Model Name</span>
+                <span className="text-gray-800 font-mono bg-white px-1.5 py-0.5 border rounded-md">{selectedConnection.model}</span>
+              </div>
+            </div>
+          )}
           {activeConnections.length === 0 && (
             <p className="text-xs text-amber-500">
               No AI models configured. Please add models in the AI Model Keys section.
@@ -403,7 +410,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
             <option value="">Select memory group</option>
-            {memoryGroups.map((group) => (
+            {memoryGroups.map((group: GroupData) => (
               <option key={group.id} value={group.id}>
                 {group.name}
               </option>
@@ -426,8 +433,8 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           >
             {currentTools.length > 0 ? ( // 'selectedTools' -> 'currentTools'로 변경
               toolsGroups
-                .filter(tool => currentTools.includes(tool.id)) // 'selectedTools' -> 'currentTools'로 변경
-                .map((tool) => (
+                .filter((tool: GroupData) => currentTools.includes(tool.id)) // 'selectedTools' -> 'currentTools'로 변경
+                .map((tool: GroupData) => (
                   <span
                     key={tool.id}
                     className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm mr-2 mb-1 flex items-center"
@@ -451,7 +458,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           {isToolsOpen && (
             <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
               {toolsGroups.length > 0 ? (
-                toolsGroups.map((tool) => (
+                toolsGroups.map((tool: GroupData) => (
                   <div
                     key={tool.id}
                     className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${
