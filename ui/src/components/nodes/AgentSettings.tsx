@@ -83,16 +83,52 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Effect to initialize default model parameters if they are not set
+  useEffect(() => {
+    if (node && node.data) {
+      const currentConfig = node.data.config || {};
+      const newConfigValues: Partial<typeof currentConfig> = {};
+      let needsUpdate = false;
+
+      if (typeof currentConfig.topK === 'undefined') {
+        newConfigValues.topK = DEFAULT_TOP_K;
+        needsUpdate = true;
+      }
+      if (typeof currentConfig.topP === 'undefined') {
+        newConfigValues.topP = DEFAULT_TOP_P;
+        needsUpdate = true;
+      }
+      if (typeof currentConfig.temperature === 'undefined') {
+        newConfigValues.temperature = DEFAULT_TEMPERATURE;
+        needsUpdate = true;
+      }
+      if (typeof currentConfig.maxTokens === 'undefined') {
+        newConfigValues.maxTokens = DEFAULT_MAX_TOKENS;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        updateNodeData(nodeId, {
+          ...node.data,
+          config: { ...currentConfig, ...newConfigValues },
+        });
+      }
+    }
+  }, [node, nodeId, updateNodeData, DEFAULT_TOP_K, DEFAULT_TOP_P, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS]);
+
   const handleModelChange = (value: string) => {
+    const selectedConn = activeConnections.find(conn => conn.model === value);
+
     updateNodeData(nodeId, {
       ...node?.data,
       config: {
-        ...node?.data.config,
-        model: value
+        ...(node?.data.config), // Preserve existing config
+        model: value,           // Update model
+        temperature: selectedConn?.temperature ?? node?.data.config?.temperature ?? DEFAULT_TEMPERATURE,
+        maxTokens: selectedConn?.maxTokens ?? node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS,
       }
     });
   };
-
   const handleMaxTokensChange = (value: string) => {
     const numValue = parseInt(value, 10);
     updateNodeData(nodeId, {
@@ -333,11 +369,32 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           >
             <option value="">Select a model</option>
             {activeConnections.map((conn) => (
-              <option key={conn.id} value={conn.model}>
-                {conn.name} ({conn.model})
-              </option>
+              // Display only the connection name, value remains conn.model
+              <option key={conn.id} value={conn.model}>{conn.name}</option>
             ))}
           </select>
+          {(() => {
+            const currentSelectedModelId = node?.data.config?.model;
+            if (currentSelectedModelId && activeConnections.length > 0) {
+              const selectedModelDetails = activeConnections.find(conn => conn.model === currentSelectedModelId);
+              if (selectedModelDetails) {
+                return (
+                  <div className="mt-1.5 px-1">
+                    <p className="text-xs text-gray-600">
+                      <span className="font-medium text-gray-700">Provider:</span> {selectedModelDetails.provider}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      <span className="font-medium text-gray-700">Model ID:</span> {selectedModelDetails.model}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      <span className="font-medium text-gray-700">API Key:</span> {selectedModelDetails.apiKey ? 'Provided' : 'Not Provided'}
+                    </p>
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
           {activeConnections.length === 0 && (
             <p className="text-xs text-amber-500">
               No AI models configured. Please add models in the AI Model Keys section.
