@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      target: development
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    restart: "no"
+    stdin_open: true
+    tty: true
+
+  backend:
+    build:
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=development
+    command: uvicorn app:app --reload --host 0.0.0.0 --port 8000
+    restart: "no"
+    stdin_open: true
+    tty: true 
