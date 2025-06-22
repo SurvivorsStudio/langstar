@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useFlowStore, NodeData } from '../../store/flowStore';
-import { Node } from 'reactflow';
+import { useFlowStore } from '../../store/flowStore';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 
@@ -99,32 +98,32 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="space-y-4">
-      <h4 className="text-sm font-medium text-gray-700">Merge Mappings</h4>
-      <p className="text-xs text-gray-500 mb-2">
+      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Merge Mappings</h4>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
         Define how incoming data should be merged. Specify an output key and select the source data.
       </p>
       {mappings.map((mapping, index) => (
-        <div key={mapping.id} className="p-3 border border-gray-200 rounded-md space-y-2 bg-gray-50">
+        <div key={mapping.id} className="p-3 border border-gray-200 dark:border-gray-600 rounded-md space-y-2 bg-gray-50 dark:bg-gray-700">
           {/* Output Key 입력 필드 */}
           <div>
-            <label htmlFor={`output-key-${mapping.id}`} className="block text-xs font-medium text-gray-600 mb-0.5">Output Key</label>
+            <label htmlFor={`output-key-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Output Key</label>
             <input
               type="text"
               id={`output-key-${mapping.id}`}
               placeholder="Output Key"
               value={mapping.outputKey}
               onChange={(e) => handleMappingChange(index, 'outputKey', e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
           </div>
           {/* Source Value 선택 드롭다운 */}
           <div>
-            <label htmlFor={`source-value-${mapping.id}`} className="block text-xs font-medium text-gray-600 mb-0.5">Source Value</label>
+            <label htmlFor={`source-value-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Source Value</label>
             <select
               id={`source-value-${mapping.id}`}
               value={mapping.sourceNodeId ? `${mapping.sourceNodeId}.${mapping.sourceNodeKey}` : ''}
               onChange={(e) => handleMappingChange(index, 'sourceNodeId', e.target.value)} // 'sourceNodeId' is a placeholder, actual logic splits it
-              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="">Select Source Value</option>
               {availableSourceOptions.map(opt => (
@@ -148,13 +147,13 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
       ))}
       <button
         onClick={handleAddMapping}
-        className="flex items-center px-3 py-1.5 border border-dashed border-blue-400 text-blue-600 rounded-md hover:bg-blue-50 text-sm"
+        className="flex items-center px-3 py-1.5 border border-dashed border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm"
       >
         <PlusCircle size={16} className="mr-2" />
         Add Mapping
       </button>
       {availableSourceOptions.length === 0 && mappings.length === 0 && (
-        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
+        <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-md">
           No input data available from connected nodes. Connect and execute preceding nodes to populate source options.
         </p>
       )}

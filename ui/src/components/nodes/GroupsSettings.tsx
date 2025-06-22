@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { Plus, X, AlertCircle, ChevronLeft } from 'lucide-react';
+import { AlertCircle, ChevronLeft } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
-
-interface Group {
-  id: string;
-  name: string;
-  description: string;
-  type: 'memory' | 'tools';
-  memoryType?: 'ConversationBufferMemory' | 'ConversationBufferWindowMemory';
-  code?: string;
-}
+import { Group } from '../../types/node';
 
 interface GroupsSettingsProps {
   nodeId: string;
@@ -19,7 +11,7 @@ interface GroupsSettingsProps {
 const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
   const { nodes, updateNodeData } = useFlowStore();
   const node = nodes.find(n => n.id === nodeId);
-  const groups = node?.data.config?.groups || [];
+  const groups = (node?.data.config?.groups as Group[]) || [];
   const [nameError, setNameError] = useState<string | null>(null);
   
   useEffect(() => {
@@ -29,7 +21,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
   }, [node?.data.selectedGroupId]);
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(node?.data.selectedGroupId || null);
-  const selectedGroup = groups.find(g => g.id === selectedGroupId);
+  const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
 
   const checkNameExists = (name: string, currentGroupId: string): boolean => {
     return groups.some(g => 
@@ -92,18 +84,18 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={handleBack}
-            className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+            className="flex items-center text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
           >
             <ChevronLeft size={16} className="mr-1" />
             Back to Groups
           </button>
           <button
             onClick={() => handleRemoveGroup(selectedGroup.id)}
-            className="text-red-500 hover:text-red-600 text-sm"
+            className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-sm"
           >
             Delete Group
           </button>
@@ -111,7 +103,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Group Name
             </label>
             <input
@@ -119,10 +111,10 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
               value={selectedGroup.name}
               onChange={(e) => handleUpdateGroup(selectedGroup.id, { name: e.target.value })}
               className={`w-full px-3 py-2 border ${
-                nameError ? 'border-red-300' : 'border-gray-300'
+                nameError ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
               } rounded-md focus:outline-none focus:ring-2 ${
                 nameError ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-              } text-sm`}
+              } text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
               placeholder="Enter group name"
             />
             {nameError && (
@@ -135,7 +127,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
 
           {selectedGroup.type === 'memory' && (
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
                 Memory Type
               </label>
               <select
@@ -143,7 +135,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
                 onChange={(e) => handleUpdateGroup(selectedGroup.id, { 
                   memoryType: e.target.value as 'ConversationBufferMemory' | 'ConversationBufferWindowMemory' 
                 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 <option value="ConversationBufferMemory">Conversation Buffer Memory</option>
                 <option value="ConversationBufferWindowMemory">Conversation Buffer Window Memory</option>
@@ -152,13 +144,13 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Description
             </label>
             <textarea
               value={selectedGroup.description}
               onChange={(e) => handleUpdateGroup(selectedGroup.id, { description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               placeholder="Enter group description"
               rows={2}
             />
@@ -168,8 +160,8 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
 
       {selectedGroup.type === 'tools' && (
         <div className="flex-1 overflow-hidden">
-          <div className="p-2 bg-blue-50 border-b border-blue-100">
-            <h3 className="text-sm font-medium text-blue-800">Python Code</h3>
+          <div className="p-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Python Code</h3>
           </div>
           <div className="h-[calc(100vh-380px)]">
             <CodeEditor

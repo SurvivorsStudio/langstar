@@ -170,13 +170,7 @@ const WorkspacePage: React.FC = () => {
     selectedAIType ? conn.type === selectedAIType : true
   );
 
-  const handleAIConnectionFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setAiConnectionForm(prev => ({
-      ...prev,
-      [name]: name === 'temperature' || name === 'maxTokens' ? parseFloat(value) : value,
-    }));
-  };
+  // handleAIConnectionFormChange function removed as it was unused
 
   const handleSaveAIConnection = async () => {
     if (!aiConnectionForm.name.trim() || !aiConnectionForm.model.trim()) {
@@ -267,12 +261,10 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
-  const logoStyle = {
-    height: "3rem"
-  }
+  // logoStyle removed as it was unused
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex h-screen">
         {/* Sidebar */}
         <WorkspaceSidebar
@@ -284,7 +276,7 @@ const WorkspacePage: React.FC = () => {
         />
 
         {/* Main Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-white dark:bg-gray-800">
           {activeMenu === 'chatflows' && (
             <WorkflowList
               availableWorkflows={availableWorkflows}

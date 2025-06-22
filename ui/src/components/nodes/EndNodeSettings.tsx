@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useFlowStore, NodeData, Edge } from '../../store/flowStore'; // Edge 타입 import
+import { useFlowStore, NodeData } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react'; // 아이콘 import
 
 interface EndNodeSettingsProps {

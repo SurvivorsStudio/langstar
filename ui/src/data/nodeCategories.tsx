@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Bot, Split, FileCode, Play, Square, MessageSquare, Settings, Group, GitMerge,
+  Bot, Split, FileCode, MessageSquare, Settings, Group, GitMerge,
   Database, Cpu
 } from 'lucide-react';
 

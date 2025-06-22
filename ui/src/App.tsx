@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import FlowBuilder from './pages/FlowBuilder';
 import WorkspacePage from './pages/WorkspacePage';
+import { useThemeStore } from './store/themeStore';
 
 function App() {
+  const { isDarkMode } = useThemeStore();
+
+  useEffect(() => {
+    // HTML 요소에 dark 클래스 추가/제거
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/workspace" replace />} />
-        <Route path="/workspace" element={<WorkspacePage />} />
-        <Route path="/flow/:id" element={<FlowBuilder />} />
-      </Routes>
-    </BrowserRouter>
+    <div className={isDarkMode ? 'dark' : ''}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/workspace" replace />} />
+          <Route path="/workspace" element={<WorkspacePage />} />
+          <Route path="/flow/:id" element={<FlowBuilder />} />
+        </Routes>
+      </BrowserRouter>
+    </div>
   );
 }
 

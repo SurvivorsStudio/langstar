@@ -7,7 +7,7 @@ import 'reactflow/dist/style.css';
 
 function FlowBuilder() {
   return (
-    <div className="flex flex-col h-screen w-full bg-gray-50">
+    <div className="flex flex-col h-screen w-full bg-gray-50 dark:bg-gray-900">
       <Header />
       <div className="flex-1 overflow-hidden">
         <ReactFlowProvider>

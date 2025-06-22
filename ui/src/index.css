@@ -45,22 +45,56 @@ body {
 }
 
 .react-flow__controls {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  border-radius: 6px;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.25), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 8px;
   overflow: hidden;
+  border: 1px solid #d1d5db;
 }
 
 .react-flow__controls-button {
   background-color: white;
   border-bottom: 1px solid #e5e7eb;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #f9fafb;
+  color: #374151;
+  transform: scale(1.05);
+}
+
+/* 다크모드 스타일 */
+.dark .react-flow__controls {
+  border: 1px solid #4b5563;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+}
+
+.dark .react-flow__controls-button {
+  background-color: #7f858f;
+  border-bottom: 1px solid #4b5563;
+  color: #ffffff;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: #4b5563;
+  color: #ffffff;
+  transform: scale(1.05);
 }
 
 .react-flow__minimap {
   background-color: white;
-  border-radius: 6px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.25), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border: 1px solid #d1d5db;
+}
+
+.dark .react-flow__minimap {
+  background-color: #111827;
+  border: 1px solid #6b7280;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.3);
 }
 
 /* Merge Node 스타일 */

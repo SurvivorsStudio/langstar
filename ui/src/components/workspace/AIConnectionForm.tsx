@@ -9,7 +9,13 @@ interface AIConnectionFormProps {
     apiKey: string;
     status: 'active' | 'draft' | 'archived';
   };
-  setAiConnectionForm: (form: any) => void;
+  setAiConnectionForm: (form: {
+    name: string;
+    provider: string;
+    model: string;
+    apiKey: string;
+    status: 'active' | 'draft' | 'archived';
+  }) => void;
   handleSaveAIConnection: () => void;
   setSelectedAIConnectionId: (id: string | null) => void;
   activeMenu: string;
@@ -26,19 +32,19 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
     <div className="mb-6">
       <button
         onClick={() => setSelectedAIConnectionId(null)}
-        className="flex items-center text-gray-600 hover:text-gray-800"
+        className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
       >
         <ChevronLeft className="w-5 h-5 mr-1" />
         Back to {activeMenu === 'ai-language' ? 'Language' : 'Embedding'} Models
       </button>
     </div>
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-medium text-gray-800 mb-4">Connection Details</h2>
+          <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Connection Details</h2>
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Connection Name
               </label>
               <input
@@ -46,19 +52,19 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
                 type="text"
                 value={aiConnectionForm.name}
                 onChange={e => setAiConnectionForm({ ...aiConnectionForm, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder="Enter connection name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Provider
               </label>
               <select
                 name="provider"
                 value={aiConnectionForm.provider}
                 onChange={e => setAiConnectionForm({ ...aiConnectionForm, provider: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               >
                 {activeMenu === 'ai-language' ? (
                   <>
@@ -78,7 +84,7 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Model
               </label>
               <input
@@ -86,12 +92,12 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
                 type="text"
                 value={aiConnectionForm.model}
                 onChange={e => setAiConnectionForm({ ...aiConnectionForm, model: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder={activeMenu === 'ai-language' ? "e.g., gpt-4, claude-3-opus" : "e.g., text-embedding-ada-002"}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 API Key
               </label>
               <input
@@ -99,12 +105,12 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
                 value={aiConnectionForm.apiKey}
                 onChange={e => setAiConnectionForm({ ...aiConnectionForm, apiKey: e.target.value })}
                 type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder="Enter API key"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Status
               </label>
               <select
@@ -114,7 +120,7 @@ const AIConnectionForm: React.FC<AIConnectionFormProps> = ({
                     ...aiConnectionForm,
                     status: e.target.value as 'active' | 'draft' | 'archived'
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               >
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
