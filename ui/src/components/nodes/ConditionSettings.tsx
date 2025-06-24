@@ -210,9 +210,9 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-gray-700">Conditions</h3>
+      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Conditions</h3>
       {nodeEdges.length === 0 ? (
-        <p className="text-sm text-gray-500">No connections yet. Connect this node to others to set conditions.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">No connections yet. Connect this node to others to set conditions.</p>
       ) : (
         orderedEdgeIds.map((edgeId) => {
           const edge = nodeEdges.find(e => e.id === edgeId);
@@ -247,11 +247,11 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, edge.id)}
               onDragEnd={handleDragEnd}
-              className={`space-y-2 bg-gray-50 p-4 rounded-lg border border-gray-200 cursor-grab ${draggedEdgeId === edge.id ? 'opacity-50 shadow-lg' : ''}`}
+              className={`space-y-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 cursor-grab ${draggedEdgeId === edge.id ? 'opacity-50 shadow-lg' : ''}`}
             >
-              <label className="block text-sm font-medium text-gray-600">
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                 Rule for connection to{' '}
-                <span className="font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-md">
+                <span className="font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded-md">
                   {getTargetNodeName(edge.target)}
                 </span>
               </label>
@@ -261,10 +261,10 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
                 onChange={(e) => updateEdgeDescription(edge.id, e.target.value)}
                 // disabled prop removed to allow editing for 'else'
                 placeholder={defaultRuleName} // Consistent placeholder
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white mb-2"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 mb-2"
               />
               <div className="flex gap-2">
-                <span className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-md font-medium w-20 text-center">
+                <span className="px-3 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md font-medium w-20 text-center">
                   {determinedType.toUpperCase()}
                 </span>
                 {determinedType !== 'else' && (
@@ -274,10 +274,10 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
                     onChange={(e) => handleConditionTextChange(edge, e.target.value, determinedType)}
                     placeholder={`${className}['value'] > 100`}
                     disabled={determinedType === 'else'}
-                    className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm bg-white ${
+                    className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm bg-white dark:bg-gray-800 ${
                       !validation.isValid 
-                        ? 'border-red-300 focus:ring-red-500 text-red-600' 
-                        : 'border-gray-300 focus:ring-blue-500'
+                        ? 'border-red-300 dark:border-red-500 focus:ring-red-500 text-red-600 dark:text-red-400' 
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 text-gray-900 dark:text-gray-100'
                     }`}
                   />
                 )}
@@ -288,7 +288,7 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
                   {validation.error}
                 </div>
               )}
-              <div className="mt-1 text-xs text-gray-500">
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {determinedType !== 'else' ? 'Enter a Python condition expression.' : 'This is the default path if other conditions are not met.'}
               </div>
             </div>
@@ -296,7 +296,7 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
         })
       )}
       {nodeEdges.length > 0 && (
-        <div className="text-xs text-gray-500 mt-2 p-2 bg-blue-50 rounded-md">
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
           <p>Tips:</p>
           <ul className="list-disc pl-4 mt-1 space-y-1">
             <li>Use Python comparison operators: ==, !=, &gt;, &lt;, &gt;=, &lt;=</li>

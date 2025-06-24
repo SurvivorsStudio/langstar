@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Bot, Split, FileCode, Play, Square, MessageSquare, Settings, Group, GitMerge,
+  Bot, Split, FileCode, MessageSquare, Settings, Group, GitMerge,
   Database, Cpu
 } from 'lucide-react';
 
@@ -8,7 +8,7 @@ export interface NodeItem {
   type: string;
   label: string;
   description: string;
-  icon: React.ReactNode;
+  icon: (className?: string) => React.ReactNode;
 }
 
 export interface NodeCategory {
@@ -26,43 +26,43 @@ export const nodeCategories: NodeCategory[] = [
         type: 'promptNode',
         label: 'Prompt',
         description: 'Define a prompt template for LLM interaction',
-        icon: <MessageSquare size={20} />
+        icon: (className = '') => <MessageSquare size={20} className={className} />
       },
       {
         type: 'systemPromptNode',
         label: 'System Prompt',
         description: 'Define system and user prompts for LLM interaction',
-        icon: <Settings size={20} />
+        icon: (className = '') => <Settings size={20} className={className} />
       },
       {
         type: 'agentNode',
         label: 'Agent',
         description: 'Agent that can execute tools',
-        icon: <Bot size={20} />
+        icon: (className = '') => <Bot size={20} className={className} />
       },
       {
         type: 'conditionNode',
         label: 'Condition',
         description: 'Conditional function to determine which route to take next',
-        icon: <Split size={20} />
+        icon: (className = '') => <Split size={20} className={className} />
       },
       {
         type: 'functionNode',
         label: 'Custom Python Function',
         description: 'Execute custom Python function',
-        icon: <FileCode size={20} />
+        icon: (className = '') => <FileCode size={20} className={className} />
       },
       {
         type: 'groupsNode',
         label: 'Groups',
         description: 'Organize and manage node groups',
-        icon: <Group size={20} />
+        icon: (className = '') => <Group size={20} className={className} />
       },
       {
         type: 'mergeNode',
         label: 'Merge',
         description: 'Merge inputs from multiple nodes',
-        icon: <GitMerge size={20} />
+        icon: (className = '') => <GitMerge size={20} className={className} />
       }
     ]
   },
@@ -74,13 +74,13 @@ export const nodeCategories: NodeCategory[] = [
         type: 'embeddingNode',
         label: 'Embedding',
         description: 'Generate embeddings from text using configured models',
-        icon: <Cpu size={20} />
+        icon: (className = '') => <Cpu size={20} className={className} />
       },
       {
         type: 'ragNode',
         label: 'RAG',
         description: 'Retrieval-Augmented Generation using vector store',
-        icon: <Database size={20} />
+        icon: (className = '') => <Database size={20} className={className} />
       }
     ]
   }

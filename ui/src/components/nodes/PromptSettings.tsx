@@ -12,7 +12,7 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   const incomingEdge = edges.find(edge => edge.target === nodeId);
-  const sourceNode = incomingEdge ? nodes.find(n => n.id === incomingEdge.source) : null;
+
   const sourceOutput = incomingEdge?.data?.output || null;
   const hasValidOutput = sourceOutput && Object.keys(sourceOutput).length > 0;
 
@@ -53,10 +53,10 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-600">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
               Output Variable
             </label>
             <div className="relative"> {/* Container for input/select and warnings */}
@@ -70,13 +70,15 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
                       onChange={(e) => handleOutputVariableChange(e.target.value)}
                       placeholder="Enter output variable name"
                       className={`flex-grow px-3 py-2 border ${
-                        !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-                      } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                        !hasValidOutput && availableVariables.length === 0 
+                          ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                      } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                       disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable} // Disable if no source and no current value
                     />
                     <button
                       onClick={() => setIsEditingOutputVariable(false)}
-                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0"
+                      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0"
                       aria-label="Confirm output variable"
                     >
                       <Check size={18} />
@@ -89,8 +91,10 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
                       value={node?.data.config?.outputVariable || ''}
                       onChange={(e) => handleOutputVariableChange(e.target.value)}
                       className={`flex-grow px-3 py-2 border ${
-                        !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-                      } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                        !hasValidOutput && availableVariables.length === 0 
+                          ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                      } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                       disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
                     >
                       <option value="">Select output variable</option>
@@ -106,7 +110,7 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                    <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
                       <Pencil size={18} />
                     </button>
                   </>
@@ -130,9 +134,9 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <div className="p-4 bg-blue-50 border-b border-blue-100">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">Prompt Template</h3>
-          <p className="text-sm text-blue-600">
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/50">
+          <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Prompt Template</h3>
+          <p className="text-sm text-blue-600 dark:text-blue-400">
             Use {'{variable}'} syntax to insert variables from input
           </p>
         </div>

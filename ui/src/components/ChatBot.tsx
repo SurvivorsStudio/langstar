@@ -17,9 +17,7 @@ const ChatBot: React.FC = () => {
     nodes, 
     updateNodeData, 
     runWorkflow,
-    edges, // edges 상태 추가
-    setEdgeOutput, // setEdgeOutput 액션 추가
-    isWorkflowRunning 
+    setEdgeOutput // setEdgeOutput 액션 추가
   } = useFlowStore(state => ({ ...state }));
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -123,7 +121,7 @@ const ChatBot: React.FC = () => {
           let botResponseContent = "Workflow finished.";
 
           if (endNodeOutput && typeof endNodeOutput === 'object') {
-            if (selectedKey && endNodeOutput.hasOwnProperty(selectedKey)) {
+            if (selectedKey && Object.prototype.hasOwnProperty.call(endNodeOutput, selectedKey)) {
               const selectedValue = endNodeOutput[selectedKey];
               botResponseContent = typeof selectedValue === 'object' ? JSON.stringify(selectedValue, null, 2) : String(selectedValue);
               console.log(`[ChatBot] Using selected key '${selectedKey}' value:`, botResponseContent);
@@ -182,8 +180,8 @@ const ChatBot: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-xl flex flex-col border border-gray-200">
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
+    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
         <h3 className="font-semibold">Workflow Assistant</h3>
         <button
           onClick={async () => {
@@ -221,7 +219,7 @@ const ChatBot: React.FC = () => {
               className={`max-w-[80%] rounded-lg p-3 ${
                 message.type === 'user'
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
               }`}
             >
               <p className="text-sm">{message.content}</p>
@@ -236,21 +234,21 @@ const ChatBot: React.FC = () => {
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg p-3">
-              <Loader className="w-5 h-5 animate-spin text-gray-500" />
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+              <Loader className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400" />
             </div>
           </div>
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 resize-none border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32"
+            className="flex-1 resize-none border border-gray-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             rows={1}
           />
           <button

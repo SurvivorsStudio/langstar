@@ -144,6 +144,7 @@ const WorkspacePage: React.FC = () => {
     ? aiConnections 
     : filteredAIConnections;
 
+
   const handleNewAIConnection = () => {
     setEditingConnection(null);
     setShowWizard(true);
@@ -283,7 +284,7 @@ const WorkspacePage: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex h-screen">
         <WorkspaceSidebar
           activeMenu={activeMenu}
@@ -294,6 +295,7 @@ const WorkspacePage: React.FC = () => {
         />
         <div className="flex-1 overflow-auto">
           {renderMainContent()}
+
         </div>
       </div>
     </div>

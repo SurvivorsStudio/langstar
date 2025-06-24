@@ -31,9 +31,6 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const memoryGroups = groups.filter((g: any) => g.type === 'memory');
   const toolsGroups = groups.filter((g: any) => g.type === 'tools');
 
-  // 노드에 입력(타겟)으로 연결된 엣지가 있는지 여부
-  const hasIncomingEdge = edges.some(edge => edge.target === id);
-
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
   const hasConnection = edges.some(edge => edge.source === id);
 
@@ -95,18 +92,18 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
    */
   const getNodeStyle = () => {
     const baseStyle = {
-      'agentNode': 'bg-blue-50 border-blue-200',
-      'conditionNode': 'bg-yellow-50 border-yellow-200',
-      'functionNode': 'bg-purple-50 border-purple-200',
-      'toolNode': 'bg-green-50 border-green-200',
-      'startNode': 'bg-gray-50 border-gray-200',
-      'endNode': 'bg-red-50 border-red-200',
-      'groupsNode': 'bg-white border-gray-200',
-    }[(data.nodeType as string)] || 'bg-white border-gray-200';
+      'agentNode': 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700',
+      'conditionNode': 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700',
+      'functionNode': 'bg-purple-50 dark:bg-purple-900 border-purple-200 dark:border-purple-700',
+      'toolNode': 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700',
+      'startNode': 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600',
+      'endNode': 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700',
+      'groupsNode': 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600',
+    }[(data.nodeType as string)] || 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
     if (isConditionNode && hasValidationError) {
-      return 'bg-red-50 border-red-300';
+      return 'bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-600';
     }
 
     return baseStyle;
@@ -118,18 +115,18 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
    */
   const getIconStyle = () => {
     const baseStyle = {
-      'agentNode': 'text-blue-600 bg-blue-100',
-      'conditionNode': 'text-yellow-600 bg-yellow-100',
-      'functionNode': 'text-purple-600 bg-purple-100',
-      'toolNode': 'text-green-600 bg-green-100',
-      'startNode': 'text-gray-600 bg-gray-100',
-      'endNode': 'text-red-600 bg-red-100',
-      'groupsNode': 'text-gray-600 bg-gray-100',
-    }[(data.nodeType as string)] || 'text-gray-600 bg-gray-100';
+      'agentNode': 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/50',
+      'conditionNode': 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-800/50',
+      'functionNode': 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-800/50',
+      'toolNode': 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800/50',
+      'startNode': 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
+      'endNode': 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-800/50',
+      'groupsNode': 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
+    }[(data.nodeType as string)] || 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
     if (isConditionNode && hasValidationError) {
-      return 'text-red-600 bg-red-100';
+      return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-800/50';
     }
 
     return baseStyle;
@@ -264,36 +261,36 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const renderGroups = (groups: any[], type: 'memory' | 'tools') => (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-gray-700">{type === 'memory' ? 'Memory' : 'Tools'}</span>
+        <span className="font-medium text-gray-700 dark:text-gray-300">{type === 'memory' ? 'Memory' : 'Tools'}</span>
       </div>
       {groups.map((group) => (
         <div 
           key={group.id} 
-          className="bg-gray-50 rounded p-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors relative group"
+          className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors relative group"
           // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
           onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
         >
           <div className="flex items-center justify-between">
-            <span className="font-medium">{group.name}</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200">{group.name}</span>
             <div className="flex items-center">
               <button
                 onClick={(e) => handleDeleteGroup(e, group.id)}
                 // 마우스 호버 시에만 삭제 버튼 표시
-                className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-gray-400 hover:text-red-500 transition-opacity"
+                className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
               >
                 <Trash2 size={14} />
               </button>
-              <ChevronRight size={14} className="text-gray-400" />
+              <ChevronRight size={14} className="text-gray-400 dark:text-gray-500" />
             </div>
           </div>
           {group.description && (
-            <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{group.description}</p>
           )}
         </div>
       ))}
       <button
         onClick={() => handleAddGroup(type)}
-        className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+        className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
       >
         <Plus size={14} className="mr-1" />
         Add {type === 'memory' ? 'Memory' : 'Tools'} Group
@@ -349,7 +346,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
             </button>
             {/* 비활성화 & hover 시 툴팁 */}
             {!hasConnection && isPlayHovered && (
-              <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 text-white text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
+              <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
                 Please connect the nodes
               </div>
             )}
@@ -380,16 +377,16 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
               onChange={handleNameChange}
               onBlur={handleNameSubmit}
               onKeyDown={handleKeyPress}
-              className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               autoFocus
             />
           ) : (
             // 이름 표시 모드
             <div className="flex items-center justify-between w-full">
-              <div className="font-medium text-gray-800 truncate">{data.label}</div>
+              <div className="font-medium text-gray-800 dark:text-gray-200 truncate">{data.label}</div>
               <button
                 onClick={() => setIsEditing(true)}
-                className="ml-2 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                 title="Rename Node"
               >
                 <Edit2 size={12} />
@@ -401,7 +398,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       
       {/* 노드 설명 표시 */}
       {data.description && (
-        <div className="text-xs text-gray-500 mb-2">{data.description}</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{data.description}</div>
       )}
 
       {/* GroupsNode일 경우 메모리 및 도구 그룹 렌더링 */}
@@ -414,7 +411,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
 
       {/* 조건 노드이고 유효성 에러가 있는 경우 에러 메시지 표시 */}
       {isConditionNode && hasValidationError && (
-        <div className="mt-2 text-xs text-red-500 flex items-center bg-red-50 p-2 rounded">
+        <div className="mt-2 text-xs text-red-500 dark:text-red-400 flex items-center bg-red-50 dark:bg-red-900 p-2 rounded">
           <AlertCircle size={12} className="mr-1" />
           Invalid condition format
         </div>
@@ -422,7 +419,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       
       {/* Start 노드는 code 미리보기 영역을 표시하지 않음 */}
       {data.code && !isStartNode && (
-        <div className="mt-2 text-xs bg-gray-100 p-2 rounded max-h-20 overflow-y-auto font-mono">
+        <div className="mt-2 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 p-2 rounded max-h-20 overflow-y-auto font-mono">
           {data.code.split('\n').slice(0, 3).join('\n')}
           {data.code.split('\n').length > 3 && '...'}
         </div>
