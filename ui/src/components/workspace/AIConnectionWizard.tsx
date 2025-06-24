@@ -238,18 +238,18 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto py-8">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={onBack}
-            className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
+            className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 mb-4"
           >
             <ChevronLeft className="w-5 h-5 mr-1" />
             Back to AI Models
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">{wizardTitle}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{wizardTitle}</h1>
         </div>
 
         {/* Progress Bar */}
@@ -264,7 +264,7 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
                       ? 'bg-blue-500 border-blue-500 text-white'
                       : currentStep > step.id
                       ? 'bg-green-500 border-green-500 text-white'
-                      : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
+                      : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-gray-400'
                   }`}
                 >
                   {currentStep > step.id ? (
@@ -276,7 +276,7 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
                 {index < steps.length - 1 && (
                   <div
                     className={`w-16 h-0.5 mx-2 transition-all duration-200 ${
-                      currentStep > step.id ? 'bg-green-500' : 'bg-gray-300'
+                      currentStep > step.id ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   />
                 )}
@@ -289,10 +289,10 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
                 key={step.id}
                 className={`text-xs font-medium transition-colors duration-200 ${
                   currentStep === step.id
-                    ? 'text-blue-600'
+                    ? 'text-blue-600 dark:text-blue-400'
                     : currentStep > step.id
-                    ? 'text-green-600'
-                    : 'text-gray-400'
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
                 {step.title}
@@ -302,7 +302,7 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
           {renderCurrentStep()}
         </div>
       </div>

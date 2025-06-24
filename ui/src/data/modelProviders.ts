@@ -161,13 +161,6 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
       { id: 'anthropic.claude-v2', name: 'anthropic.claude-v2', displayName: 'Claude 2', description: 'Anthropic Claude 2', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', 'v2'] },
       { id: 'anthropic.claude-instant-v1', name: 'anthropic.claude-instant-v1', displayName: 'Claude Instant', description: 'Anthropic Claude Instant', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', 'Instant'] },
       { id: 'anthropic.claude-v2:0', name: 'anthropic.claude-v2:0', displayName: 'Claude', description: 'Anthropic Claude', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude'] },
-      { id: 'ai21.jamba-1-5-large-v1:0', name: 'ai21.jamba-1-5-large-v1:0', displayName: 'Jamba 1.5 Large', description: 'AI21 Jamba 1.5 Large', maxTokens: 8192, capabilities: ['Text', 'Chat'], tags: ['AI21', 'Jamba', 'Large'] },
-      { id: 'ai21.jamba-1-5-mini-v1:0', name: 'ai21.jamba-1-5-mini-v1:0', displayName: 'Jamba 1.5 Mini', description: 'AI21 Jamba 1.5 Mini', maxTokens: 8192, capabilities: ['Text', 'Chat'], tags: ['AI21', 'Jamba', 'Mini'] },
-      { id: 'ai21.jamba-instruct-v1:0', name: 'ai21.jamba-instruct-v1:0', displayName: 'Jamba-Instruct', description: 'AI21 Jamba-Instruct', maxTokens: 8192, capabilities: ['Text', 'Chat'], tags: ['AI21', 'Jamba', 'Instruct'] },
-      { id: 'mistral.mistral-large-2402-v1:0', name: 'mistral.mistral-large-2402-v1:0', displayName: 'Mistral Large (24.02)', description: 'Mistral Large 24.02', maxTokens: 32000, capabilities: ['Text', 'Chat'], tags: ['Mistral', 'Large', '2402'] },
-      { id: 'mistral.mistral-small-2402-v1:0', name: 'mistral.mistral-small-2402-v1:0', displayName: 'Mistral Small (24.02)', description: 'Mistral Small 24.02', maxTokens: 32000, capabilities: ['Text', 'Chat'], tags: ['Mistral', 'Small', '2402'] },
-      { id: 'mistral.mixtral-8x7b-instruct-v0:1', name: 'mistral.mixtral-8x7b-instruct-v0:1', displayName: 'Mixtral 8x7B Instruct', description: 'Mixtral 8x7B Instruct', maxTokens: 32000, capabilities: ['Text', 'Chat'], tags: ['Mistral', 'Mixtral', '8x7B'] },
-      { id: 'mistral.pixtral-large-2502-v1:0', name: 'mistral.pixtral-large-2502-v1:0', displayName: 'Pixtral Large (25.02)', description: 'Pixtral Large 25.02', maxTokens: 32000, capabilities: ['Text', 'Chat'], tags: ['Mistral', 'Pixtral', '2502'] }
     ],
     authFields: [
       { name: 'accessKeyId', label: 'Access Key ID', type: 'text', required: true, placeholder: 'AKIA...', helpText: 'AWS Access Key ID' },

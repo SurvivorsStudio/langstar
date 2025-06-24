@@ -46,10 +46,10 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="text-center mb-8 animate-fadeIn">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
           Select {provider.name} Model
         </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
           Choose the AI model that best fits your needs. Each model has different capabilities, 
           performance characteristics, and pricing.
         </p>
@@ -59,7 +59,7 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
       <div className="mb-8 animate-fadeIn" style={{ animationDelay: '200ms' }}>
         <button
           onClick={onBack}
-          className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+          className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
         >
           <ChevronLeft className="w-5 h-5 mr-2" />
           Back to Provider Selection
@@ -70,13 +70,13 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
       <div className="space-y-8">
         {Object.entries(groupedModels).map(([category, models], categoryIndex) => (
           <div key={category} className="animate-fadeIn" style={{ animationDelay: `${300 + categoryIndex * 100}ms` }}>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{category}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">{category}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {models.map((model, index) => (
                 <div
                   key={model.id}
                   onClick={() => onSelect(model.id)}
-                  className="group bg-white rounded-xl border-2 border-gray-200 p-6 cursor-pointer hover:border-blue-500 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                  className="group bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-6 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
                   style={{ animationDelay: `${400 + categoryIndex * 100 + index * 50}ms` }}
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -90,15 +90,15 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
                     </div>
                   </div>
 
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {model.name}
                   </h3>
                   
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
                     {model.description}
                   </p>
 
-                  <div className="space-y-2 text-sm text-gray-500">
+                  <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex justify-between">
                       <span>Context Length:</span>
                       <span className="font-medium">{model.maxTokens?.toLocaleString() || 'N/A'}</span>
@@ -112,17 +112,17 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
                   {model.tags && model.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {model.tags.map(tag => (
-                        <span key={tag} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">#{tag}</span>
+                        <span key={tag} className="px-2 py-1 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">#{tag}</span>
                       ))}
                     </div>
                   )}
 
                   <div className="pt-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 transition-colors duration-300 group-hover:text-gray-700">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-300 group-hover:text-gray-700 dark:group-hover:text-gray-100">
                         Click to select
                       </span>
-                      <Check className="w-5 h-5 text-blue-500 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110" />
+                      <Check className="w-5 h-5 text-blue-500 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110" />
                     </div>
                   </div>
                 </div>
@@ -133,7 +133,7 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
       </div>
 
       {/* Footer */}
-      <div className="text-center text-sm text-gray-500 animate-fadeIn" style={{ animationDelay: '800ms' }}>
+      <div className="text-center text-sm text-gray-500 dark:text-gray-400 animate-fadeIn" style={{ animationDelay: '800ms' }}>
         <p>After selecting a model, you'll enter authentication information in the next step</p>
       </div>
     </div>
