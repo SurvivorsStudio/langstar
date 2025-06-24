@@ -55,6 +55,9 @@ export interface AIConnection {
   provider: string;
   model: string;
   apiKey?: string; // API 키는 선택적으로 저장 (보안 고려)
+  accessKeyId?: string; // AWS Access Key ID
+  secretAccessKey?: string; // AWS Secret Access Key
+  region?: string; // AWS Region
   temperature?: number; // Language model 전용
   maxTokens?: number;   // Language model 전용
   status: 'active' | 'draft' | 'archived';
@@ -842,12 +845,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           // API 페이로드에 맞게 모델 정보 변환
-          const modelForAPI = {
+          let modelForAPI: any = {
             connName: (modelConnection as AIConnection).name,
             providerName: (modelConnection as AIConnection).provider,
             modelName: (modelConnection as AIConnection).model,
-            apiKey: (modelConnection as AIConnection).apiKey
           };
+          if ((modelConnection as AIConnection).provider.toLowerCase() === 'aws') {
+            modelForAPI.accessKeyId = (modelConnection as AIConnection).accessKeyId;
+            modelForAPI.secretAccessKey = (modelConnection as AIConnection).secretAccessKey;
+            modelForAPI.region = (modelConnection as AIConnection).region;
+          } else {
+            modelForAPI.apiKey = (modelConnection as AIConnection).apiKey;
+          }
 
           const modelSetting = {
             topK: topK ?? 40,
@@ -1301,8 +1310,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const request = store.getAll();
 
       request.onsuccess = () => {
-        set({ aiConnections: request.result as AIConnection[], isLoadingAIConnections: false, loadErrorAIConnections: null });
-        console.log(`FlowStore: Found ${request.result.length} AI connections:`, request.result);
+        // 마이그레이션: type 필드 소문자화 및 기본값 보정
+        const normalized = (request.result as AIConnection[]).map(conn => {
+          let type = (conn.type || '').toLowerCase();
+          if (type !== 'language' && type !== 'embedding') {
+            type = 'embedding'; // 잘못된 값이면 기본값
+          }
+          return { ...conn, type: type as 'language' | 'embedding' };
+        });
+        set({ aiConnections: normalized, isLoadingAIConnections: false, loadErrorAIConnections: null });
+        console.log(`FlowStore: Found ${normalized.length} AI connections:`, normalized);
       };
       request.onerror = (event) => {
         const error = (event.target as IDBRequest).error;
@@ -1357,13 +1374,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         if (modelDetails) {
           // 저장된 객체를 서버가 요구하는 최종 포맷으로 변환합니다.
-          const modelConfigForExport = {
+          let modelConfigForExport: any = {
             connName: modelDetails.name,
             providerName: modelDetails.provider,
             modelName: modelDetails.model,
-            apiKey: modelDetails.apiKey
           };
-          
+          if (modelDetails.provider.toLowerCase() === 'aws') {
+            modelConfigForExport.accessKeyId = modelDetails.accessKeyId;
+            modelConfigForExport.secretAccessKey = modelDetails.secretAccessKey;
+            modelConfigForExport.region = modelDetails.region;
+          } else {
+            modelConfigForExport.apiKey = modelDetails.apiKey;
+          }
           // 변환된 객체로 기존 config.model을 대체합니다.
           finalNodeData.config = {
             ...finalNodeData.config,

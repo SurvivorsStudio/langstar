@@ -46,46 +46,15 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
         </button>
         <div>
           <button
-            onClick={() => toggleMenu('aiKeys')}
-            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu.startsWith('ai-')
+            onClick={() => setActiveMenu('ai-model-config')}
+            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'ai-model-config'
               ? 'text-blue-600 bg-blue-50'
               : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             <Key className="w-4 h-4 mr-2" />
-            <span className="flex-1 text-left">AI Model Keys</span>
-            <ChevronDown className={`w-4 h-4 transform transition-transform ${expandedMenus.aiKeys ? 'rotate-180' : ''}`} />
+            <span className="flex-1 text-left">AI Model Configuration</span>
           </button>
-          {expandedMenus.aiKeys && (
-            <div className="ml-6 mt-1 space-y-1">
-              <button
-                onClick={() => {
-                  setActiveMenu('ai-language');
-                  setSelectedAIType('language');
-                }}
-                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'ai-language'
-                  ? 'text-blue-600 bg-blue-50'
-                  : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex-1 text-left">Language Models</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => {
-                  setActiveMenu('ai-embedding');
-                  setSelectedAIType('embedding');
-                }}
-                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'ai-embedding'
-                  ? 'text-blue-600 bg-blue-50'
-                  : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex-1 text-left">Embedding Models</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </nav>
