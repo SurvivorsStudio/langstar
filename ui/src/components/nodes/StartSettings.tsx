@@ -86,10 +86,10 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700">Default Settings</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Default Settings</h3>
         
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Class Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -98,10 +98,10 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
             onChange={(e) => handleClassNameChange(e.target.value)}
             placeholder="Enter class name"
             className={`w-full px-3 py-2 border ${
-              showClassNameError ? 'border-red-300 ring-red-200' : 'border-gray-300'
+              showClassNameError ? 'border-red-300 ring-red-200 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
             } rounded-md focus:outline-none focus:ring-2 ${
               showClassNameError ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-            } text-sm`}
+            } text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
           />
           {showClassNameError && (
             <div className="flex items-center mt-1 text-red-500 text-xs">
@@ -112,13 +112,13 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Class Type
           </label>
           <select
             value={classType}
             onChange={(e) => handleClassTypeChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           >
             <option value="TypedDict">TypedDict</option>
             <option value="BaseModel">BaseModel</option>
@@ -128,10 +128,10 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-medium text-gray-700">Variables</h3>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Variables</h3>
           <button
             onClick={handleAddVariable}
-            className="flex items-center px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+            className="flex items-center px-2 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded"
           >
             <Plus size={16} className="mr-1" />
             Add Variable
@@ -140,17 +140,17 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
 
         <div className="space-y-4">
           {variables.map((variable, index) => (
-            <div key={index} className="relative p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div key={index} className="relative p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
               <button
                 onClick={() => handleRemoveVariable(index)}
-                className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600"
+                className="absolute top-2 right-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X size={16} />
               </button>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Variable Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -159,10 +159,10 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                     onChange={(e) => handleVariableChange(index, 'name', e.target.value)}
                     placeholder="Enter variable name"
                     className={`w-full px-3 py-2 border ${
-                      !variable.name.trim() ? 'border-red-300 ring-red-200' : 'border-gray-300'
+                      !variable.name.trim() ? 'border-red-300 ring-red-200 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
                     } rounded-md focus:outline-none focus:ring-2 ${
                       !variable.name.trim() ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-                    } text-sm`}
+                    } text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
                   />
                   {!variable.name.trim() && (
                     <div className="flex items-center mt-1 text-red-500 text-xs">
@@ -173,13 +173,13 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Variable Type
                   </label>
                   <select
                     value={variable.type}
                     onChange={(e) => handleVariableChange(index, 'type', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   >
                     <option value="string">string</option>
                     <option value="int">int</option>
@@ -190,7 +190,7 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Default Value
                   </label>
                   <input
@@ -198,18 +198,18 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                     value={variable.defaultValue}
                     onChange={(e) => handleVariableChange(index, 'defaultValue', e.target.value)}
                     placeholder="Enter default value"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Select Variable
                   </label>
                   <select
                     value={variable.selectVariable}
                     onChange={(e) => handleVariableChange(index, 'selectVariable', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   >
                     <option value="">None</option>
                     <option value="question">question</option>

@@ -63,22 +63,21 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
     });
   };
 
-  // Mock embedding generation
-  const generateEmbedding = () => {
-    if (!sourceOutput || !node?.data.config?.inputColumn || !node?.data.config?.outputVariable) return;
-
-    const result = { ...sourceOutput };
-    result[node.data.config.outputColumn] = [1, 2, 3, 4]; // Mock embedding result
-    return result;
-  };
+  // Mock embedding generation - currently unused but kept for future implementation
+  // const generateEmbedding = () => {
+  //   if (!sourceOutput || !node?.data.config?.inputColumn || !node?.data.config?.outputVariable) return;
+  //   const result = { ...sourceOutput };
+  //   result[node.data.config.outputColumn] = [1, 2, 3, 4]; // Mock embedding result
+  //   return result;
+  // };
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700">Embedding Settings</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Embedding Settings</h3>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Output Variable
           </label>
           <div className="relative"> {/* Container for input/select and warnings */}
@@ -92,14 +91,14 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
                     onChange={(e) => handleOutputVariableChange(e.target.value)}
                     placeholder="Enter output variable name"
                     className={`flex-grow px-3 py-2 border ${
-                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                     // Disable if no source and no current value, and no available variables to choose from
                     disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable} 
                   />
                   <button
                     onClick={() => setIsEditingOutputVariable(false)}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0"
+                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0"
                     aria-label="Confirm output column"
                   >
                     <Check size={18} />
@@ -112,8 +111,8 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
                     value={node?.data.config?.outputVariable || ''}
                     onChange={(e) => handleOutputVariableChange(e.target.value)}
                     className={`flex-grow px-3 py-2 border ${
-                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-                    } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                      !hasValidOutput && availableVariables.length === 0 ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                     disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
                   >
                     <option value="">Select output variable</option>
@@ -129,7 +128,7 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
                       </option>
                     ))}
                   </select>
-                  <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                  <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
                     <Pencil size={18} />
                   </button>
                 </>
@@ -140,13 +139,13 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
         </div>
         
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Embedding Model
           </label>
           <select
             value={node?.data.config?.model || ''}
             onChange={(e) => handleModelChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           >
             <option value="">Select a model</option>
             {mockEmbeddingModels.map(conn => (
@@ -156,22 +155,22 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
             ))}
           </select>
           {mockEmbeddingModels.length === 0 && (
-            <p className="text-xs text-amber-500">
+            <p className="text-xs text-amber-500 dark:text-amber-400">
               No embedding models configured. Please add models in the RAG Configuration section.
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600">
+          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Input Column
           </label>
           <select
             value={node?.data.config?.inputColumn || ''}
             onChange={(e) => handleInputColumnChange(e.target.value)}
             className={`w-full px-3 py-2 border ${
-              !hasValidOutput ? 'bg-gray-50 text-gray-400' : 'bg-white'
-            } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+              !hasValidOutput ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+            } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
             disabled={!hasValidOutput}
           >
             <option value="">Select input column</option>
@@ -182,7 +181,7 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
             ))}
           </select>
           {!incomingEdge && (
-            <div className="flex items-center mt-1 text-amber-500 text-xs">
+            <div className="flex items-center mt-1 text-amber-500 dark:text-amber-400 text-xs">
               <AlertCircle size={12} className="mr-1" />
               Connect an input node to access variables
             </div>
@@ -190,9 +189,9 @@ const EmbeddingSettings: React.FC<EmbeddingSettingsProps> = ({ nodeId }) => {
         </div>
       </div>
 
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">Output Format</h4>
-        <pre className="text-xs text-blue-600 bg-white p-3 rounded border border-blue-100">
+      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+        <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Output Format</h4>
+        <pre className="text-xs text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 p-3 rounded border border-blue-100 dark:border-blue-800">
 {`{
   "input_column": "Hello",
   "output_variable": [1, 2, 3, 4],

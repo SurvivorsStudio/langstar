@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import { EdgeProps, getBezierPath, EdgeLabelRenderer } from 'reactflow';
-import { ChevronRight, X, Trash2 } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import OutputInspector from '../OutputInspector';
 import { useFlowStore } from '../../store/flowStore';
 
@@ -14,7 +14,6 @@ const CustomEdge = ({
   targetPosition,
   data,
   source,
-  target,
   style = {},
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
@@ -81,16 +80,13 @@ const CustomEdge = ({
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY - 35}px)`, // Y 위치 조정
-              background: 'rgba(239, 246, 255, 0.9)', // Tailwind blue-50 with opacity
               padding: '3px 8px',
               borderRadius: '12px',
               fontSize: '10px',
               fontWeight: 600, // semibold
-              color: '#1e40af', // Tailwind blue-800
-              border: '1px solid rgba(219, 234, 254, 0.9)', // Tailwind blue-200 with opacity
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px 0 rgba(0, 0, 0, 0.04)',
             }}
-            className="nodrag nopan"
+            className="nodrag nopan bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50"
           >
             {conditionDescription}
           </div>
@@ -109,24 +105,24 @@ const CustomEdge = ({
           <div className="absolute -top-2 -right-2 flex gap-1">
             <button
               onClick={handleClearOutput}
-              className="p-1 bg-gray-500 hover:bg-gray-600 text-white rounded-full shadow-sm transition-colors z-10"
+              className="p-1 bg-gray-500 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-full shadow-sm transition-colors z-10"
               title="Clear Output"
             >
               <Trash2 size={12} />
             </button>
             <button
               onClick={handleDelete}
-              className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-sm transition-colors z-10"
+              className="p-1 bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white rounded-full shadow-sm transition-colors z-10"
               title="Remove Connection"
             >
               <X size={12} />
             </button>
           </div>
           <div 
-            className="bg-white shadow-md rounded-md p-2 text-xs border border-gray-200 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-shadow"
+            className="bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border border-gray-200 dark:border-gray-600 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setShowInspector(true)}
           >
-            <pre className="text-gray-600 whitespace-pre-wrap break-words">
+            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
               {outputPreview.length > 200 ? outputPreview.slice(0, 200) + '...' : outputPreview}
             </pre>
           </div>

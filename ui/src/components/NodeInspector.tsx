@@ -34,9 +34,9 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [availableVariables, setAvailableVariables] = useState<string[]>([]);
 
   useEffect(() => {
-    const node = nodes.find((n: Node<NodeData>) => n.id === nodeId);
+    const node = nodes.find((n: any) => n.id === nodeId);
     if (node) {
-      setCurrentNode(node);
+      setCurrentNode(node as any);
       setCode(node.data.code || '# Write your Python code here\n\n');
       setNodeName(node.data.label || 'Untitled Node');
 
@@ -120,35 +120,35 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const isMergeNode = currentNode.type === 'mergeNode';
 
   return (
-    <div className="w-96 bg-white border-l border-gray-200 h-full overflow-hidden flex flex-col shadow-md z-10">
-      <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800">Node Inspector</h2>
+    <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
           <X size={18} />
         </button>
       </div>
       
-      <div className="px-4 py-3 border-b border-gray-200">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Node Name
         </label>
         <input
           type="text"
           value={nodeName}
           onChange={handleNameChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           placeholder="Enter node name"
         />
       </div>
       
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 dark:border-gray-700">
         {!isStartNode && (
           <button
             className={`flex-1 py-2 flex justify-center items-center ${
-              activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'
+              activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
             }`}
             onClick={() => setActiveTab('input_data')}
           >
@@ -161,7 +161,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
             return (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
-                  activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'
+                  activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
                 }`}
                 onClick={() => setActiveTab('code')}
               >
@@ -172,7 +172,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
             return (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
-                  activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'
+                  activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
                 }`}
                 onClick={() => setActiveTab('code')}
               >
@@ -186,7 +186,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         {!(isPromptNode || isSystemPromptNode) && (
           <button
             className={`flex-1 py-2 flex justify-center items-center ${
-              activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'
+              activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
             }`}
             onClick={() => setActiveTab('settings')}
           >
@@ -198,7 +198,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'input_data' && !isStartNode && (
           <div className="p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Incoming Data</h3>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Incoming Data</h3>
             {incomingEdges.length === 0 ? (
               <div className="flex items-center mt-1 text-amber-500 text-xs">
                 <AlertCircle size={12} className="mr-1" />
@@ -210,7 +210,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                 Connected node(s) have not produced output or output is empty. Execute preceding nodes.
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-lg p-3 font-mono text-xs">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 font-mono text-xs text-gray-900 dark:text-gray-100">
                 <pre className="whitespace-pre-wrap break-words">
                   {JSON.stringify(mergedInputData, null, 2)}
                 </pre>
@@ -226,17 +226,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
               <SystemPromptSettings nodeId={nodeId} />
             ) : (
               <>
-                <div className="p-4 border-b border-gray-200">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-600">
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                       Available Input Variables
                     </label>
                     <select
                       value={selectedVariable}
                       onChange={(e) => setSelectedVariable(e.target.value)}
                       className={`w-full px-3 py-2 border ${
-                        !hasValidInputData ? 'bg-gray-50 text-gray-400' : 'bg-white'
-                      } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                        !hasValidInputData 
+                          ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                      } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                       disabled={!hasValidInputData}
                     >
                       <option value="">Select a variable</option>
@@ -275,10 +277,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
           <div className="p-4 overflow-y-auto h-full">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Node Type
                 </label>
-                <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600">
+                <div className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                   {currentNode.type}
                 </div>
               </div>

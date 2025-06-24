@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useFlowStore, NodeData, Edge } from '../../store/flowStore'; // Edge 타입 import
+import { useFlowStore, NodeData } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react'; // 아이콘 import
 
 interface EndNodeSettingsProps {
@@ -99,14 +99,16 @@ const EndNodeSettings: React.FC<EndNodeSettingsProps> = ({ nodeId }) => {
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor="endnode-select-key" className="block text-sm font-medium text-gray-700 mb-1">Chatbot Output Key</label>
+        <label htmlFor="endnode-select-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chatbot Output Key</label>
         <select
           id="endnode-select-key"
           value={selectedKeyName}
           onChange={handleSelectedKeyChange}
-          className={`w-full px-3 py-2 border ${
-            availableKeys.length === 0 ? 'bg-gray-50 text-gray-400' : 'bg-white'
-          } border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
+          className={`w-full px-3 py-2 border \
+            ${availableKeys.length === 0 
+              ? 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500' 
+              : 'bg-white dark:bg-gray-700 dark:text-gray-100'} \
+            border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
           disabled={availableKeys.length === 0}
         >
           <option value="">-- Select a key --</option>
@@ -136,8 +138,8 @@ const EndNodeSettings: React.FC<EndNodeSettingsProps> = ({ nodeId }) => {
         })()}
       </div>
       <div>
-        <label htmlFor="endnode-displayed-value" className="block text-sm font-medium text-gray-700 mb-1">Expected Chatbot Response</label>
-        <pre id="endnode-displayed-value" className="mt-1 text-sm text-gray-600 bg-gray-100 p-2 border border-gray-300 rounded-md min-h-[38px] whitespace-pre-wrap break-all">
+        <label htmlFor="endnode-displayed-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expected Chatbot Response</label>
+        <pre id="endnode-displayed-value" className="mt-1 text-sm text-gray-600 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 p-2 border border-gray-300 dark:border-gray-600 rounded-md min-h-[38px] whitespace-pre-wrap break-all">
           {displayedValue}
         </pre>
       </div>

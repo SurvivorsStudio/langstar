@@ -45,22 +45,56 @@ body {
 }
 
 .react-flow__controls {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  border-radius: 6px;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.25), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 8px;
   overflow: hidden;
+  border: 1px solid #d1d5db;
 }
 
 .react-flow__controls-button {
   background-color: white;
   border-bottom: 1px solid #e5e7eb;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #f9fafb;
+  color: #374151;
+  transform: scale(1.05);
+}
+
+/* 다크모드 스타일 */
+.dark .react-flow__controls,
+.dark .react-flow__controls > * {
+  background-color: #1f2937 !important; /* Tailwind gray-800, 사이드바와 동일 */
+}
+
+.dark .react-flow__controls-button {
+  background-color: #7f858f;
+  border-bottom: 1px solid #4b5563;
+  color: #ffffff;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: #4b5563;
+  color: #ffffff;
+  transform: scale(1.05);
 }
 
 .react-flow__minimap {
   background-color: white;
-  border-radius: 6px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.25), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border: 1px solid #d1d5db;
+}
+
+.dark .react-flow__minimap {
+  background-color: #111827;
+  border: 1px solid #6b7280;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.3);
 }
 
 /* Merge Node 스타일 */
@@ -75,4 +109,14 @@ body {
 /* Merge Node가 선택되었을 때의 스타일 (기존 selected 스타일과 동일하게 적용) */
 .flow__node-mergeNode.selected { /* 'react-' 접두사 제거 */
   box-shadow: 0 0 0 2px #3b82f6; /* 파란색 강조 효과 (Tailwind blue-500) */
+}
+
+.dark .react-flow__controls-button svg {
+  color: #fff !important;
+  stroke: #fff !important;
+  fill: #fff !important;
+}
+
+.dark .react-flow__controls {
+  border: 1px solid #374151 !important; /* Tailwind gray-700, 사이드바와 동일 */
 }
