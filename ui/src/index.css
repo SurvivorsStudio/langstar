@@ -67,9 +67,9 @@ body {
 }
 
 /* 다크모드 스타일 */
-.dark .react-flow__controls {
-  border: 1px solid #4b5563;
-  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+.dark .react-flow__controls,
+.dark .react-flow__controls > * {
+  background-color: #1f2937 !important; /* Tailwind gray-800, 사이드바와 동일 */
 }
 
 .dark .react-flow__controls-button {
@@ -109,4 +109,14 @@ body {
 /* Merge Node가 선택되었을 때의 스타일 (기존 selected 스타일과 동일하게 적용) */
 .flow__node-mergeNode.selected { /* 'react-' 접두사 제거 */
   box-shadow: 0 0 0 2px #3b82f6; /* 파란색 강조 효과 (Tailwind blue-500) */
+}
+
+.dark .react-flow__controls-button svg {
+  color: #fff !important;
+  stroke: #fff !important;
+  fill: #fff !important;
+}
+
+.dark .react-flow__controls {
+  border: 1px solid #374151 !important; /* Tailwind gray-700, 사이드바와 동일 */
 }

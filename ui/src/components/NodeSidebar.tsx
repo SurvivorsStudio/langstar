@@ -88,16 +88,16 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                 {category.nodes.map((node) => (
                   <div
                     key={node.type}
-                    className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
+                    className="flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
                     draggable
                     onDragStart={(event) => handleNodeDragStart(event, node.type, node.label)}
                   >
-                    <div className="w-8 h-8 flex items-center justify-center mr-3">
-                      {node.icon}
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
+                      {node.icon(isDarkMode ? 'text-white' : 'text-gray-700')}
                     </div>
-                    <div>
-                      <div className="font-medium text-sm text-gray-800 dark:text-gray-200">{node.label}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{node.description}</div>
+                    <div className="flex flex-col items-start">
+                      <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{node.label}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 text-left">{node.description}</div>
                     </div>
                   </div>
                 ))}
