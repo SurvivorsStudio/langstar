@@ -35,7 +35,6 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           }`}
         >
           <span className="flex-1 text-left">Chatflows</span>
-          <ChevronRight className="w-4 h-4" />
         </button>
         <button
           onClick={() => setActiveMenu('rag')}
@@ -46,14 +45,13 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
         >
           <Database className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">RAG Configuration</span>
-          <ChevronRight className="w-4 h-4" />
         </button>
         <div>
           <button
             onClick={() => setActiveMenu('ai-model-config')}
-            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 ${activeMenu === 'ai-model-config'
-              ? 'text-blue-600 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-50'
+            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'ai-model-config'
+              ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
             <Key className="w-4 h-4 mr-2" />

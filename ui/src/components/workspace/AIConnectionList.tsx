@@ -40,33 +40,33 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-white dark:bg-gray-900 min-h-screen">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">
+          <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
             AI Models
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 dark:text-gray-300 mt-2">
             Manage your AI model connections and API keys
           </p>
         </div>
         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
           {/* 필터 버튼 그룹 */}
-          <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             <button
-              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'all' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'all' ? 'bg-blue-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
               onClick={() => setFilter('all')}
             >
               All
             </button>
             <button
-              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'language' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'language' ? 'bg-blue-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
               onClick={() => setFilter('language')}
             >
               Language Model
             </button>
             <button
-              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'embedding' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+              className={`px-4 py-2 rounded-md font-medium transition-colors duration-150 ${filter === 'embedding' ? 'bg-blue-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
               onClick={() => setFilter('embedding')}
             >
               Embedding Model
@@ -85,7 +85,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
       {/* 언어 모델 섹션 */}
       {showLanguage && (
         <div className="mb-10">
-          <h2 className="text-xl font-bold text-black mb-4">Language Models</h2>
+          <h2 className="text-xl font-bold text-black dark:text-gray-100 mb-4">Language Models</h2>
           {isLoading && (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -114,45 +114,45 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
                 <div
                   key={connection.id}
                   onClick={() => handleEditAIConnection(connection)}
-                  className="bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer group transform hover:scale-105"
+                  className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-300 cursor-pointer group transform hover:scale-105"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       {/* 타입 배지 */}
                       <div className="mb-2 flex items-center">
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full mr-2 bg-purple-100 text-purple-700">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full mr-2 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200">
                           <MessageSquareText className="w-4 h-4 mr-1" />
                           Language Model
                         </span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Name:</span>
-                        <span className="bg-gray-50 px-2 py-1 rounded text-xs">{connection.name}</span>
+                        <span className="bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded text-xs">{connection.name}</span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Provider:</span>
-                        <span className="bg-gray-100 px-2 py-1 rounded text-xs">{connection.provider}</span>
+                        <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">{connection.provider}</span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Model:</span>
                         <span
-                          className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap block"
+                          className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap block"
                           title={connection.model}
                         >
                           {connection.model}
                         </span>
                       </div>
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           Modified: {formatDate(connection.lastModified)}
                         </span>
                         <span
                           className={`px-3 py-1 text-xs rounded-full font-medium ${
                             connection.status === 'active'
-                              ? 'bg-green-100 text-green-700'
+                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                               : connection.status === 'draft'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                           }`}
                         >
                           {connection.status === 'active' ? 'Active' : 
@@ -163,9 +163,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm('정말로 이 모델을 삭제하시겠습니까?')) {
-                          handleDeleteAIConnection(connection.id, e);
-                        }
+                        handleDeleteAIConnection(connection.id, e);
                       }}
                       className="ml-2 p-2 rounded-full transition-colors"
                       title="Delete"
@@ -183,7 +181,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
       {/* 임베딩 모델 섹션 */}
       {showEmbedding && (
         <div>
-          <h2 className="text-xl font-bold text-black mb-4">Embedding Models</h2>
+          <h2 className="text-xl font-bold text-black dark:text-gray-100 mb-4">Embedding Models</h2>
           {isLoading && (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -212,45 +210,45 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
                 <div
                   key={connection.id}
                   onClick={() => handleEditAIConnection(connection)}
-                  className="bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer group transform hover:scale-105"
+                  className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-300 cursor-pointer group transform hover:scale-105"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       {/* 타입 배지 */}
                       <div className="mb-2 flex items-center">
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full mr-2 bg-green-100 text-green-700">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full mr-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
                           <Database className="w-4 h-4 mr-1" />
                           Embedding Model
                         </span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Name:</span>
-                        <span className="bg-gray-50 px-2 py-1 rounded text-xs">{connection.name}</span>
+                        <span className="bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded text-xs">{connection.name}</span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Provider:</span>
-                        <span className="bg-gray-100 px-2 py-1 rounded text-xs">{connection.provider}</span>
+                        <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">{connection.provider}</span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <span className="font-medium mr-2 w-16">Model:</span>
                         <span
-                          className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap block"
+                          className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap block"
                           title={connection.model}
                         >
                           {connection.model}
                         </span>
                       </div>
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           Modified: {formatDate(connection.lastModified)}
                         </span>
                         <span
                           className={`px-3 py-1 text-xs rounded-full font-medium ${
                             connection.status === 'active'
-                              ? 'bg-green-100 text-green-700'
+                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                               : connection.status === 'draft'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                           }`}
                         >
                           {connection.status === 'active' ? 'Active' : 
@@ -261,9 +259,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm('정말로 이 모델을 삭제하시겠습니까?')) {
-                          handleDeleteAIConnection(connection.id, e);
-                        }
+                        handleDeleteAIConnection(connection.id, e);
                       }}
                       className="ml-2 p-2 rounded-full transition-colors"
                       title="Delete"
