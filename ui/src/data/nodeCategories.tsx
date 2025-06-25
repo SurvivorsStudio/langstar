@@ -56,7 +56,7 @@ export const nodeCategories: NodeCategory[] = [
         type: 'toolsMemoryNode',
         label: 'Tools&Memory',
         description: 'Tools and Memory groups management',
-        icon: (className = '') => <FolderOpen className="w-5 h-5" />
+        icon: (className = '') => <FolderOpen size={20} className={className} />
       },
       {
         type: 'mergeNode',
