@@ -24,9 +24,9 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
   const isStartNode = type === 'startNode';
   const isEndNode = type === 'endNode';
   const isConditionNode = type === 'conditionNode';
-  const isGroupsNode = type === 'groupsNode';
+  const isToolsMemoryNode = type === 'toolsMemoryNode';
 
-  // GroupsNode일 경우, 설정에서 그룹 목록 가져오기
+  // ToolsMemoryNode일 경우, 설정에서 그룹 목록 가져오기
   const groups: any[] = data.config?.groups || [];
   const memoryGroups = groups.filter((g: any) => g.type === 'memory');
   const toolsGroups = groups.filter((g: any) => g.type === 'tools');
@@ -98,7 +98,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       'toolNode': 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700',
       'startNode': 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600',
       'endNode': 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700',
-      'groupsNode': 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600',
+      'toolsMemoryNode': 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600',
     }[(data.nodeType as string)] || 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
@@ -121,7 +121,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       'toolNode': 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800/50',
       'startNode': 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
       'endNode': 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-800/50',
-      'groupsNode': 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
+      'toolsMemoryNode': 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
     }[(data.nodeType as string)] || 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700';
 
     // 조건 노드이고 유효성 에러가 있는 경우 스타일 재정의
@@ -305,7 +305,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       }`}
     >
       {/* 시작 노드와 그룹 노드가 아닌 경우 상단 핸들 (입력) 표시 */}
-      {!isStartNode && !isGroupsNode && (
+      {!isStartNode && !isToolsMemoryNode && (
         <Handle
           type="target"
           position={Position.Top}
@@ -317,7 +317,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       {/* 노드 우측 상단 버튼 (실행, 삭제) */}
       <div className="absolute -top-2 -right-2 flex gap-2">
         {/* End 노드는 실행(재생) 버튼도 숨김 */}
-        {!isGroupsNode && !isEndNode && (
+        {!isToolsMemoryNode && !isEndNode && (
           <div
             className="relative overflow-visible"
             onMouseEnter={() => setIsPlayHovered(true)}
@@ -401,8 +401,8 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{data.description}</div>
       )}
 
-      {/* GroupsNode일 경우 메모리 및 도구 그룹 렌더링 */}
-      {isGroupsNode && (
+      {/* ToolsMemoryNode일 경우 메모리 및 도구 그룹 렌더링 */}
+      {isToolsMemoryNode && (
         <div className="mt-4 space-y-4">
           {renderGroups(memoryGroups, 'memory')}
           {renderGroups(toolsGroups, 'tools')}
@@ -426,7 +426,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
       )}
       
       {/* 종료 노드와 그룹 노드가 아닌 경우 하단 핸들 (출력) 표시 */}
-      {!isEndNode && !isGroupsNode && (
+      {!isEndNode && !isToolsMemoryNode && (
         <Handle
           type="source"
           position={Position.Bottom}

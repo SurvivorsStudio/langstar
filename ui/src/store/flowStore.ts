@@ -814,9 +814,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           if (selectedToolIds.length > 0) {
             // 이 부분은 로그 출력을 위한 것이므로 API 페이로드 구성과는 별개입니다.
             console.log(`[AgentNode ${nodeId}] --- 🛠️ Tool 상세 정보 시작 ---`);
-            const groupsNode = get().nodes.find(n => n.type === 'groupsNode');
-            if (groupsNode && groupsNode.data.config?.groups) {
-              const allGroups = groupsNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; code?: string; [key: string]: any }>;
+            const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
+            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; code?: string; [key: string]: any }>;
               
               selectedToolIds.forEach(toolId => {
                 const toolGroup = allGroups.find(g => g.id === toolId);
@@ -826,11 +826,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   console.log(`[AgentNode ${nodeId}]     - 설명 (Description): ${toolGroup.description || 'N/A'}`);
                   console.log(`[AgentNode ${nodeId}]     - Python 코드 (Code): \n${toolGroup.code || 'N/A'}`);
                 } else {
-                  console.warn(`[AgentNode ${nodeId}]   ⚠️ 경고: 선택된 Tool ID '${toolId}'에 해당하는 그룹을 GroupsNode에서 찾을 수 없습니다.`);
+                  console.warn(`[AgentNode ${nodeId}]   ⚠️ 경고: 선택된 Tool ID '${toolId}'에 해당하는 그룹을 toolsMemoryNode에서 찾을 수 없습니다.`);
                 }
               });
             } else {
-              console.warn(`[AgentNode ${nodeId}]   ⚠️ 경고: GroupsNode를 찾을 수 없거나 그룹 데이터가 없어 Tool 상세 정보를 로드할 수 없습니다.`);
+              console.warn(`[AgentNode ${nodeId}]   ⚠️ 경고: toolsMemoryNode를 찾을 수 없거나 그룹 데이터가 없어 Tool 상세 정보를 로드할 수 없습니다.`);
             }
             console.log(`[AgentNode ${nodeId}] --- 🛠️ Tool 상세 정보 종료 ---`);
           } else {
@@ -898,9 +898,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           let memoryTypeForAPI: string | undefined = undefined;
           let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
           if (memoryGroup) { // memoryGroup is the ID of the selected group
-            const groupsNode = get().nodes.find(n => n.type === 'groupsNode');
-            if (groupsNode && groupsNode.data.config?.groups) {
-              const allGroups = groupsNode.data.config.groups as Array<{ id: string; name: string; type: string; memoryType?: string; [key: string]: any }>;
+            const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
+            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; memoryType?: string; [key: string]: any }>;
               const selectedGroupDetails = allGroups.find(g => g.id === memoryGroup);
               if (selectedGroupDetails && selectedGroupDetails.type === 'memory') {
                 // groupsNode에 저장된 memoryType 값을 우선 사용합니다.
@@ -924,9 +924,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           // API 페이로드용 tools_for_api 구성
           let tools_for_api: Array<{ tool_name: string; tool_description: string; tool_code: string }> = []; // 'python_code' -> 'tool_code'로 변경
           if (selectedToolIds.length > 0) {
-            const groupsNode = get().nodes.find(n => n.type === 'groupsNode');
-            if (groupsNode && groupsNode.data.config?.groups) {
-              const allGroups = groupsNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; code?: string; [key: string]: any }>;
+            const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
+            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; code?: string; [key: string]: any }>;
               selectedToolIds.forEach(toolId => {
                 const toolGroup = allGroups.find(g => g.id === toolId);
                 if (toolGroup && toolGroup.type === 'tools') { // groupsNode에서 가져온 그룹이 'tools' 타입인지 확인
@@ -936,11 +936,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                     tool_code: toolGroup.code || '' // 'python_code' -> 'tool_code'로 변경
                   });
                 } else {
-                  console.warn(`[AgentNode ${nodeId}] API Payload: Tool ID '${toolId}'에 해당하는 Tool 정보를 GroupsNode에서 찾을 수 없거나 타입이 'tools'가 아닙니다. API 요청에서 제외됩니다.`);
+                  console.warn(`[AgentNode ${nodeId}] API Payload: Tool ID '${toolId}'에 해당하는 Tool 정보를 toolsMemoryNode에서 찾을 수 없거나 타입이 'tools'가 아닙니다. API 요청에서 제외됩니다.`);
                 }
               });
             } else {
-              console.warn(`[AgentNode ${nodeId}] API Payload: GroupsNode를 찾을 수 없거나 그룹 데이터가 없어 Tool 정보를 API 페이로드에 포함할 수 없습니다.`);
+              console.warn(`[AgentNode ${nodeId}] API Payload: toolsMemoryNode를 찾을 수 없거나 그룹 데이터가 없어 Tool 정보를 API 페이로드에 포함할 수 없습니다.`);
             }
           }
 
@@ -1386,10 +1386,51 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           } else {
             modelConfigForExport.apiKey = modelDetails.apiKey;
           }
-          // 변환된 객체로 기존 config.model을 대체합니다.
+          
+          // Memory Group 정보를 실제 구성 정보로 변환
+          let memoryConfigForExport: any = undefined;
+          if (finalNodeData.config?.memoryGroup) {
+            const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
+            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; memoryType?: string; [key: string]: any }>;
+              const selectedMemoryGroup = allGroups.find(g => g.id === finalNodeData.config!.memoryGroup && g.type === 'memory');
+              if (selectedMemoryGroup) {
+                memoryConfigForExport = {
+                  id: selectedMemoryGroup.id,
+                  name: selectedMemoryGroup.name,
+                  description: selectedMemoryGroup.description || '',
+                  memoryType: selectedMemoryGroup.memoryType || 'ConversationBufferMemory'
+                };
+              }
+            }
+          }
+
+          // Tools 정보를 실제 구성 정보로 변환
+          let toolsConfigForExport: Array<{ id: string; name: string; description: string; code: string }> = [];
+          if (finalNodeData.config?.tools && Array.isArray(finalNodeData.config.tools)) {
+            const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
+            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; code?: string; [key: string]: any }>;
+              finalNodeData.config.tools.forEach((toolId: string) => {
+                const selectedToolGroup = allGroups.find(g => g.id === toolId && g.type === 'tools');
+                if (selectedToolGroup) {
+                  toolsConfigForExport.push({
+                    id: selectedToolGroup.id,
+                    name: selectedToolGroup.name,
+                    description: selectedToolGroup.description || '',
+                    code: selectedToolGroup.code || ''
+                  });
+                }
+              });
+            }
+          }
+
+          // 변환된 객체로 기존 config를 대체합니다.
           finalNodeData.config = {
             ...finalNodeData.config,
             model: modelConfigForExport,
+            memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
+            tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
           };
         }
       }

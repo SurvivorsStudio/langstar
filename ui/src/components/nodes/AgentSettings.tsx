@@ -75,9 +75,9 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   }, [nodes, edges, nodeId, getNodeById]); // getNodeById는 store에서 오므로 직접적인 의존성은 아니지만, nodes/edges 변경 시 재계산 필요
 
   // Get all groups nodes and extract memory and tools groups
-  const groupsNode = nodes.find(n => n.type === 'groupsNode');
-  const memoryGroups: GroupData[] = groupsNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'memory') || [];
-  const toolsGroups: GroupData[] = groupsNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'tools') || [];
+  const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
+  const memoryGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'memory') || [];
+  const toolsGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'tools') || [];
 
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
