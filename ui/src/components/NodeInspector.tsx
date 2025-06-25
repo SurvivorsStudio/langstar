@@ -7,7 +7,6 @@ import PromptSettings from './nodes/PromptSettings';
 import SystemPromptSettings from './nodes/SystemPromptSettings';
 import AgentSettings from './nodes/AgentSettings';
 import StartSettings from './nodes/StartSettings';
-import GroupsSettings from './nodes/GroupsSettings';
 import EmbeddingSettings from './nodes/EmbeddingSettings';
 import RAGSettings from './nodes/RAGSettings';
 import MergeSettings from './nodes/MergeSettings';
