@@ -204,6 +204,7 @@ class WorkflowService:
                     "from typing import Annotated",
                     "import operator",
                     "from langchain_core.prompts import PromptTemplate",
+                    "from langchain.chains import LLMChain",
                     "from langgraph.graph import StateGraph, START, END",
                     "",
                     "class MyState(BaseModel):",
@@ -217,7 +218,7 @@ class WorkflowService:
                         else:
                             code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
                         code_lines.append(code_token)
-                return "\n".join(code_lines)
+                return "\n".join(code_lines) + "\n"
 
             def create_function_node(function_name, py_code, func_exec):
                 indented_code = textwrap.indent(py_code, "    ")
@@ -447,6 +448,26 @@ def node_{function_name}(state):
 
                         result.append(temp_config.copy())
                         result.append({node_name: {}})
+                    
+                    elif node['type'] == 'agentNode': 
+                        node_id   = node['id']
+                        node_type = node['type']
+                        node_name = node['data']['label']
+                        
+                        conditions_config_list = node['data']['config']
+
+                        config_id = node_name + "_Config"
+
+                        temp_config = {}
+                        temp_config[config_id] = { 'config' : conditions_config_list } 
+                        
+                        temp_config[config_id]['config']['node_type'] = node_type
+                        temp_config[config_id]['config']['next_node'] = edge_relation[node_name]
+                        temp_config[config_id]['config']['node_name'] = node_name
+
+                        result.append( temp_config.copy() )
+                        result.append( {node_name : {}} ) 
+                    
 
                 python_code = create_state(result)
                 python_code += """
@@ -575,6 +596,215 @@ def node_**endNode**( state ) :
     return return_next_node( node_name, next_node_list, return_value ) 
 """ + "\n" + "\n" + "\n"
 
+                agent_node_code_base = """
+
+def node_**agentNode**( state ) : 
+    from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+    my_name = "**agentNode**" 
+    node_name = my_name
+    node_config_name = my_name + "_Config"
+
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config_name]['config']
+    print( node_config )
+
+    # 모델 정보
+    model_info = node_config['model']
+    provider = model_info['providerName'] 
+    modelName = model_info['modelName'] 
+    if provider == "aws" : 
+        accessKeyId     = model_info['accessKeyId'] 
+        secretAccessKey = model_info['secretAccessKey'] 
+        region          = model_info['region'] 
+        
+    else :
+        apiKey = model_info['apiKey'] 
+
+    # prompt 
+    system_prompt_key = node_config['systemPromptInputKey']
+    system_prompt     = node_input[system_prompt_key]
+    
+    user_prompt_key = node_config['userPromptInputKey']
+    user_prompt     = node_input[user_prompt_key]
+    
+    output_value  = node_config['agentOutputVariable']
+    
+
+    # 답변 옵션     
+    temperature = node_config['temperature']
+    max_token   = node_config['maxTokens']
+    top_k       = node_config['topK']
+    top_p       = node_config['topP']
+
+
+    **model_connection**
+
+
+    # 도구 없이 LLM 직접 호출
+    response = llm_chian.predict( **{ "user_prompt" : user_prompt }  )
+    node_input[output_value] = response.content if hasattr(response, 'content') else response
+
+    return_value = node_input.copy()
+
+    # 다음 노드 처리
+    next_node_list = node_config.get('next_node', []) 
+    return return_next_node(node_name, next_node_list, return_value )
+"""  + "\n" + "\n" + "\n"
+
+                bedrock_no_memory_tools = """
+
+    from langchain_aws import ChatBedrockConverse
+    
+    llm = ChatBedrockConverse(
+                    model=modelName,
+                    temperature=temperature,
+                    max_tokens=max_token
+                )
+                
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt
+    )
+
+"""
+
+                openai_no_memory_tools = """
+
+    from langchain_openai import ChatOpenAI
+    
+    llm = ChatOpenAI(
+        temperature = temperature, 
+        max_tokens = max_token, 
+        model_name = modelName, 
+        api_key = apiKey 
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt
+    )
+        
+"""  
+
+                google_no_memory_tools = """
+
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    
+    llm = ChatGoogleGenerativeAI(
+        model=modelName,
+        temperature=temperature,
+        max_output_tokens=200,
+        google_api_key=apiKey 
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt
+    )
+    
+"""
+
+
+                import_ConversationBufferMemory = """from langchain.memory import ConversationBufferMemory
+memory = ConversationBufferMemory(return_messages=True)
+"""
+
+                bedrock_ConversationBufferMemory = """
+
+    from langchain_aws import ChatBedrockConverse
+    
+    llm  = ChatBedrockConverse(
+                    model=modelName,
+                    temperature=temperature,
+                    max_tokens=max_token
+                )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt,
+        memory=memory
+    )
+
+
+"""
+
+                openai_ConversationBufferMemory = """
+
+    from langchain_openai import ChatOpenAI
+    
+    llm = ChatOpenAI(
+        temperature = temperature, 
+        max_tokens = max_token, 
+        model_name = modelName, 
+        api_key = apiKey 
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt,
+        memory=memory
+    )
+
+
+"""
+
+
+                google_ConversationBufferMemory = """
+
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    
+    llm = ChatGoogleGenerativeAI(
+        model=modelName,
+        temperature=temperature,
+        max_output_tokens=200,
+        google_api_key=apiKey 
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{user_prompt}")
+    ])
+
+    llm_chian = LLMChain(
+        llm=llm,
+        prompt=prompt,
+        memory=memory
+    )
+
+
+"""
+
+
                 # create function 
                 for node in create_node_json['nodes']:
                     node_name = node['data']['label']
@@ -604,6 +834,44 @@ def node_**endNode**( state ) :
                             condition_config.append(row)
                         python_code += create_branch(node_name, condition_config)
                         python_code += create_condition_node(node_name, condition_config)
+
+
+                    elif node['type'] == 'agentNode': 
+                        ############################# 임시 설정 #############################
+                        tools = []  #node['data']['config']['tools'] 
+                        memory_type = "ConversationBufferMemory"
+                        ###################################################################
+                        
+                        if node['data']['config']['model']['providerName'] == "openai" :
+                            if len(tools) == 0 and memory_type == "": 
+                                python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", openai_no_memory_tools )
+                            elif len(tools) == 0 and memory_type != "":
+                                if memory_type == "ConversationBufferMemory" : 
+                                    python_code += import_ConversationBufferMemory
+                                    python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", openai_ConversationBufferMemory )
+                                
+                                
+                                
+                        elif node['data']['config']['model']['providerName'] == "aws" :
+                            if len(tools) == 0 and memory_type == "": 
+                                python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", bedrock_no_memory_tools )
+                            elif len(tools) == 0 and memory_type != "":
+                                if memory_type == "ConversationBufferMemory" : 
+                                    python_code += import_ConversationBufferMemory
+                                    python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", bedrock_ConversationBufferMemory )
+                                
+                                
+                                
+                                
+                        elif node['data']['config']['model']['providerName'] == "google" :
+                            if len(tools) == 0 and memory_type == "": 
+                                python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", google_no_memory_tools )
+                            elif len(tools) == 0 and memory_type != "":
+                                if memory_type == "ConversationBufferMemory" : 
+                                    python_code += import_ConversationBufferMemory
+                                    python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", google_ConversationBufferMemory )
+                                
+                    
 
                 # create node  
                 python_code += "\ngraph = StateGraph(MyState)\n" 
@@ -637,6 +905,9 @@ def node_**endNode**( state ) :
                             node_branch[key] = value
                         node_branch = str(node_branch)
                         python_code += f"""graph.add_conditional_edges("_{node_name}", node_branch_{node_name}, {node_branch}  )"""
+
+                    elif node['type'] == 'agentNode': 
+                        python_code += tmp_create_node.replace( "**tmp_node**", node_name ) 
 
                 python_code += "\n"
                 
