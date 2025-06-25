@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Bot, Split, FileCode, MessageSquare, Settings, Group, GitMerge,
-  Database, Cpu
+  Database, Cpu, FolderOpen
 } from 'lucide-react';
 
 export interface NodeItem {
@@ -53,10 +53,10 @@ export const nodeCategories: NodeCategory[] = [
         icon: (className = '') => <FileCode size={20} className={className} />
       },
       {
-        type: 'groupsNode',
-        label: 'Groups',
-        description: 'Organize and manage node groups',
-        icon: (className = '') => <Group size={20} className={className} />
+        type: 'toolsMemoryNode',
+        label: 'Tools&Memory',
+        description: 'Tools and Memory groups management',
+        icon: (className = '') => <FolderOpen className="w-5 h-5" />
       },
       {
         type: 'mergeNode',

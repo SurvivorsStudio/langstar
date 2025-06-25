@@ -12,6 +12,7 @@ import EmbeddingSettings from './nodes/EmbeddingSettings';
 import RAGSettings from './nodes/RAGSettings';
 import MergeSettings from './nodes/MergeSettings';
 import EndNodeSettings from './nodes/EndNodeSettings';
+import ToolsMemorySettings from './nodes/ToolsMemorySettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
 
@@ -113,7 +114,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const isSystemPromptNode = currentNode.type === 'systemPromptNode';
   const isAgentNode = currentNode.type === 'agentNode';
   const isStartNode = currentNode.type === 'startNode';
-  const isGroupsNode = currentNode.type === 'groupsNode';
+  const isToolsMemoryNode = currentNode.type === 'toolsMemoryNode';
   const isEmbeddingNode = currentNode.type === 'embeddingNode';
   const isRAGNode = currentNode.type === 'ragNode';
   const isEndNode = currentNode.type === 'endNode';
@@ -168,7 +169,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                 <Settings size={16} className="mr-1" /> Settings
               </button>
             );
-          } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isGroupsNode || isEmbeddingNode || isRAGNode || isMergeNode)) {
+          } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode)) {
             return (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
@@ -288,7 +289,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
               {isStartNode && <StartSettings nodeId={nodeId} />}
               {isConditionNode && <ConditionSettings nodeId={nodeId} />}
               {isAgentNode && <AgentSettings nodeId={nodeId} />}
-              {isGroupsNode && <GroupsSettings nodeId={nodeId} />}
+              {isToolsMemoryNode && <ToolsMemorySettings nodeId={nodeId} />}
               {isEmbeddingNode && <EmbeddingSettings nodeId={nodeId} />}
               {isRAGNode && <RAGSettings nodeId={nodeId} />}
               {isMergeNode && <MergeSettings nodeId={nodeId} />}

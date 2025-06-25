@@ -1,26 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle, ChevronLeft } from 'lucide-react';
+import { AlertCircle, ChevronLeft, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
-import { Group } from '../../types/node';
+import { Group, NodeData } from '../../types/node';
 
-interface GroupsSettingsProps {
+interface ToolsMemorySettingsProps {
   nodeId: string;
 }
 
-const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
+const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => {
   const { nodes, updateNodeData } = useFlowStore();
   const node = nodes.find(n => n.id === nodeId);
   const groups = (node?.data.config?.groups as Group[]) || [];
   const [nameError, setNameError] = useState<string | null>(null);
   
   useEffect(() => {
-    if (node?.data.selectedGroupId) {
-      setSelectedGroupId(node.data.selectedGroupId);
+    const selectedGroupId = (node?.data as NodeData)?.selectedGroupId;
+    if (selectedGroupId) {
+      setSelectedGroupId(selectedGroupId);
     }
-  }, [node?.data.selectedGroupId]);
+  }, [(node?.data as NodeData)?.selectedGroupId]);
 
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(node?.data.selectedGroupId || null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>((node?.data as NodeData)?.selectedGroupId || null);
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
 
   const checkNameExists = (name: string, currentGroupId: string): boolean => {
@@ -65,7 +66,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
           ...node?.data.config,
           groups: groups.filter(g => g.id !== groupId)
         }
-      });
+      } as NodeData);
       setSelectedGroupId(null);
     }
   };
@@ -75,7 +76,7 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
     updateNodeData(nodeId, {
       ...node?.data,
       selectedGroupId: null
-    });
+    } as NodeData);
   };
 
   if (!selectedGroup) {
@@ -176,4 +177,4 @@ const GroupsSettings: React.FC<GroupsSettingsProps> = ({ nodeId }) => {
   );
 };
 
-export default GroupsSettings;
+export default ToolsMemorySettings;

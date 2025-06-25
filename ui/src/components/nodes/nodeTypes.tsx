@@ -4,7 +4,6 @@ import {
   Database, Cpu
 } from 'lucide-react';
 import { CustomNode } from './CustomNode';
-
 const AgentNode = (props: any) => (
   <CustomNode 
     {...props}
@@ -89,14 +88,14 @@ const SystemPromptNode = (props: any) => (
   />
 );
 
-const GroupsNode = (props: any) => (
+const ToolsMemoryNode = (props: any) => (
   <CustomNode 
     {...props}
     data={{
       ...props.data,
       icon: <Group size={16} />,
-      nodeType: 'groupsNode',
-      description: 'Organize and manage node groups'
+      nodeType: 'toolsMemoryNode',
+      description: 'Tools and Memory groups management'
     }}
   />
 );
@@ -145,7 +144,7 @@ export const nodeTypes = {
   endNode: EndNode,
   promptNode: PromptNode,
   systemPromptNode: SystemPromptNode,
-  groupsNode: GroupsNode,
+  toolsMemoryNode: ToolsMemoryNode,
   embeddingNode: EmbeddingNode,
   ragNode: RAGNode,
   mergeNode: MergeNode, // MergeNode 추가
