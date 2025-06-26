@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFlowStore, NodeData } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react'; // 아이콘 import
+import CustomSelect from '../Common/CustomSelect';
 
 interface EndNodeSettingsProps {
   nodeId: string;
@@ -78,11 +79,9 @@ const EndNodeSettings: React.FC<EndNodeSettingsProps> = ({ nodeId }) => {
     }
   }, [currentNode, nodeId, edges, updateDisplayedValue]); // 의존성 배열에 nodeId, edges, updateDisplayedValue 추가
 
-  const handleSelectedKeyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newKey = e.target.value;
+  const handleSelectedKeyChange = (newKey: string) => {
     setSelectedKeyName(newKey);
     debouncedUpdateNodeData({ config: { ...currentNode?.data.config, receiveKey: newKey } });
-    
     // 선택 변경 시 즉시 표시 값 업데이트 (mergedInputFromEdges 사용)
     const incomingEdges = edges.filter(edge => edge.target === nodeId);
     const currentMergedInput = incomingEdges.reduce((acc, edge) => {
@@ -100,22 +99,13 @@ const EndNodeSettings: React.FC<EndNodeSettingsProps> = ({ nodeId }) => {
     <div className="space-y-4">
       <div>
         <label htmlFor="endnode-select-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chatbot Output Key</label>
-        <select
-          id="endnode-select-key"
+        <CustomSelect
           value={selectedKeyName}
           onChange={handleSelectedKeyChange}
-          className={`w-full px-3 py-2 border \
-            ${availableKeys.length === 0 
-              ? 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500' 
-              : 'bg-white dark:bg-gray-700 dark:text-gray-100'} \
-            border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
+          options={availableKeys.map(key => ({ value: key, label: key }))}
+          placeholder="-- Select a key --"
           disabled={availableKeys.length === 0}
-        >
-          <option value="">-- Select a key --</option>
-          {availableKeys.map(key => (
-            <option key={key} value={key}>{key}</option>
-          ))}
-        </select>
+        />
         {(() => {
           const hasIncomingEdges = edges.some(edge => edge.target === nodeId);
           if (!hasIncomingEdges) {
