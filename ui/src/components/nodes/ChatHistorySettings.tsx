@@ -1,6 +1,7 @@
 import React from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface ChatHistorySettingsProps {
   nodeId: string;
@@ -68,21 +69,13 @@ const ChatHistorySettings: React.FC<ChatHistorySettingsProps> = ({ nodeId }) => 
           <label className="block text-sm font-medium text-gray-600">
             Role Variable
           </label>
-          <select
+          <CustomSelect
             value={node?.data.config?.roleVariable || ''}
-            onChange={(e) => handleRoleVariableChange(e.target.value)}
-            className={`w-full px-3 py-2 border ${
-              !hasValidOutput ? 'bg-gray-50 text-gray-400' : 'bg-white'
-            } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+            onChange={handleRoleVariableChange}
+            options={hasValidOutput ? Object.keys(sourceOutput).map(variable => ({ value: variable, label: variable })) : []}
+            placeholder="Select role variable"
             disabled={!hasValidOutput}
-          >
-            <option value="">Select role variable</option>
-            {hasValidOutput && Object.keys(sourceOutput).map((variable) => (
-              <option key={variable} value={variable}>
-                {variable}
-              </option>
-            ))}
-          </select>
+          />
           {!incomingEdge && (
             <div className="flex items-center mt-1 text-amber-500 text-xs">
               <AlertCircle size={12} className="mr-1" />
@@ -95,21 +88,13 @@ const ChatHistorySettings: React.FC<ChatHistorySettingsProps> = ({ nodeId }) => 
           <label className="block text-sm font-medium text-gray-600">
             Content Variable
           </label>
-          <select
+          <CustomSelect
             value={node?.data.config?.contentVariable || ''}
-            onChange={(e) => handleContentVariableChange(e.target.value)}
-            className={`w-full px-3 py-2 border ${
-              !hasValidOutput ? 'bg-gray-50 text-gray-400' : 'bg-white'
-            } border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+            onChange={handleContentVariableChange}
+            options={hasValidOutput ? Object.keys(sourceOutput).map(variable => ({ value: variable, label: variable })) : []}
+            placeholder="Select content variable"
             disabled={!hasValidOutput}
-          >
-            <option value="">Select content variable</option>
-            {hasValidOutput && Object.keys(sourceOutput).map((variable) => (
-              <option key={variable} value={variable}>
-                {variable}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </div>
 

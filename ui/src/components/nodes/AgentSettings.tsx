@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import type { AIConnection } from '../../store/flowStore';
+import CustomSelect from '../Common/CustomSelect';
 
 // Define an interface for the group objects for better type safety
 interface GroupData {
@@ -174,16 +175,15 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
 
   const handleMemoryGroupChange = (groupId: string) => {
-    // 선택된 groupId를 사용하여 memoryGroups 배열에서 해당 그룹을 찾습니다.
     const selectedGroup = memoryGroups.find(g => g.id === groupId);
-    // 해당 그룹의 memoryType을 가져옵니다. 없으면 빈 문자열로 처리합니다.
     const memoryTypeString = selectedGroup?.memoryType || '';
 
     updateNodeData(nodeId, {
       config: {
-        memoryGroup: groupId, // 여전히 그룹 ID는 저장해둘 수 있습니다 (UI 표시용 또는 다른 용도)
-        memoryTypeString: memoryTypeString // 실제 memoryType 문자열을 저장
-      } 
+        ...node?.data.config, // 기존 값 보존
+        memoryGroup: groupId,
+        memoryTypeString: memoryTypeString
+      }
     });
   };
 
@@ -223,6 +223,8 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
       : (node?.data.config?.model as string) || '';
 
   const selectedConnection = activeConnections.find(conn => conn.id === selectedModelId);
+
+  const selectedMemoryGroup = memoryGroups.find(g => g.id === node?.data.config?.memoryGroup);
 
   return (
     <div className="space-y-6">
@@ -274,30 +276,22 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                 </>
               ) : (
                 <>
-                  <select
-                    id="agentOutputVariable"
+                  <CustomSelect
                     value={node?.data.config?.agentOutputVariable || ''}
-                    onChange={(e) => handleAgentOutputVariableChange(e.target.value)}
-                    className={`flex-grow px-3 py-2 border ${
-                      (!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0 
-                        ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                    } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-                  >
-                    <option value="">Select output variable (required)</option>
-                    {node?.data.config?.agentOutputVariable &&
-                     node.data.config.agentOutputVariable !== "" && 
-                     !availableInputKeys.includes(node.data.config.agentOutputVariable) && (
-                      <option key={node.data.config.agentOutputVariable} value={node.data.config.agentOutputVariable}>
-                        {node.data.config.agentOutputVariable} (New/Default)
-                      </option>
-                    )}
-                    {availableInputKeys.map((variable) => (
-                      <option key={variable} value={variable}>
-                        {variable} (Overwrite)
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleAgentOutputVariableChange}
+                    options={[
+                      ...(
+                        node?.data.config?.agentOutputVariable &&
+                        node.data.config.agentOutputVariable !== "" &&
+                        !availableInputKeys.includes(node.data.config.agentOutputVariable)
+                          ? [{ value: node.data.config.agentOutputVariable, label: `${node.data.config.agentOutputVariable} (New/Default)` }]
+                          : []
+                      ),
+                      ...availableInputKeys.map(variable => ({ value: variable, label: `${variable} (Overwrite)` }))
+                    ]}
+                    placeholder="Select output variable (required)"
+                    disabled={(!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0}
+                  />
                   <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
                     <Pencil size={18} />
                   </button>
@@ -323,18 +317,16 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Model
           </label>
-          <select
+          <CustomSelect
             value={selectedModelId}
-            onChange={(e) => handleModelChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select a model</option>
-            {activeConnections.map((conn) => (
-              <option key={conn.id} value={conn.id}>
-                {conn.name} ({conn.model})
-              </option>
-            ))}
-          </select>
+            onChange={handleModelChange}
+            options={activeConnections.map(conn => ({
+              value: conn.id,
+              label: `${conn.name} (${conn.model})`
+            }))}
+            placeholder="Select a model"
+            disabled={activeConnections.length === 0}
+          />
           {selectedConnection && (
             <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md space-y-1">
               <div className="flex justify-between items-center text-xs">
@@ -358,18 +350,13 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             System Prompt (Input Key)
           </label>
-          <select
+          <CustomSelect
             value={node?.data.config?.systemPromptInputKey || ''}
-            onChange={(e) => handleSystemPromptInputKeyChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select an input key for system prompt</option>
-            {availableInputKeys.map((key) => (
-              <option key={key} value={key}>
-                {key}
-              </option>
-            ))}
-          </select>
+            onChange={handleSystemPromptInputKeyChange}
+            options={availableInputKeys.map(key => ({ value: key, label: key }))}
+            placeholder="Select an input key for system prompt"
+            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+          />
           {!isSourceConnected && (
             <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
           )}
@@ -382,18 +369,13 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             User Prompt (Input Key)
           </label>
-          <select
+          <CustomSelect
             value={node?.data.config?.userPromptInputKey || ''}
-            onChange={(e) => handleUserPromptInputKeyChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select an input key for user prompt</option>
-            {availableInputKeys.map((key) => (
-              <option key={key} value={key}>
-                {key}
-              </option>
-            ))}
-          </select>
+            onChange={handleUserPromptInputKeyChange}
+            options={availableInputKeys.map(key => ({ value: key, label: key }))}
+            placeholder="Select an input key for user prompt"
+            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+          />
           {!isSourceConnected && (
             <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
           )}
@@ -406,18 +388,29 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Memory Group
           </label>
-          <select
-            value={node?.data.config?.memoryGroup || ''} // UI 표시는 그룹 ID 기준
-            onChange={(e) => handleMemoryGroupChange(e.target.value)} // 핸들러에는 그룹 ID 전달
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select memory group</option>
-            {memoryGroups.map((group: GroupData) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={node?.data.config?.memoryGroup || ''}
+            onChange={handleMemoryGroupChange}
+            options={memoryGroups.map(group => ({ value: group.id, label: group.name }))}
+            placeholder="Select memory group"
+            disabled={memoryGroups.length === 0}
+          />
+          {node?.data.config?.memoryGroup && (
+            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Name</span>
+                <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
+                  {selectedMemoryGroup?.name || 'Unknown'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Type</span>
+                <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
+                  {selectedMemoryGroup?.memoryType || 'Unknown'}
+                </span>
+              </div>
+            </div>
+          )}
           {memoryGroups.length === 0 && (
             <p className="text-xs text-amber-500">
               No memory groups found. Add memory groups in the Groups node.

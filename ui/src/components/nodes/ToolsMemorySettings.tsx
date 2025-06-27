@@ -3,6 +3,7 @@ import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
 import { Group, NodeData } from '../../types/node';
+import CustomSelect from '../Common/CustomSelect';
 
 interface ToolsMemorySettingsProps {
   nodeId: string;
@@ -117,16 +118,15 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
               <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
                 Memory Type
               </label>
-              <select
+              <CustomSelect
                 value={selectedGroup.memoryType || 'ConversationBufferMemory'}
-                onChange={(e) => handleUpdateGroup(selectedGroup.id, { 
-                  memoryType: e.target.value as 'ConversationBufferMemory' | 'ConversationBufferWindowMemory' 
-                })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              >
-                <option value="ConversationBufferMemory">Conversation Buffer Memory</option>
-                <option value="ConversationBufferWindowMemory">Conversation Buffer Window Memory</option>
-              </select>
+                onChange={value => handleUpdateGroup(selectedGroup.id, { memoryType: value as 'ConversationBufferMemory' | 'ConversationBufferWindowMemory' })}
+                options={[
+                  { value: 'ConversationBufferMemory', label: 'Conversation Buffer Memory' },
+                  { value: 'ConversationBufferWindowMemory', label: 'Conversation Buffer Window Memory' }
+                ]}
+                placeholder="Select memory type"
+              />
             </div>
           )}
 
