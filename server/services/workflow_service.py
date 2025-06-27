@@ -337,6 +337,9 @@ class WorkflowService:
                     "from langchain_core.prompts import PromptTemplate",
                     "from langchain.chains import LLMChain",
                     "from langgraph.graph import StateGraph, START, END",
+                    "from langchain.agents import create_tool_calling_agent, AgentExecutor",
+                    "from typing import Optional",
+                    "from langchain_core.tools import StructuredTool",
                     "",
                     "class MyState(BaseModel):",
                     "    response:dict = {}"
@@ -784,6 +787,68 @@ def node_**agentNode**( state ) :
     return return_next_node(node_name, next_node_list, return_value )
 """  + "\n" + "\n" + "\n"
 
+
+                agent_node_code_base2 = """
+
+def node_**agentNode**( state ) : 
+    from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+    my_name = "**agentNode**" 
+    node_name = my_name
+    node_config_name = my_name + "_Config"
+
+    state_dict  = state.model_dump()
+    node_input  = state_dict[my_name] 
+    node_config = state_dict[node_config_name]['config']
+    print( node_config )
+
+    # 모델 정보
+    model_info = node_config['model']
+    provider = model_info['providerName'] 
+    modelName = model_info['modelName'] 
+    if provider == "aws" : 
+        accessKeyId     = model_info['accessKeyId'] 
+        secretAccessKey = model_info['secretAccessKey'] 
+        region          = model_info['region'] 
+        
+    else :
+        apiKey = model_info['apiKey'] 
+
+    # prompt 
+    system_prompt_key = node_config['systemPromptInputKey']
+    system_prompt     = node_input[system_prompt_key]
+    
+    user_prompt_key = node_config['userPromptInputKey']
+    user_prompt     = node_input[user_prompt_key]
+    
+    output_value  = node_config['agentOutputVariable']
+    
+
+    # 답변 옵션     
+    temperature = node_config['temperature']
+    max_token   = node_config['maxTokens']
+    top_k       = node_config['topK']
+    top_p       = node_config['topP']
+
+
+    **model_connection**
+
+
+    agent = create_tool_calling_agent(llm, tool_list, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=False)
+
+        # 도구 없이 LLM 직접 호출
+    response = agent_executor.invoke({"user_prompt": user_prompt})
+    node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
+
+    return_value = node_input.copy()
+
+    # 다음 노드 처리
+    next_node_list = node_config.get('next_node', []) 
+    return return_next_node(node_name, next_node_list, return_value )
+
+"""
+
                 bedrock_no_memory_tools = """
 
     from langchain_aws import ChatBedrockConverse
@@ -936,6 +1001,46 @@ memory = ConversationBufferMemory(return_messages=True)
 """
 
 
+                bedrock_tool_code = """
+
+    from langchain_aws import ChatBedrockConverse
+    
+    llm  = ChatBedrockConverse(
+                    model=modelName,
+                    temperature=temperature,
+                    max_tokens=max_token
+                )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        ("human", "{user_prompt}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+
+   
+    tool_list = []
+
+    **tool_code**
+
+    
+"""
+
+
+                token_tool_code = """
+
+**py_code**
+
+    _**tool_name**_tool =  StructuredTool.from_function(
+                                                            func=**tool_name**,
+                                                            name="**tool_name**",
+                                                            description=('''**tool_description**''') 
+                                                        )
+
+    tool_list.append( _**tool_name**_tool ) 
+
+"""
+
+
                 # create function 
                 for node in create_node_json['nodes']:
                     node_name = node['data']['label']
@@ -969,8 +1074,8 @@ memory = ConversationBufferMemory(return_messages=True)
 
                     elif node['type'] == 'agentNode': 
                         ############################# 임시 설정 #############################
-                        tools = []  #node['data']['config']['tools'] 
-                        memory_type = "ConversationBufferMemory"
+                        tools = node['data']['config']['tools'] 
+                        memory_type = "" #"ConversationBufferMemory"
                         ###################################################################
                         
                         if node['data']['config']['model']['providerName'] == "openai" :
@@ -990,6 +1095,24 @@ memory = ConversationBufferMemory(return_messages=True)
                                 if memory_type == "ConversationBufferMemory" : 
                                     python_code += import_ConversationBufferMemory
                                     python_code += agent_node_code_base.replace( "**agentNode**", node_name ).replace( "**model_connection**", bedrock_ConversationBufferMemory )
+
+                            elif len(tools) != 0 and memory_type == "":
+                                token_tool_code_list = []
+                                for tool_info in  node['data']['config']['tools']: 
+                                    indented_code = textwrap.indent(tool_info['code'], "    ")
+                                    parsed = ast.parse(tool_info['code'])
+                                    func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
+                                    function_name = func_def.name  
+                                    tmp_code = token_tool_code.replace( "**py_code**", indented_code ).replace( "**tool_name**", function_name ).replace( "**tool_description**", tool_info["description"] ) 
+                                    token_tool_code_list.append( tmp_code ) 
+                                
+                                token_tool_code_list = "\n".join( token_tool_code_list ) 
+                                tmp_tool_code = bedrock_tool_code.replace( "**tool_code**" , token_tool_code_list ) 
+                                python_code += agent_node_code_base2.replace( "**agentNode**", node_name ).replace( "**model_connection**" , tmp_tool_code ) 
+
+                            
+                            elif len(tools) != 0 and memory_type != "":
+                                pass
                                 
                                 
                                 
