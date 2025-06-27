@@ -830,14 +830,9 @@ def node_**agentNode**( state ) :
     top_k       = node_config['topK']
     top_p       = node_config['topP']
 
-
     **model_connection**
-
-
-    agent = create_tool_calling_agent(llm, tool_list, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=False)
-
-        # 도구 없이 LLM 직접 호출
+    
+    # 도구 없이 LLM 직접 호출
     response = agent_executor.invoke({"user_prompt": user_prompt})
     node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
 
@@ -1000,6 +995,19 @@ memory = ConversationBufferMemory(return_messages=True)
 
 """
 
+                token_tool_code = """
+
+**py_code**
+
+    _**tool_name**_tool =  StructuredTool.from_function(
+                                                            func=**tool_name**,
+                                                            name="**tool_name**",
+                                                            description=('''**tool_description**''') 
+                                                        )
+
+    tool_list.append( _**tool_name**_tool ) 
+
+"""
 
                 bedrock_tool_code = """
 
@@ -1022,23 +1030,43 @@ memory = ConversationBufferMemory(return_messages=True)
 
     **tool_code**
 
+    agent = create_tool_calling_agent(llm, tool_list, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=False)
+
     
 """
 
+                bedrock_tool_memory_code = """
 
-                token_tool_code = """
+    from langchain_aws import ChatBedrockConverse
+    
+    llm  = ChatBedrockConverse(
+                    model=modelName,
+                    temperature=temperature,
+                    max_tokens=max_token
+                )
 
-**py_code**
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", f"{system_prompt}"),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{user_prompt}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
 
-    _**tool_name**_tool =  StructuredTool.from_function(
-                                                            func=**tool_name**,
-                                                            name="**tool_name**",
-                                                            description=('''**tool_description**''') 
-                                                        )
+   
+    tool_list = []
 
-    tool_list.append( _**tool_name**_tool ) 
+    **tool_code**
+
+    agent = create_tool_calling_agent(llm, tool_list, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tool_list, memory=memory, verbose=False)
 
 """
+    
+
+
+
+               
 
 
                 # create function 
@@ -1075,7 +1103,7 @@ memory = ConversationBufferMemory(return_messages=True)
                     elif node['type'] == 'agentNode': 
                         ############################# 임시 설정 #############################
                         tools = node['data']['config']['tools'] 
-                        memory_type = "" #"ConversationBufferMemory"
+                        memory_type = node['data']['config']['memoryGroup']['memoryType']
                         ###################################################################
                         
                         if node['data']['config']['model']['providerName'] == "openai" :
@@ -1112,8 +1140,22 @@ memory = ConversationBufferMemory(return_messages=True)
 
                             
                             elif len(tools) != 0 and memory_type != "":
-                                pass
+                                if memory_type == "ConversationBufferMemory" : 
+                                    python_code += import_ConversationBufferMemory
+                                    token_tool_code_list = []
+                                    for tool_info in  node['data']['config']['tools']: 
+                                        indented_code = textwrap.indent(tool_info['code'], "    ")
+                                        parsed = ast.parse(tool_info['code'])
+                                        func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
+                                        function_name = func_def.name  
+                                        tmp_code = token_tool_code.replace( "**py_code**", indented_code ).replace( "**tool_name**", function_name ).replace( "**tool_description**", tool_info["description"] ) 
+                                        token_tool_code_list.append( tmp_code ) 
+                                    
+                                    token_tool_code_list = "\n".join( token_tool_code_list ) 
+                                    tmp_tool_code = bedrock_tool_memory_code.replace( "**tool_code**" , token_tool_code_list ) 
+                                    python_code += agent_node_code_base2.replace( "**agentNode**", node_name ).replace( "**model_connection**" , tmp_tool_code ) 
                                 
+
                                 
                                 
                                 
