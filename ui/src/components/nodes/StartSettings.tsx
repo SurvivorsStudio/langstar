@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { Plus, X, AlertCircle } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface Variable {
   name: string;
@@ -115,14 +116,15 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Class Type
           </label>
-          <select
+          <CustomSelect
             value={classType}
-            onChange={(e) => handleClassTypeChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          >
-            <option value="TypedDict">TypedDict</option>
-            <option value="BaseModel">BaseModel</option>
-          </select>
+            onChange={handleClassTypeChange}
+            options={[
+              { value: 'TypedDict', label: 'TypedDict' },
+              { value: 'BaseModel', label: 'BaseModel' }
+            ]}
+            placeholder="Select class type"
+          />
         </div>
       </div>
 
@@ -176,17 +178,18 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Variable Type
                   </label>
-                  <select
+                  <CustomSelect
                     value={variable.type}
-                    onChange={(e) => handleVariableChange(index, 'type', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  >
-                    <option value="string">string</option>
-                    <option value="int">int</option>
-                    <option value="float">float</option>
-                    <option value="list">list</option>
-                    <option value="dict">dict</option>
-                  </select>
+                    onChange={value => handleVariableChange(index, 'type', value)}
+                    options={[
+                      { value: 'string', label: 'string' },
+                      { value: 'int', label: 'int' },
+                      { value: 'float', label: 'float' },
+                      { value: 'list', label: 'list' },
+                      { value: 'dict', label: 'dict' }
+                    ]}
+                    placeholder="Select variable type"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -206,15 +209,16 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Select Variable
                   </label>
-                  <select
+                  <CustomSelect
                     value={variable.selectVariable}
-                    onChange={(e) => handleVariableChange(index, 'selectVariable', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  >
-                    <option value="">None</option>
-                    <option value="question">question</option>
-                    <option value="chat_history">chat_history</option>
-                  </select>
+                    onChange={value => handleVariableChange(index, 'selectVariable', value)}
+                    options={[
+                      { value: '', label: 'None' },
+                      { value: 'question', label: 'question' },
+                      { value: 'chat_history', label: 'chat_history' }
+                    ]}
+                    placeholder="Select variable"
+                  />
                 </div>
               </div>
             </div>
