@@ -22,7 +22,7 @@ const edgeTypes = {
 };
 
 const FlowBuilder: React.FC = () => {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, removeNode } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -38,8 +38,6 @@ const FlowBuilder: React.FC = () => {
     setSelectedNode(null);
     setShowInspector(false);
   }, []);
-
-
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -64,8 +62,20 @@ const FlowBuilder: React.FC = () => {
     });
   }, [addNode, reactFlowInstance]);
 
+  // 키보드 단축키로 노드 삭제
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Delete' && selectedNode) {
+      const node = nodes.find(n => n.id === selectedNode);
+      if (node && node.type !== 'startNode' && node.type !== 'endNode') {
+        removeNode(selectedNode);
+        setSelectedNode(null);
+        setShowInspector(false);
+      }
+    }
+  }, [selectedNode, nodes, removeNode]);
+
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full" tabIndex={0} onKeyDown={handleKeyDown}>
       {showNodeSidebar && (
         <NodeSidebar onClose={() => setShowNodeSidebar(false)} />
       )}
@@ -85,6 +95,9 @@ const FlowBuilder: React.FC = () => {
           snapGrid={[15, 15]}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          deleteKeyCode={null}
+          multiSelectionKeyCode={null}
+          selectionKeyCode={null}
         >
           <Background 
             color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 
@@ -104,7 +117,6 @@ const FlowBuilder: React.FC = () => {
               </button>
             )}
           </Panel>
-
         </ReactFlow>
       </div>
       {showInspector && selectedNode && (
