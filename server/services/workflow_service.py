@@ -13,75 +13,14 @@ import traceback
 from typing import Dict, Any
 from langchain.chains import LLMChain
 from langchain_core.tools import StructuredTool
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from typing import Optional
+from server.services.code_export import templates
+                    
 
 
 # 로거 설정
 logger = logging.getLogger(__name__)
-
-
-def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[]):
-    # 도구 없이, 메모리 없이
-    llm = ChatBedrockConverse(
-            model=modelName,
-            temperature=temperature,
-            max_tokens=max_token
-        )
-
-    if memory == "" and len(tools) == 0:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"{system_prompt}"),
-            ("human", "{user_prompt}")
-        ])
-       
-        llm_chain = LLMChain(llm=llm, prompt=prompt)
-        response = llm_chain.predict(user_prompt=user_prompt)
-        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
-
-    # 메모리 있어
-    elif memory != "" and len(tools) == 0:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"{system_prompt}"),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{user_prompt}")
-        ])
-        
-        llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
-        response = llm_chain.predict(user_prompt=user_prompt)
-        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
-
-    # 도구 있어
-    elif memory == "" and len(tools) != 0:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"{system_prompt}"),
-            ("human", "{user_prompt}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
-
-        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
-        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
-        return response
-
-    # 도구 있어, 메모리 있어
-    elif memory != "" and len(tools) != 0:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"{system_prompt}"),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{user_prompt}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
-
-        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
-        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
-        return response
-
-
-
 
 
 class WorkflowService:
@@ -181,15 +120,6 @@ class WorkflowService:
     @staticmethod
     def process_agent_node(msg: Dict[str, Any]) -> str:
 
-        #  {'model': {'connName': 'nova-lite', 'providerName': 'aws', 'modelName': 'amazon.nova-lite-v1:0', 'accessKeyId': 'adfadf', 'secretAccessKey': 'asfasdf', 'region': 'afdadf'}, 
-        #  'modelSetting': {'topK': 40, 'topP': 1, 'temperature': 0.7, 'maxTokens': 2048}, 
-        #  'system_prompt': '����� ai ����� �Դϴ�. ', 'user_prompt': '�ȳ�', 'memory_group': 'group-1750834607125', 'memory_group_name': 'New Memory Group', 
-        #  'tools': [], 'memory_type': 'ConversationBufferMemory', 'return_key': 'output_result'}
-        print( "--->", msg )
-        """Process agent node"""
-        
-
-        
         try:
             logger.info("Processing agent node")
             modelName = msg['model']['modelName']
@@ -197,7 +127,10 @@ class WorkflowService:
             user_prompt = msg['user_prompt']
             memory_type = msg.get('memory_type', "")
             memory_group_name = msg.get('memory_group_name', "")
-            tools = msg.get('tools',[])
+            # tools = msg.get('tools',[])
+            tools_data = msg['tools']
+            tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
+
 
             chat_id = msg.get('chat_id', str(uuid.uuid1()))
 
@@ -216,26 +149,76 @@ class WorkflowService:
                 
                 memory = WorkflowService.MEMORY_STORE[chat_id][memory_group_name]
                 
-                
-
-
-            
             
             if msg['model']['providerName'] == 'aws' : 
-                return run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory, tools )
+                llm = ChatBedrockConverse(
+                        model=modelName,
+                        temperature=temperature,
+                        max_tokens=max_token
+                    )
+
+                if memory == "" and len(tools) == 0:
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", f"{system_prompt}"),
+                        ("human", "{user_prompt}")
+                    ])
                 
-            elif msg['providerName'] == 'openai' : 
-                if memory_type == "" : 
-                    pass 
-                else : 
-                    pass 
+                    llm_chain = LLMChain(llm=llm, prompt=prompt)
+                    response = llm_chain.predict(user_prompt=user_prompt)
+                    return response
 
+                # 메모리 있어
+                elif memory != "" and len(tools) == 0:
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", f"{system_prompt}"),
+                        MessagesPlaceholder(variable_name="history"),
+                        ("human", "{user_prompt}")
+                    ])
+                    
+                    llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
+                    response = llm_chain.predict(user_prompt=user_prompt)
+                    return response
 
-            elif msg['providerName'] == 'google' : 
-                if memory_type == "" : 
-                    pass 
-                else : 
-                    pass 
+                # 도구 있어
+                elif memory == "" and len(tools) != 0:
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", f"{system_prompt}"),
+                        ("human", "{user_prompt}"),
+                        ("placeholder", "{agent_scratchpad}"),
+                    ])
+
+                    tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
+                    agent = create_tool_calling_agent(llm, tools, prompt)
+                    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+                    response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+                    print( response )
+                    try : 
+                        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+                    except : 
+                        response = response["output"][0]['text']
+                    return response
+
+                # 도구 있어, 메모리 있어
+                elif memory != "" and len(tools) != 0:
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", f"{system_prompt}"),
+                        MessagesPlaceholder(variable_name="history"),
+                        ("human", "{user_prompt}"),
+                        ("placeholder", "{agent_scratchpad}"),
+                    ])
+                    
+                    tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
+                    agent = create_tool_calling_agent(llm, tools, prompt)
+                    agent_executor = AgentExecutor(agent=agent, tools=tools,  memory=memory, verbose=False)
+                    response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+                    print( response )
+                    try : 
+                        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+                    except : 
+                        response = response["output"][0]['text']
+                    
+                    return response
+
 
         except Exception as e: 
             error_msg = f"Error in agent node processing: {str(e)}"
@@ -244,82 +227,6 @@ class WorkflowService:
 
 
 
-        # try:
-        #     logger.info("Processing agent node")
-        #     model_id = msg['model']
-        #     system_prompt = msg.get('system_prompt', "당신은 AI 도우미입니다")
-        #     user_prompt = msg['user_prompt']
-        #     return_key = msg['return_key']
-        #     tools_data = msg['tools']
-        #     tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
-        #     memory_type = msg.get('memory_type', "")
-            
-        #     logger.info(f"Agent node config - model: {model_id}, tools: {len(tools)}, memory: {memory_type}")
-            
-        #     llm = ChatBedrockConverse(
-        #         model="us.amazon.nova-pro-v1:0",
-        #         temperature=0.1,
-        #         max_tokens=1000
-        #     )
-            
-        #     if memory_type:
-        #         memory_group_name = msg['memory_group_name']
-        #         chat_id = msg.get('chat_id', str(uuid.uuid1()))
-                
-        #         # Initialize memory if not exists
-        #         if memory_type == "ConversationBufferMemory":
-        #             if chat_id not in WorkflowService.MEMORY_STORE:
-        #                 memory = ConversationBufferMemory(memory_key=memory_group_name, return_messages=True)
-        #                 WorkflowService.MEMORY_STORE[chat_id] = {memory_group_name: memory}
-        #             elif memory_group_name not in WorkflowService.MEMORY_STORE[chat_id]:
-        #                 memory = ConversationBufferMemory(memory_key=memory_group_name, return_messages=True)
-        #                 WorkflowService.MEMORY_STORE[chat_id][memory_group_name] = memory
-                
-        #         memory = WorkflowService.MEMORY_STORE[chat_id][memory_group_name]
-                
-        #         # Create prompt with memory placeholder
-        #         prompt = ChatPromptTemplate.from_messages([
-        #             ("system", f"{system_prompt}\n이전 대화 내용을 참고하여 사용자의 질문에 맥락에 맞게 답변하세요."),
-        #             MessagesPlaceholder(variable_name=memory_group_name),
-        #             ("human", "{input}"),
-        #             MessagesPlaceholder(variable_name="agent_scratchpad")
-        #         ])
-                
-        #         # Create agent with prompt only (no memory parameter)
-        #         agent = create_openai_tools_agent(llm, tools, prompt)
-                
-        #         # Create agent executor with memory
-        #         agent_executor = AgentExecutor(
-        #             agent=agent, 
-        #             tools=tools, 
-        #             memory=memory,
-        #             verbose=True
-        #         )
-                
-        #         result = agent_executor.invoke({"input": user_prompt})
-        #         logger.info("Agent node processed successfully with memory")
-        #         return result['output'][0]['text']
-            
-        #     else:
-        #         # No memory case
-        #         prompt = ChatPromptTemplate.from_messages([
-        #             ("system", f"{system_prompt}\n이전 대화 내용을 참고하여 사용자의 질문에 맥락에 맞게 답변하세요."),
-        #             ("human", "{input}"),
-        #             MessagesPlaceholder(variable_name="agent_scratchpad")
-        #         ])
-                
-        #         # Create agent without memory
-        #         agent = create_openai_tools_agent(llm, tools, prompt)
-        #         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-                
-        #         result = agent_executor.invoke({"input": user_prompt})
-        #         logger.info("Agent node processed successfully without memory")
-        #         return result['output'][0]['text']
-                
-        # except Exception as e:
-        #     error_msg = f"Error in agent node processing: {str(e)}"
-        #     logger.error(error_msg, exc_info=True)
-        #     return {"error": str(e)}
 
     @staticmethod
     def generate_langgraph_code(create_node_json: Dict[str, Any]) -> str:
@@ -329,30 +236,6 @@ class WorkflowService:
             logger.info(f"Workflow nodes: {len(create_node_json.get('nodes', []))}")
             logger.info(f"Workflow edges: {len(create_node_json.get('edges', []))}")
             
-            def create_state(config_json):
-                code_lines = [
-                    "from pydantic import BaseModel",
-                    "from typing import Annotated",
-                    "import operator",
-                    "from langchain_core.prompts import PromptTemplate",
-                    "from langchain.chains import LLMChain",
-                    "from langgraph.graph import StateGraph, START, END",
-                    "from langchain.agents import create_tool_calling_agent, AgentExecutor",
-                    "from typing import Optional",
-                    "from langchain_core.tools import StructuredTool",
-                    "",
-                    "class MyState(BaseModel):",
-                    "    response:dict = {}"
-                ]
-                
-                for config_token in config_json:
-                    for config_key, config_val in config_token.items():
-                        if '__annotated__' in config_val:
-                            code_token = "    {0} :Annotated[dict, operator.or_] = ".format(config_key) + "{}"
-                        else:
-                            code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
-                        code_lines.append(code_token)
-                return "\n".join(code_lines) + "\n"
 
             def create_function_node(function_name, py_code, func_exec):
                 indented_code = textwrap.indent(py_code, "    ")
@@ -603,29 +486,9 @@ def node_{function_name}(state):
                         result.append( {node_name : {}} ) 
                     
 
-                python_code = create_state(result)
-                python_code += """
-def return_next_node( my_node, next_node_list, return_value  ):
-
-    updates = {}
-    for next_node in next_node_list : 
-        next_name = next_node['node_name']
-        next_type = next_node['node_type']
-        
-        # merge node 
-        if next_type == 'mergeNode':
-            if next_name not in updates:
-                updates[next_name] = {my_node : return_value}
-            else : 
-                updates[next_name][my_node] = return_value
                 
-        # 일반 노드 
-        else : 
-            if next_name not in updates:
-                updates[next_name] = return_value
-                
-    return updates
-""" + "\n" + "\n" + "\n"
+                python_code = templates.init_state_code( result )
+                python_code += templates.return_next_node_code()
                 
                 start_node_code = """
 def node_**startNode**(state):
@@ -1073,37 +936,33 @@ memory = ConversationBufferMemory(return_messages=True)
                 for node in create_node_json['nodes']:
                     node_name = node['data']['label']
                     if node['type'] == 'startNode':
-                        python_code += start_node_code.replace("**startNode**", node_name)
+                        # python_code += start_node_code.replace("**startNode**", node_name)
+                        python_code += templates.start_node_code( node )   
                         
                     elif node['type'] == 'promptNode':
-                        python_code += prompt_node_code.replace("**promptNode**", node_name)
+                        python_code += templates.prompt_node_code( node )   
                         
                     elif node['type'] == 'mergeNode':
-                        python_code += merge_node_code.replace("**mergeNode**", node_name)
+                        python_code += templates.merge_node_code( node )   
                 
                     elif node['type'] == 'endNode':
-                        python_code += end_node_code.replace("**endNode**", node_name)
+                        python_code += templates.end_node_code( node )   
 
                     elif node['type'] == 'functionNode':
-                        py_code = node['data']['code']
-                        parsed = ast.parse(py_code)
-                        func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
-                        function_name = func_def.name            
-                        python_code += create_function_node(node_name, py_code, function_name) + "\n" + "\n"
+                        python_code += templates.python_function_node_code( node )   
 
                     elif node['type'] == 'conditionNode':
-                        condition_config = []
-                        for row in node['data']['config']['conditions']:
-                            row['next_node'] = [node_id_to_node_label[row['targetNodeId']]]
-                            condition_config.append(row)
-                        python_code += create_branch(node_name, condition_config)
-                        python_code += create_condition_node(node_name, condition_config)
+                        python_code += templates.condition_node_code( node )   
 
 
                     elif node['type'] == 'agentNode': 
                         ############################# 임시 설정 #############################
                         tools = node['data']['config']['tools'] 
-                        memory_type = node['data']['config']['memoryGroup']['memoryType']
+                        if 'memoryGroup' in node['data']['config'] : 
+                            print( node['data']['config']['memoryGroup'] )
+                            memory_type = node['data']['config']['memoryGroup']['memoryType']
+                        else : 
+                            memory_type =""
                         ###################################################################
                         
                         if node['data']['config']['model']['providerName'] == "openai" :
