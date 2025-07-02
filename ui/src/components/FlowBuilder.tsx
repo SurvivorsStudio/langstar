@@ -69,6 +69,12 @@ const FlowBuilder: React.FC = () => {
       position,
       data: { label, code: '', config: {} }
     });
+    setTimeout(() => {
+      const newNode = useFlowStore.getState().nodes.find(
+        n => n.position.x === position.x && n.position.y === position.y && n.type === type && n.data.label === label
+      );
+      if (newNode) setSelectedNode(newNode.id);
+    }, 0);
   }, [addNode, reactFlowInstance]);
 
   // 키보드 단축키로 노드/엣지 삭제
