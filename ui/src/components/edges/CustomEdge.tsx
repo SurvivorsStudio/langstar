@@ -15,6 +15,7 @@ const CustomEdge = ({
   data,
   source,
   style = {},
+  selected,
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
   const { nodes, removeEdge, setEdgeOutput } = useFlowStore();
@@ -69,7 +70,11 @@ const CustomEdge = ({
       <path
         id={id}
         style={style}
-        className="react-flow__edge-path stroke-slate-400 stroke-[2px]"
+        className={`react-flow__edge-path stroke-[2px] ${
+          selected 
+            ? 'stroke-blue-500 dark:stroke-blue-400 drop-shadow-md' 
+            : 'stroke-slate-400'
+        }`}
         d={edgePath}
         markerEnd="url(#arrow)"
       />
@@ -112,17 +117,29 @@ const CustomEdge = ({
             </button>
             <button
               onClick={handleDelete}
-              className="p-1 bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white rounded-full shadow-sm transition-colors z-10"
+              className={`p-1 rounded-full shadow-sm transition-colors z-10 ${
+                selected
+                  ? 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white'
+                  : 'bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white'
+              }`}
               title="Remove Connection"
             >
               <X size={12} />
             </button>
           </div>
           <div 
-            className="bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border border-gray-200 dark:border-gray-600 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-shadow"
+            className={`rounded-md p-2 text-xs max-h-32 overflow-y-auto cursor-pointer transition-all ${
+              selected
+                ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 shadow-lg'
+                : 'bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-600 hover:shadow-lg'
+            }`}
             onClick={() => setShowInspector(true)}
           >
-            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
+            <pre className={`whitespace-pre-wrap break-words ${
+              selected
+                ? 'text-blue-800 dark:text-blue-200'
+                : 'text-gray-600 dark:text-gray-300'
+            }`}>
               {outputPreview.length > 200 ? outputPreview.slice(0, 200) + '...' : outputPreview}
             </pre>
           </div>
