@@ -300,7 +300,7 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
 
   return (
     <div
-      className={`${getNodeStyle()} border-2 rounded-md p-4 w-64 shadow-sm relative ${
+      className={`${getNodeStyle()} border-2 rounded-md p-4 w-64 shadow-sm transition-shadow relative ${
         selected ? 'shadow-md ring-2 ring-blue-300' : ''
       }`}
     >

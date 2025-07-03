@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -22,47 +22,12 @@ const edgeTypes = {
 };
 
 const FlowBuilder: React.FC = () => {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-
-  // 저장된 워크플로우 자동 불러오기
-  useEffect(() => {
-    if (projectName) {
-      loadWorkflow(projectName).catch(() => {
-        // 저장된 워크플로우가 없으면 무시(기본 상태 유지)
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName]);
-
-  // viewport가 바뀔 때마다 ReactFlow 인스턴스에 적용
-  useEffect(() => {
-    if (reactFlowInstance && viewport) {
-      // 저장된 viewport가 기본값(즉, x:0, y:0, zoom:1)일 때만 중앙으로 이동
-      if (
-        viewport.x === 0 && viewport.y === 0 && viewport.zoom === 1 && nodes.length > 0
-      ) {
-        // 모든 노드의 중앙 계산
-        const xs = nodes.map(n => n.position.x);
-        const ys = nodes.map(n => n.position.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        reactFlowInstance.setCenter(centerX, centerY, { zoom: 1 });
-      } else {
-        reactFlowInstance.setViewport(viewport);
-      }
-    }
-  // projectName이 바뀔 때(즉, 워크플로우를 처음 불러올 때)만 실행
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reactFlowInstance, viewport, projectName]);
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     setSelectedNode(node.id);
@@ -116,6 +81,8 @@ const FlowBuilder: React.FC = () => {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
+          snapToGrid
+          snapGrid={[15, 15]}
           onDrop={onDrop}
           onDragOver={onDragOver}
         >
