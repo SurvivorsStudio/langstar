@@ -148,6 +148,10 @@ export const initialNodes: Node<NodeData>[] = [
   }
 ];
 
+// 새 워크플로우를 위한 빈 초기 상태
+export const emptyInitialNodes: Node<NodeData>[] = [];
+export const emptyInitialEdges: Edge[] = [];
+
 export const initialEdges: Edge[] = [];
 
 const getCircularReplacer = () => {
@@ -412,7 +416,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || 'data';
 
-    let edgeData: any = { output: null };
+    const edgeData: any = { output: null };
 
     if (isConditionNode) {
       // Count existing outgoing edges from this source before adding the new one
@@ -431,14 +435,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
-  setProjectName: (name: string) => set({ projectName: name }),
+  setProjectName: (name: string) => set(state => state.projectName === name ? {} : { projectName: name }),
   
   addNode: ({ type, position, data }) => {
     const id = nanoid();
     const uniqueLabel = getUniqueNodeName(get().nodes, data.label);
     const defaultConfig = type === 'startNode' ? {
       className: '',
-      classType: 'TypedDict' as 'TypedDict',
+      classType: 'TypedDict' as const,
       variables: []
     } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
       outputVariable: 'python_function_output',
@@ -845,7 +849,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           // API 페이로드에 맞게 모델 정보 변환
-          let modelForAPI: any = {
+          const modelForAPI: any = {
             connName: (modelConnection as AIConnection).name,
             providerName: (modelConnection as AIConnection).provider,
             modelName: (modelConnection as AIConnection).model,
@@ -922,7 +926,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           // API 페이로드용 tools_for_api 구성
-          let tools_for_api: Array<{ tool_name: string; tool_description: string; tool_code: string }> = []; // 'python_code' -> 'tool_code'로 변경
+          const tools_for_api: Array<{ tool_name: string; tool_description: string; tool_code: string }> = []; // 'python_code' -> 'tool_code'로 변경
           if (selectedToolIds.length > 0) {
             const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
             if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
@@ -1340,7 +1344,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
     const nodesToSave = nodes.map((currentNode: Node<NodeData>) => {
       const { icon, ...restOfNodeData } = currentNode.data; // 노드의 data 필드 (icon 제외)
-      let finalNodeData = { ...restOfNodeData }; // 최종적으로 노드에 저장될 data 객체
+      const finalNodeData = { ...restOfNodeData }; // 최종적으로 노드에 저장될 data 객체
 
       // 만약 현재 노드가 conditionNode 타입이라면, config에 조건 정보를 추가합니다.
       if (currentNode.type === 'conditionNode') {
@@ -1374,7 +1378,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         if (modelDetails) {
           // 저장된 객체를 서버가 요구하는 최종 포맷으로 변환합니다.
-          let modelConfigForExport: any = {
+          const modelConfigForExport: any = {
             connName: modelDetails.name,
             providerName: modelDetails.provider,
             modelName: modelDetails.model,
@@ -1406,7 +1410,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           // Tools 정보를 실제 구성 정보로 변환
-          let toolsConfigForExport: Array<{ id: string; name: string; description: string; code: string }> = [];
+          const toolsConfigForExport: Array<{ id: string; name: string; description: string; code: string }> = [];
           if (finalNodeData.config?.tools && Array.isArray(finalNodeData.config.tools)) {
             const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
             if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {

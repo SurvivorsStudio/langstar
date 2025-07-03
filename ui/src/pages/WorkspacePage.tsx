@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 // import logoImage from '../assets/common/langstar_logo.png';
-import { useFlowStore, DEFAULT_PROJECT_NAME, initialNodes, initialEdges } from '../store/flowStore';
+import { useFlowStore, DEFAULT_PROJECT_NAME, emptyInitialNodes, emptyInitialEdges } from '../store/flowStore';
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar';
 import WorkflowList from '../components/workspace/WorkflowList';
 import RagConfigList from '../components/workspace/RagConfigList';
@@ -198,16 +198,20 @@ const WorkspacePage: React.FC = () => {
   };
 
   const handleNewWorkflow = () => {
-    const store = useFlowStore.getState();
     let newProjectName = defaultProjectName;
     let counter = 1;
-    while (store.availableWorkflows.includes(newProjectName)) {
+    while (availableWorkflows.includes(newProjectName)) {
       newProjectName = `${defaultProjectName} (${counter})`;
       counter++;
     }
 
     setProjectName(newProjectName);
-    useFlowStore.setState({ nodes: initialNodes, edges: initialEdges, viewport: { x: 0, y: 0, zoom: 1 }, lastSaved: null });
+    useFlowStore.setState({ 
+      nodes: emptyInitialNodes, 
+      edges: emptyInitialEdges, 
+      viewport: { x: 0, y: 0, zoom: 1 }, 
+      lastSaved: null 
+    });
     navigate(`/flow/${encodeURIComponent(newProjectName)}`);
   };
 
