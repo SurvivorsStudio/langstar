@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -22,22 +23,38 @@ const edgeTypes = {
 };
 
 const FlowBuilder: React.FC = () => {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport } = useFlowStore();
+  const { id } = useParams<{ id: string }>();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [synced, setSynced] = useState(false);
 
-  // 저장된 워크플로우 자동 불러오기
+  // id와 projectName이 다를 때만 setProjectName (동기화 플래그 사용)
   useEffect(() => {
-    if (projectName) {
-      loadWorkflow(projectName).catch(() => {
-        // 저장된 워크플로우가 없으면 무시(기본 상태 유지)
+    if (id) {
+      const decodedId = decodeURIComponent(id);
+      if (decodedId !== projectName) {
+        setProjectName(decodedId);
+        setSynced(false); // 동기화 중
+      } else {
+        setSynced(true); // 동기화 완료
+      }
+    }
+    // projectName은 의존성에서 제외!
+  }, [id, setProjectName, projectName]);
+
+  // 동기화가 끝난 후에만 loadWorkflow 실행
+  useEffect(() => {
+    if (synced && projectName) {
+      console.log(`[SYNCED] 워크플로우 로드 시도: "${projectName}"`);
+      loadWorkflow(projectName).catch((error) => {
+        console.log(`[SYNCED] 워크플로우 "${projectName}" 로드 실패 (새 워크플로우일 수 있음):`, error);
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName]);
+  }, [synced, projectName]);
 
   // viewport가 바뀔 때마다 ReactFlow 인스턴스에 적용
   useEffect(() => {
@@ -98,6 +115,14 @@ const FlowBuilder: React.FC = () => {
       data: { label, code: '', config: {} }
     });
   }, [addNode, reactFlowInstance]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <span>워크플로우 불러오는 중...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full">
