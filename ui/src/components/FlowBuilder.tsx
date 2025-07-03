@@ -22,10 +22,13 @@ const edgeTypes = {
 };
 
 const FlowBuilder: React.FC = () => {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport } = useFlowStore();
+
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, removeNode, removeEdge } = useFlowStore();
+
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -66,15 +69,21 @@ const FlowBuilder: React.FC = () => {
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     setSelectedNode(node.id);
+    setSelectedEdge(null);
     setShowInspector(true);
   }, []);
 
-  const onPaneClick = useCallback(() => {
+  const onEdgeClick = useCallback((_: unknown, edge: any) => {
+    setSelectedEdge(edge.id);
     setSelectedNode(null);
     setShowInspector(false);
   }, []);
 
-
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    setSelectedEdge(null);
+    setShowInspector(false);
+  }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -97,10 +106,33 @@ const FlowBuilder: React.FC = () => {
       position,
       data: { label, code: '', config: {} }
     });
+    setTimeout(() => {
+      const newNode = useFlowStore.getState().nodes.find(
+        n => n.position.x === position.x && n.position.y === position.y && n.type === type && n.data.label === label
+      );
+      if (newNode) setSelectedNode(newNode.id);
+    }, 0);
   }, [addNode, reactFlowInstance]);
 
+  // 키보드 단축키로 노드/엣지 삭제
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Delete') {
+      if (selectedNode) {
+        const node = nodes.find(n => n.id === selectedNode);
+        if (node && node.type !== 'startNode' && node.type !== 'endNode') {
+          removeNode(selectedNode);
+          setSelectedNode(null);
+          setShowInspector(false);
+        }
+      } else if (selectedEdge) {
+        removeEdge(selectedEdge);
+        setSelectedEdge(null);
+      }
+    }
+  }, [selectedNode, selectedEdge, nodes, removeNode, removeEdge]);
+
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full" tabIndex={0} onKeyDown={handleKeyDown}>
       {showNodeSidebar && (
         <NodeSidebar onClose={() => setShowNodeSidebar(false)} />
       )}
@@ -112,12 +144,16 @@ const FlowBuilder: React.FC = () => {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
           onDrop={onDrop}
           onDragOver={onDragOver}
+          deleteKeyCode={null}
+          multiSelectionKeyCode={null}
+          selectionKeyCode={null}
         >
           <Background 
             color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 
@@ -137,7 +173,6 @@ const FlowBuilder: React.FC = () => {
               </button>
             )}
           </Panel>
-
         </ReactFlow>
       </div>
       {showInspector && selectedNode && (
