@@ -1,4 +1,6 @@
-
+import re 
+import textwrap
+from server.services.code_export import aws_templates
 
 # create_state 
 def init_state_code( config_json ) : 
@@ -33,7 +35,6 @@ class MyState(BaseModel):
 def return_next_node_code():
     code = """
 def return_next_node( my_node, next_node_list, return_value  ):
-
     updates = {}
     for next_node in next_node_list : 
         next_name = next_node['node_name']
@@ -45,7 +46,6 @@ def return_next_node( my_node, next_node_list, return_value  ):
                 updates[next_name] = {my_node : return_value}
             else : 
                 updates[next_name][my_node] = return_value
-                
         # 일반 노드 
         else : 
             if next_name not in updates:
@@ -109,7 +109,6 @@ def node_{node_name}(state):
     prompt = template.format(**node_input)
     output_value = node_config['outputVariable']
     
-
     # 다음 노드에 전달하는 값 
     return_value = node_input.copy() 
     return_value.update( {{ output_value : prompt }} ) 
@@ -134,7 +133,6 @@ def node_{node_name}(state):
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
     node_config = state_dict[node_config]
-
                         
     # 다음 노드에 전달하는 값 
     return_value = {{}} 
@@ -142,7 +140,6 @@ def node_{node_name}(state):
         match_node  = value['node_name'] 
         match_value = value['node_value'] 
         return_value[key]  = node_input[match_node][match_value]
-
 
     # 전달하고자 하는 타겟 node 리스트 
     next_node_list = node_config.get('next_node', []) 
@@ -237,8 +234,6 @@ def condition_sub2_node_code (function_name, condition_config):
 def node_{function_name}(state):
     my_name = "{function_name}"
     node_name = my_name
-    
-
     state_dict  = state.model_dump()
 
 {indented_code}
@@ -251,7 +246,7 @@ def node_{function_name}(state):
     return function_node_code
     
 
-def condition_node_code( node ) :
+def condition_node_code( node, node_id_to_node_label ) :
     node_name = node['data']['label']
     condition_config = []
     for row in node['data']['config']['conditions']:
@@ -296,8 +291,54 @@ def node_{node_name}(state):
 
 def agent_node_code( node ):
     provider = node['data']['config']['model']['providerName'] 
+    tools = node['data']['config']['tools'] 
+    memory_type = node['data']['config']['memoryGroup']['memoryType']
+
     if provider == "aws": 
-        pass 
-    else :
-        pass 
+        if memory_type =="" and len(tools) == 0: 
+            return aws_templates.base_base_agent_code( node )
+        elif memory_type !="" and len(tools) == 0: 
+            return aws_templates.memory_base_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return aws_templates.base_tool_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return aws_templates.memory_tool_agent_code( node )
+    else : 
+        if memory_type =="" and len(tools) == 0: 
+            return aws_templates.base_base_agent_code( node )
+        elif memory_type !="" and len(tools) == 0: 
+            return aws_templates.memory_base_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return aws_templates.base_tool_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return aws_templates.memory_tool_agent_code( node )
     
+
+
+def create_start_node_code( node ) : 
+    node_name = node['data']['label']
+    return f"""
+graph = StateGraph(MyState)
+graph.add_node("_{node_name}", node_{node_name})
+"""
+
+
+def create_node_code( node ) : 
+    node_name = node['data']['label']
+    return f"""graph.add_node("_{node_name}", node_{node_name})
+"""
+
+
+def create_condition_node_code( node ) : 
+    node_name = node['data']['label']
+    code = create_node_code( node )
+    node_branch = {} 
+    for condition_config in node['data']['config']['conditions']:
+        key = condition_config['description'] 
+        value = "_" + condition_config['targetNodeLabel']
+        node_branch[key] = value
+    node_branch = str(node_branch)
+    code += f"""graph.add_conditional_edges("_{node_name}", node_branch_{node_name}, {node_branch}  )
+"""
+    return code
+
