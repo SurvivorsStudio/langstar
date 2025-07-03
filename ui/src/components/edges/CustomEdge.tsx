@@ -101,7 +101,7 @@ const CustomEdge = ({
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
-        <div className="relative">
+        <div className="relative" onMouseDown={e => e.stopPropagation()}>
           <div className="absolute -top-2 -right-2 flex gap-1">
             <button
               onClick={handleClearOutput}
@@ -119,8 +119,9 @@ const CustomEdge = ({
             </button>
           </div>
           <div 
-            className="bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border border-gray-200 dark:border-gray-600 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => setShowInspector(true)}
+            className="bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border border-gray-200 dark:border-gray-600 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg"
+            onClick={e => { e.stopPropagation(); setShowInspector(true); }}
+            onMouseDown={e => e.stopPropagation()}
           >
             <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
               {outputPreview.length > 200 ? outputPreview.slice(0, 200) + '...' : outputPreview}

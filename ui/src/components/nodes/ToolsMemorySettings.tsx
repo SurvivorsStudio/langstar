@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle, ChevronLeft, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
 import { Group, NodeData } from '../../types/node';
 import CustomSelect from '../Common/CustomSelect';
@@ -72,14 +72,6 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
     }
   };
 
-  const handleBack = () => {
-    setSelectedGroupId(null);
-    updateNodeData(nodeId, {
-      ...node?.data,
-      selectedGroupId: null
-    } as NodeData);
-  };
-
   if (!selectedGroup) {
     return null;
   }
@@ -88,13 +80,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handleBack}
-            className="flex items-center text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
-          >
-            <ChevronLeft size={16} className="mr-1" />
-            Back to Groups
-          </button>
+          <div />
           <button
             onClick={() => handleRemoveGroup(selectedGroup.id)}
             className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-sm"
