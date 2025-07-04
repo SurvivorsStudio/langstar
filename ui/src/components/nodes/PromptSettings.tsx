@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import CodeEditor from '../CodeEditor';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle, Pencil, Check } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface PromptSettingsProps {
   nodeId: string;
@@ -86,30 +87,18 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
                   </>
                 ) : (
                   <>
-                    <select
-                      id="promptOutputVariableSelect"
+                    <CustomSelect
                       value={node?.data.config?.outputVariable || ''}
-                      onChange={(e) => handleOutputVariableChange(e.target.value)}
-                      className={`flex-grow px-3 py-2 border ${
-                        !hasValidOutput && availableVariables.length === 0 
-                          ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                      } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                      onChange={handleOutputVariableChange}
+                      options={[
+                        ...(node?.data.config?.outputVariable && !availableVariables.includes(node.data.config.outputVariable)
+                          ? [{ value: node.data.config.outputVariable, label: `${node.data.config.outputVariable} (Custom)` }]
+                          : []),
+                        ...availableVariables.map(variable => ({ value: variable, label: variable }))
+                      ]}
+                      placeholder="Select output variable"
                       disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
-                    >
-                      <option value="">Select output variable</option>
-                      {node?.data.config?.outputVariable && 
-                       !availableVariables.includes(node.data.config.outputVariable) && (
-                        <option value={node.data.config.outputVariable}>
-                          {node.data.config.outputVariable} (Custom)
-                        </option>
-                      )}
-                      {availableVariables.map((variable) => (
-                        <option key={variable} value={variable}>
-                          {variable}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
                       <Pencil size={18} />
                     </button>

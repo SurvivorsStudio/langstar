@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle, Pencil, Check } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface RAGSettingsProps {
   nodeId: string;
@@ -146,18 +147,13 @@ const RAGSettings: React.FC<RAGSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             RAG Configuration
           </label>
-          <select
+          <CustomSelect
             value={node?.data.config?.ragConfig || ''}
-            onChange={(e) => handleConfigChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select a RAG configuration</option>
-            {mockRAGConfigs.map((config) => (
-              <option key={config.id} value={config.id}>
-                {config.name} ({config.vectorDb})
-              </option>
-            ))}
-          </select>
+            onChange={handleConfigChange}
+            options={mockRAGConfigs.map(config => ({ value: config.id, label: `${config.name} (${config.vectorDb})` }))}
+            placeholder="Select a RAG configuration"
+            disabled={mockRAGConfigs.length === 0}
+          />
           {mockRAGConfigs.length === 0 && (
             <p className="text-xs text-amber-500 dark:text-amber-400">
               No RAG configurations found. Please set up RAG in the RAG Configuration section.
