@@ -24,7 +24,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -91,7 +91,26 @@ const FlowBuilder: React.FC = () => {
     setShowInspector(false);
   }, []);
 
-
+  // backspace 키로 노드 삭제 방지, delete 키로 선택된 노드 삭제
+  const onKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'Backspace') {
+      event.preventDefault();
+      event.stopPropagation();
+    } else if (event.key === 'Delete' && selectedNode) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      // 선택된 노드가 Start나 End 노드가 아닌 경우에만 삭제
+      const nodeToDelete = nodes.find(node => node.id === selectedNode);
+      if (nodeToDelete && nodeToDelete.type !== 'startNode' && nodeToDelete.type !== 'endNode') {
+        if (window.confirm('Are you sure you want to delete this node?')) {
+          removeNode(selectedNode);
+          setSelectedNode(null);
+          setShowInspector(false);
+        }
+      }
+    }
+  }, [selectedNode, nodes, removeNode]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -143,6 +162,7 @@ const FlowBuilder: React.FC = () => {
           fitView
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onKeyDown={onKeyDown}
         >
           <Background 
             color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 
