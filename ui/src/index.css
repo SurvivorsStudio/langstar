@@ -158,8 +158,12 @@ body {
   transition: all 0.1s ease-in-out;
 }
 
+/* ReactFlow 노드 선택(파란 네모) 효과 제거 */
 .react-flow__node.selected {
-  box-shadow: 0 0 0 2px #3b82f6;
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+  /* 필요하다면 background도 조정 가능 */
 }
 
 .react-flow__handle {

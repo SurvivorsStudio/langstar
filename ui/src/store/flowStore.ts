@@ -91,6 +91,10 @@ export interface FlowState {
   viewport: Viewport; // viewport 상태 추가
   setViewport: (viewport: Viewport) => void; // viewport 업데이트 함수 추가
 
+  // 노드 선택 상태
+  selectedNode: string | null;
+  setSelectedNode: (id: string | null) => void;
+
   // IndexedDB 저장 및 불러오기 관련 상태 및 함수
   isSaving: boolean;
   saveError: string | null;
@@ -113,6 +117,10 @@ export interface FlowState {
   addAIConnection: (connection: Omit<AIConnection, 'id' | 'lastModified'>) => Promise<AIConnection>;
   updateAIConnection: (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => Promise<AIConnection>;
   deleteAIConnection: (connectionId: string) => Promise<void>;
+  
+  // 포커스 관리
+  focusedElement: { type: 'node' | 'edge' | null; id: string | null };
+  setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -392,6 +400,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
+  // 노드 선택 상태
+  selectedNode: null,
+  setSelectedNode: (id: string | null) => set({ selectedNode: id }),
+
   // IndexedDB 관련 상태 초기값
   isSaving: false,
   saveError: null,
@@ -403,6 +415,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   aiConnections: [],
   isLoadingAIConnections: false,
   loadErrorAIConnections: null,
+  
+  // 포커스 관리 초기 상태
+  focusedElement: { type: null, id: null },
 
 
   setViewport: (viewport: Viewport) => {
@@ -1644,6 +1659,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+
+  setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => set({ focusedElement: { type, id } }),
 
   
 }));
