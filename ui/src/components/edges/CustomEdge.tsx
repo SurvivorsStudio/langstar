@@ -4,6 +4,12 @@ import { X, Trash2 } from 'lucide-react';
 import OutputInspector from '../OutputInspector';
 import { useFlowStore } from '../../store/flowStore';
 
+export function handleEdgeDelete(edgeId: string, removeEdge: (id: string) => void): void {
+  if (window.confirm('Are you sure you want to remove this connection?')) {
+    removeEdge(edgeId);
+  }
+}
+
 const CustomEdge = ({
   id,
   sourceX,
@@ -17,8 +23,9 @@ const CustomEdge = ({
   style = {},
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
-  const { nodes, removeEdge, setEdgeOutput } = useFlowStore();
+  const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode } = useFlowStore();
   const sourceNode = nodes.find(n => n.id === source);
+  const isEdgeTextFocused = focusedElement.type === 'edge' && focusedElement.id === id;
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
@@ -41,9 +48,7 @@ const CustomEdge = ({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to remove this connection?')) {
-      removeEdge(id);
-    }
+    handleEdgeDelete(id, removeEdge);
   };
 
   const handleClearOutput = (e: React.MouseEvent) => {
@@ -119,8 +124,17 @@ const CustomEdge = ({
             </button>
           </div>
           <div 
-            className="bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border border-gray-200 dark:border-gray-600 max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg"
-            onClick={e => { e.stopPropagation(); setShowInspector(true); }}
+            className={`bg-white dark:bg-gray-800 shadow-md rounded-md p-2 text-xs border max-h-32 overflow-y-auto cursor-pointer hover:shadow-lg transition-all duration-200 ${
+              isEdgeTextFocused 
+                ? 'border-white dark:border-white shadow-lg ring-2 ring-white dark:ring-white ring-opacity-50' 
+                : 'border-gray-200 dark:border-gray-600'
+            }`}
+            onClick={e => { 
+              e.stopPropagation(); 
+              setFocusedElement('edge', id);
+              setSelectedNode(null);
+              setShowInspector(true); 
+            }}
             onMouseDown={e => e.stopPropagation()}
           >
             <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
@@ -134,7 +148,10 @@ const CustomEdge = ({
         <div className="fixed top-0 right-0 h-full z-50">
           <OutputInspector
             output={output}
-            onClose={() => setShowInspector(false)}
+            onClose={() => {
+              setShowInspector(false);
+              setFocusedElement(null, null);
+            }}
           />
         </div>
       )}

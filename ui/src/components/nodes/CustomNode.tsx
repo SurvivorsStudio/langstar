@@ -8,9 +8,9 @@ import { useFlowStore } from '../../store/flowStore';
  * React Flow 라이브러리에서 사용되는 커스텀 노드를 렌더링합니다.
  * 노드의 타입, 상태, 데이터에 따라 다양한 UI와 기능을 제공합니다.
  */
-export const CustomNode = memo(({ data, isConnectable, selected, id, type }: NodeProps) => {
+export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   // 노드 이름 편집 모드 상태
@@ -298,10 +298,13 @@ export const CustomNode = memo(({ data, isConnectable, selected, id, type }: Nod
     </div>
   );
 
+  // 노드가 포커스되었는지 확인
+  const isNodeFocused = focusedElement.type === 'node' && focusedElement.id === id;
+
   return (
     <div
-      className={`${getNodeStyle()} border-2 rounded-md p-4 w-64 shadow-sm relative ${
-        selected ? 'shadow-md ring-2 ring-blue-300' : ''
+      className={`${getNodeStyle()} border-2 rounded-md p-4 w-64 shadow-sm relative transition-all duration-200 ${
+        isNodeFocused ? 'border-white dark:border-white shadow-lg ring-2 ring-white dark:ring-white ring-opacity-50' : ''
       }`}
     >
       {/* 시작 노드와 그룹 노드가 아닌 경우 상단 핸들 (입력) 표시 */}
