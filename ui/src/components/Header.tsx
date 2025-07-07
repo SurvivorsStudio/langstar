@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
+import { Link } from 'react-router-dom';
+import homeLogo from '../assets/common/home_logo.png';
 
 import CodeEditor from './CodeEditor';
 
@@ -24,12 +26,11 @@ const Header: React.FC = () => {
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-2 px-4 flex items-center justify-between shadow-sm">
       <div className="flex items-center">
         <div className="flex items-center">
-          <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center text-white mr-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-            </svg>
-          </div>
+          <Link to="/">
+            <div className="w-8 h-8 rounded-md bg-[#1E2836] flex items-center justify-center text-white mr-2 cursor-pointer">
+              <img src={homeLogo} alt="Home Logo" className="w-8 h-8 object-contain" />
+            </div>
+          </Link>
           <div className="relative">
             <input
               type="text"
