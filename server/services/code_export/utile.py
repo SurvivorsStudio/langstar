@@ -1,5 +1,6 @@
 
 
+# 노드 id를 라벨로 변환합니다. 
 def init_node_id_to_node_label( create_node_json ) : 
     node_id_to_node_label = {}
     for node in create_node_json['nodes']:
@@ -9,7 +10,7 @@ def init_node_id_to_node_label( create_node_json ) :
         node_id_to_node_label[node_id] = {'node_name': node_label, 'node_type': node_type}
     return node_id_to_node_label
 
-
+# 노드의 관계를 json으로 변환합니다. 
 def init_edge_relation( create_node_json ) :
     node_id_to_node_label = init_node_id_to_node_label( create_node_json )
     edge_relation = {}
@@ -164,6 +165,7 @@ def init_node_config( create_node_json ) :
             temp_config[config_id]['config']['node_type'] = node_type
             temp_config[config_id]['config']['next_node'] = edge_relation[node_name]
             temp_config[config_id]['config']['node_name'] = node_name
+            temp_config[config_id]['config']['chat_history'] = []
 
             result.append( temp_config.copy() )
             result.append( {node_name : {}} )  
