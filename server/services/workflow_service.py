@@ -28,7 +28,7 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             max_tokens=max_token
         )
 
-    if memory == "" and len(tools) == 0:
+    if memory == "" and len(tool_info) == 0:
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"{system_prompt}"),
             ("human", "{user_prompt}")
@@ -39,7 +39,7 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 메모리 있어
-    elif memory != "" and len(tools) == 0:
+    elif memory != "" and len(tool_info) == 0:
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"{system_prompt}"),
             MessagesPlaceholder(variable_name="history"),
@@ -51,7 +51,7 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 도구 있어
-    elif memory == "" and len(tools) != 0:
+    elif memory == "" and len(tool_info) != 0:
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"{system_prompt}"),
             ("human", "{user_prompt}"),
@@ -66,7 +66,7 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
         return response
 
     # 도구 있어, 메모리 있어
-    elif memory != "" and len(tools) != 0:
+    elif memory != "" and len(tool_info) != 0:
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"{system_prompt}"),
             MessagesPlaceholder(variable_name="history"),
@@ -297,6 +297,7 @@ class WorkflowService:
 
                 python_code += "\n"
                 
+                # create egde 
                 cnt = 0 
                 for node in create_node_json['edges']:
                     source_node_id = node['source']
@@ -323,7 +324,10 @@ class WorkflowService:
                    
                     if node_id_to_node_label[target_node_id]['node_type'] == 'endNode':
                         python_code += """graph.add_edge("_**source**", END)\n""".replace("**source**", target_node_name)
-                        python_code += """app = graph.compile()"""
+                        # python_code += """app = graph.compile()"""
+
+                        python_code += """checkpointer = InMemorySaver()"""
+                        python_code += """app = graph.compile(checkpointer=checkpointer)"""
                         break
 
                 return python_code

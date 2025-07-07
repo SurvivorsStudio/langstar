@@ -1,5 +1,6 @@
 import re 
 import textwrap
+import ast
 from server.services.code_export import aws_templates
 
 # create_state 
@@ -24,6 +25,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from typing import Optional
 from langchain_core.tools import StructuredTool
+from langgraph.checkpoint.memory import InMemorySaver 
 
 class MyState(BaseModel):
     response:dict = {{}}
@@ -34,7 +36,7 @@ class MyState(BaseModel):
 # return_next_node
 def return_next_node_code():
     code = """
-def return_next_node( my_node, next_node_list, return_value  ):
+def return_next_node( my_node, next_node_list, return_value, node_cofing = {} ):
     updates = {}
     for next_node in next_node_list : 
         next_name = next_node['node_name']
@@ -50,6 +52,8 @@ def return_next_node( my_node, next_node_list, return_value  ):
         else : 
             if next_name not in updates:
                 updates[next_name] = return_value
+                
+    updates = updates | node_cofing 
                 
     return updates
 """
@@ -81,7 +85,8 @@ def node_{node_name}(state):
     # 전달하고자 하는 타겟 node 리스트
     next_node_list = full_node_config_data.get('next_node', [])
     
-    return return_next_node(node_label, next_node_list, return_value)
+    return_config = {{ node_config_key : state_dict[node_config_key] }}
+    return return_next_node(node_label, next_node_list, return_value, return_config)
 """
     return code
 
@@ -93,12 +98,12 @@ def prompt_node_code( node ) :
 def node_{node_name}(state):
     my_name = "{node_name}" 
     node_name = my_name
-    node_config = my_name + "_Config"
+    node_config_key = my_name + "_Config"
 
     # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
-    node_config = state_dict[node_config]
+    node_config = state_dict[node_config_key]
     
     # prompt 생성 
     template = PromptTemplate(
@@ -115,8 +120,9 @@ def node_{node_name}(state):
 
     # 전달하고자 하는 타겟 node 리스트 
     next_node_list = node_config.get('next_node', []) 
-    
-    return return_next_node( node_name, next_node_list, return_value ) 
+
+    return_config = {{ node_config_key : state_dict[node_config_key] }}
+    return return_next_node( node_name, next_node_list, return_value, return_config ) 
 """
     return code 
 
@@ -127,12 +133,12 @@ def merge_node_code( node ) :
 def node_{node_name}(state):
     my_name = "{node_name}" 
     node_name = my_name
-    node_config = my_name + "_Config"
+    node_config_key = my_name + "_Config"
 
     # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
-    node_config = state_dict[node_config]
+    node_config = state_dict[node_config_key]
                         
     # 다음 노드에 전달하는 값 
     return_value = {{}} 
@@ -144,7 +150,8 @@ def node_{node_name}(state):
     # 전달하고자 하는 타겟 node 리스트 
     next_node_list = node_config.get('next_node', []) 
 
-    return return_next_node( node_name, next_node_list, return_value )   
+    return_config = {{ node_config_key : state_dict[node_config_key] }}
+    return return_next_node( node_name, next_node_list, return_value, return_config )   
 """
     return code 
 
@@ -155,12 +162,12 @@ def end_node_code( node ) :
 def node_{node_name}( state ) : 
     my_name = "{node_name}" 
     node_name = my_name
-    node_config = my_name + "_Config"
+    node_config_key = my_name + "_Config"
 
     # 사용자에게 전달 받은 값과 설정값을 가지고 온다. 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
-    node_config = state_dict[node_config]['config']['receiveKey']
+    node_config = state_dict[node_config_key]['config']['receiveKey']
 
     # 다음 노드에 전달하는 값 
     return_value = {{}} 
@@ -171,9 +178,10 @@ def node_{node_name}( state ) :
             return_value[key] = node_input[key] 
 
     # 결과값 전달
+    return_config = {{ node_config_key : state_dict[node_config_key] }}
+
     next_node_list = [ {{'node_name': 'response', 'node_type': 'responseNode'}} ]
-        
-    return return_next_node( node_name, next_node_list, return_value ) 
+    return return_next_node( node_name, next_node_list, return_value, return_config )   
     """
     return code 
 
@@ -225,7 +233,7 @@ def condition_sub2_node_code (function_name, condition_config):
         next_node_list = row['next_node']
         code += f"""
     {condition} : 
-        return return_next_node( node_name, {next_node_list}, {tmp_param} ) 
+        return return_next_node( node_name, {next_node_list}, {tmp_param}, {{ node_config_key : state_dict[node_config_key] }} ) 
 """
 
     indented_code = textwrap.indent(code, "    ")
@@ -234,6 +242,7 @@ def condition_sub2_node_code (function_name, condition_config):
 def node_{function_name}(state):
     my_name = "{function_name}"
     node_name = my_name
+    node_config_key = my_name + "_Config"
     state_dict  = state.model_dump()
 
 {indented_code}
@@ -271,7 +280,7 @@ def python_function_node_code( node ):
 def node_{node_name}(state):
     my_name = "{node_name}"
     node_name = my_name
-    node_config = my_name + "_Config"
+    node_config_key = my_name + "_Config"
 
     state_dict  = state.model_dump()
 
@@ -281,25 +290,41 @@ def node_{node_name}(state):
     input_param = state_dict[node_name ] 
     result = {function_name}( input_param ) 
     
-    node_config = state_dict[node_config]
+    node_config = state_dict[node_config_key]
+
+    return_config = {{ node_config_key : state_dict[node_config_key] }}    
     next_node_list = node_config.get('next_node', []) 
-    return return_next_node( node_name, next_node_list, result ) 
+
+    return return_next_node( node_name, next_node_list, result, return_config ) 
 
 """
     return code 
 
 
 def agent_node_code( node ):
+    print( node )
     provider = node['data']['config']['model']['providerName'] 
-    tools = node['data']['config']['tools'] 
-    memory_type = node['data']['config']['memoryGroup']['memoryType']
+    # tools = node['data']['config']['tools'] 
+    tools = (
+    node.get('data', {})
+        .get('config', {})
+        .get('tools', [])
+    )
+        
+    # memory_type = node['data']['config']['memoryGroup']['memoryType']
+    memory_type = (
+    node.get('data', {})
+        .get('config', {})
+        .get('memoryGroup', {})
+        .get('memoryType', '')
+    )
 
     if provider == "aws": 
         if memory_type =="" and len(tools) == 0: 
             return aws_templates.base_base_agent_code( node )
         elif memory_type !="" and len(tools) == 0: 
             return aws_templates.memory_base_agent_code( node )
-        elif memory_type !="" and len(tools) != 0: 
+        elif memory_type =="" and len(tools) != 0: 
             return aws_templates.base_tool_agent_code( node )
         elif memory_type !="" and len(tools) != 0: 
             return aws_templates.memory_tool_agent_code( node )
@@ -308,11 +333,10 @@ def agent_node_code( node ):
             return aws_templates.base_base_agent_code( node )
         elif memory_type !="" and len(tools) == 0: 
             return aws_templates.memory_base_agent_code( node )
-        elif memory_type !="" and len(tools) != 0: 
+        elif memory_type =="" and len(tools) != 0: 
             return aws_templates.base_tool_agent_code( node )
         elif memory_type !="" and len(tools) != 0: 
             return aws_templates.memory_tool_agent_code( node )
-    
 
 
 def create_start_node_code( node ) : 

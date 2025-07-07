@@ -1,3 +1,5 @@
+import ast
+import textwrap
 
 def base_base_agent_code(node) : 
     node_name = node['data']['label']
@@ -69,7 +71,9 @@ def node_{node_name}( state ) :
 
     # 다음 노드 처리
     next_node_list = node_config.get('next_node', []) 
-    return return_next_node(node_name, next_node_list, return_value )
+    
+    return_config = {{ node_config_name : state_dict[node_config_name] }}    
+    return return_next_node(node_name, next_node_list, return_value, return_config )
 """ 
     return code 
 
@@ -86,12 +90,15 @@ memory = ConversationBufferMemory(return_messages=True)
 def memory_base_agent_code(node) : 
     code = ""
     node_name = node['data']['label']
-    code = memory_select_code() 
 
-    code += f"""
+    if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
+        code += f"""
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_aws import ChatBedrockConverse
+from langchain.memory import ConversationBufferMemory
+
+
 def node_{node_name}( state ) : 
-    from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_aws import ChatBedrockConverse
 
     my_name = "{node_name}" 
     node_name = my_name
@@ -113,6 +120,8 @@ def node_{node_name}( state ) :
         
     else :
         apiKey = model_info['apiKey'] 
+
+    memory = get_memory_data( state_dict[node_config_name] )
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -158,13 +167,15 @@ def node_{node_name}( state ) :
 
     # 다음 노드 처리
     next_node_list = node_config.get('next_node', []) 
-    return return_next_node(node_name, next_node_list, return_value )
+    return_config = return_update_config( state_dict[node_config_name], user_prompt, node_input[output_value] )
+    return return_next_node(node_name, next_node_list, return_value, {{node_config_name : return_config}} )
 """ 
-    return code 
+        return code 
 
 
 # tool 에 들어갈 정보들을 생성한다. 
-def get_tool_list(node) : 
+def get_tool_list(node) :
+    token_tool_code_list = [] 
     for tool_info in  node['data']['config']['tools']: 
         indented_code = textwrap.indent(tool_info['code'], "    ")
         parsed = ast.parse(tool_info['code'])
@@ -263,8 +274,61 @@ def node_{node_name}( state ) :
 
     # 다음 노드 처리
     next_node_list = node_config.get('next_node', []) 
-    return return_next_node(node_name, next_node_list, return_value )
+    return_config = {{ node_config_name : state_dict[node_config_name] }}    
+    return return_next_node(node_name, next_node_list, return_value, return_config )
     """ 
+    return code 
+
+
+def common_memory_code() : 
+    code = """
+def get_memory_data( node_config ) : 
+    
+    memory_type = node_config['config']['memoryGroup']['memoryType']
+
+    if memory_type == 'ConversationBufferWindowMemory' : 
+        # limit_size = node_config['config']['memory_type']
+        if len( node_config['config']['chat_history'] ) == 0 :
+            memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
+            memory_buffer.chat_memory.messages = []
+        else : 
+            memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
+            memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+        
+    elif memory_type == 'ConversationBufferMemory' : 
+        if len( node_config['config']['chat_history'] ) == 0 :
+            memory_buffer = ConversationBufferMemory(return_messages=True)
+            memory_buffer.chat_memory.messages = []
+        else : 
+            memory_buffer = ConversationBufferMemory(return_messages=True)
+            memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+
+    return memory_buffer
+        
+
+
+def return_update_config( node_config, user_message_content, ai_message_content  ) :
+   
+    memory_type = node_config['config']['memoryGroup']['memoryType']
+    
+    if memory_type == 'ConversationBufferWindowMemory' : 
+        limit_size = 2
+        memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
+        memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+
+    elif memory_type == 'ConversationBufferMemory' : 
+        memory_buffer = ConversationBufferMemory(return_messages=True)
+        memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+        
+    # set value
+    memory_buffer.chat_memory.add_user_message(user_message_content)
+    memory_buffer.chat_memory.add_ai_message(ai_message_content)
+
+    # get update value
+    current_buffered_history = memory_buffer.load_memory_variables({})['history']
+    node_config['config']['chat_history'] = current_buffered_history
+    return node_config
+    """
     return code 
 
 
@@ -273,8 +337,12 @@ def memory_tool_agent_code(node) :
     node_name = node['data']['label']
     tool_list = get_tool_list(node)
 
-    code = memory_select_code() 
+    # code = memory_select_code() 
+    print( node )
+
+    code += common_memory_code() 
     code += f"""
+
 def node_{node_name}( state ) : 
 
     from langchain_aws import ChatBedrockConverse
@@ -309,6 +377,8 @@ def node_{node_name}( state ) :
     user_prompt     = node_input[user_prompt_key]
     
     output_value  = node_config['agentOutputVariable']
+
+    memory = get_memory_data( state_dict[node_config_name] )
     
 
     # 답변 옵션     
@@ -347,7 +417,8 @@ def node_{node_name}( state ) :
 
     # 다음 노드 처리
     next_node_list = node_config.get('next_node', []) 
-    return return_next_node(node_name, next_node_list, return_value )
+    return_config = return_update_config( state_dict[node_config_name], user_prompt, node_input[output_value] )
+    return return_next_node(node_name, next_node_list, return_value, {{node_config_name : return_config}} )
     """ 
 
     return code 
