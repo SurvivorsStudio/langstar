@@ -14,11 +14,16 @@ from typing import Dict, Any
 from langchain.chains import LLMChain
 from langchain_core.tools import StructuredTool
 from server.services.code_export import templates, utile
+from server.services.code_excute import flower_manager
+from server.models import workflow
+from fastapi import HTTPException
+
+
 
 
 # 로거 설정
 logger = logging.getLogger(__name__)
-
+flower_manager = flower_manager.FlowerManager()
 
 def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[]):
     # 도구 없이, 메모리 없이
@@ -147,6 +152,41 @@ class WorkflowService:
         except Exception as e:
             logger.error(f"Error in start node processing: {str(e)}", exc_info=True)
             raise
+
+    @staticmethod
+    def run_chatflow( msg: Dict[str, Any]):
+        print( msg )
+        flower_id = msg['flower_id']
+        input_data = msg['input_data']
+        try:
+            # flower 로드
+            if flower_id not in flower_manager.loaded_flowers : 
+                print( "최초 들어오는 값입니다" ) 
+                graph = flower_manager.load_flower(flower_id)
+            print( flower_manager.loaded_flowers ) 
+            print( flower_id ) 
+                
+            graph = flower_manager.loaded_flowers[flower_id]
+            
+            # graph 실행
+            result = graph.invoke(input_data, {"configurable": {"thread_id": 1}} )
+            
+            return workflow.FlowerResponse(
+                flower_id=flower_id,
+                result=result,
+                status="success"
+            )
+        
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+
+
+    @staticmethod
+    def chatflow_list():
+        flowers = flower_manager.scan_flowers()
+        return workflow.FlowerListResponse(available_flowers=flowers)
 
     @staticmethod
     def create_tool_from_api(tool_name: str, tool_description: str, tool_code: str) -> Tool:
@@ -326,8 +366,8 @@ class WorkflowService:
                         python_code += """graph.add_edge("_**source**", END)\n""".replace("**source**", target_node_name)
                         # python_code += """app = graph.compile()"""
 
-                        python_code += """checkpointer = InMemorySaver()"""
-                        python_code += """app = graph.compile(checkpointer=checkpointer)"""
+                        python_code += """checkpointer = InMemorySaver()\n"""
+                        python_code += """app = graph.compile(checkpointer=checkpointer)\n"""
                         break
 
                 return python_code
