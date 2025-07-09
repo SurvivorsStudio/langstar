@@ -222,7 +222,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       name: newName,
       description: '',
       nodes: [],
-      type
+      type,
+      ...(type === 'memory' && { memoryType: 'ConversationBufferMemory' }) // memory 그룹일 때만 기본값 추가
     };
     // 노드 데이터 업데이트 (새 그룹 추가)
     updateNodeData(id, {

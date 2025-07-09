@@ -2,6 +2,7 @@ import React from 'react';
 import CodeEditor from '../CodeEditor';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface SystemPromptSettingsProps {
   nodeId: string;
@@ -47,23 +48,13 @@ const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ nodeId }) =
               Output Variable
             </label>
             <div className="relative">
-              <select
+              <CustomSelect
                 value={node?.data.config?.outputVariable || ''}
-                onChange={(e) => handleOutputVariableChange(e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  !hasValidOutput 
-                    ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                onChange={handleOutputVariableChange}
+                options={availableVariables.map(variable => ({ value: variable, label: variable }))}
+                placeholder="Select output variable"
                 disabled={!hasValidOutput}
-              >
-                <option value="">Select output variable</option>
-                {availableVariables.map((variable) => (
-                  <option key={variable} value={variable}>
-                    {variable}
-                  </option>
-                ))}
-              </select>
+              />
               {!incomingEdge && (
                 <div className="flex items-center mt-1 text-amber-500 text-xs">
                   <AlertCircle size={12} className="mr-1" />

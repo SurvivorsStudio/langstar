@@ -4,6 +4,7 @@ from server.services.workflow_service import WorkflowService
 import logging
 import traceback
 
+
 # 로거 설정
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,32 @@ def export_langgraph(msg: dict = Body(...)):
         langgraph_code = WorkflowService.generate_langgraph_code(msg)
         logger.info("LangGraph export request processed successfully")
         return {"langgraph": langgraph_code}
+    except Exception as e:
+        logger.error(f"Error in LangGraph export endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 
+
+@router.post('/workflow/run/{flower_id}')
+def run_chatflow(msg: dict = Body(...)):
+    """Export workflow to LangGraph Python code"""
+    try:
+        logger.info("Received Run Chatflow request")
+        result = WorkflowService.run_chatflow(msg)
+        logger.info("run_chatflow request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in LangGraph export endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 
+
+
+
+@router.post('/workflow/list')
+def run_chatflow_list(msg: dict = Body(...)):
+    """Export workflow to LangGraph Python code"""
+    try:
+        logger.info("Received Run workflow list")
+        result = WorkflowService.chatflow_list()
+        logger.info("Run workflow list request processed successfully")
+        return result
     except Exception as e:
         logger.error(f"Error in LangGraph export endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) 
