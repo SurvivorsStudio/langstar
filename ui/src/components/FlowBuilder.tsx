@@ -15,7 +15,7 @@ import { useFlowStore } from '../store/flowStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import { nodeTypes } from './nodes/nodeTypes';
-import CustomEdge from './edges/CustomEdge';
+import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle } from 'lucide-react';
 
 const edgeTypes = {
@@ -24,10 +24,9 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [synced, setSynced] = useState(false);
@@ -84,14 +83,45 @@ const FlowBuilder: React.FC = () => {
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     setSelectedNode(node.id);
     setShowInspector(true);
-  }, []);
+    setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)
+  }, [setFocusedElement, setSelectedNode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setShowInspector(false);
-  }, []);
+    setFocusedElement(null, null); // 패널 클릭 시 모든 포커스 해제
+  }, [setFocusedElement, setSelectedNode]);
 
-
+  // backspace 키로 노드 삭제 방지, delete 키로 선택된 노드 삭제
+  const onKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'Backspace') {
+      event.preventDefault();
+      event.stopPropagation();
+    } else if (event.key === 'Delete') {
+      // 엣지 포커스 상태에서 delete 키: 엣지 삭제
+      if (focusedElement.type === 'edge' && focusedElement.id) {
+        handleEdgeDelete(focusedElement.id, removeEdge);
+        setFocusedElement(null, null);
+        setShowInspector(false);
+        return;
+      }
+      // 노드 포커스 상태에서 delete 키: 노드 삭제
+      if (selectedNode) {
+        event.preventDefault();
+        event.stopPropagation();
+        // 선택된 노드가 Start나 End 노드가 아닌 경우에만 삭제
+        const nodeToDelete = nodes.find(node => node.id === selectedNode);
+        if (nodeToDelete && nodeToDelete.type !== 'startNode' && nodeToDelete.type !== 'endNode') {
+          if (window.confirm('Are you sure you want to delete this node?')) {
+            removeNode(selectedNode);
+            setSelectedNode(null);
+            setShowInspector(false);
+            setFocusedElement(null, null); // 노드 삭제 시 포커스 해제
+          }
+        }
+      }
+    }
+  }, [selectedNode, nodes, removeNode, setSelectedNode, setFocusedElement, focusedElement, removeEdge]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -143,6 +173,7 @@ const FlowBuilder: React.FC = () => {
           fitView
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onKeyDown={onKeyDown}
         >
           <Background 
             color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 
@@ -168,7 +199,11 @@ const FlowBuilder: React.FC = () => {
       {showInspector && selectedNode && (
         <NodeInspector
           nodeId={selectedNode}
-          onClose={() => setShowInspector(false)}
+          onClose={() => {
+            setShowInspector(false);
+            setFocusedElement(null, null); // NodeInspector 닫힐 때 포커스 해제
+            setSelectedNode(null);
+          }}
         />
       )}
     </div>
