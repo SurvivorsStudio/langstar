@@ -113,6 +113,11 @@ export interface FlowState {
   addAIConnection: (connection: Omit<AIConnection, 'id' | 'lastModified'>) => Promise<AIConnection>;
   updateAIConnection: (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => Promise<AIConnection>;
   deleteAIConnection: (connectionId: string) => Promise<void>;
+  // 클립보드용 복사/붙여넣기 기능
+  clipboardNodes: Node<NodeData>[];
+  clipboardEdges: Edge[];
+  copyNodes: (nodeIds: string[]) => void;
+  pasteNodes: () => void;
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -403,7 +408,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   aiConnections: [],
   isLoadingAIConnections: false,
   loadErrorAIConnections: null,
-
+  // 초기 빈 클립보드
+  clipboardNodes: [],
+  clipboardEdges: [],
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
@@ -1644,6 +1651,60 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
+  copyNodes: (nodeIds: string[]) => {
+    const allNodes = get().nodes;
+    const allEdges = get().edges;
 
-  
+    // 1) 복사 후보 노드 중에서 startNode/endNode는 제외
+    const nodesToCopy = allNodes.filter(n =>
+        nodeIds.includes(n.id) &&
+        n.type !== 'startNode' &&
+        n.type !== 'endNode'
+    );
+
+    const idSet = new Set(nodesToCopy.map(n => n.id));
+
+    // 2) 복사 후보 엣지는 양쪽이 모두 복사 대상인 노드일 때만
+    const edgesToCopy = allEdges.filter(e =>
+        idSet.has(e.source as string) &&
+        idSet.has(e.target as string)
+    );
+
+    set({ clipboardNodes: nodesToCopy, clipboardEdges: edgesToCopy });
+  },
+
+  // flowStore.ts
+
+  pasteNodes: () => {
+    const { clipboardNodes, clipboardEdges, nodes, edges } = get();
+    if (clipboardNodes.length === 0) return;
+
+    const idMap: Record<string,string> = {};
+    // 1) 노드 복제 (조금 offset)
+    const newNodes = clipboardNodes.map(n => {
+      const newId = nanoid();
+      idMap[n.id] = newId;
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + 20, y: n.position.y + 20 },
+        selected: true,              // 붙여넣은 노드만 선택
+      } as Node<NodeData>;
+    });
+    // 2) 엣지 복제 (source/target 매핑)
+    const newEdges = clipboardEdges.map(e => ({
+      ...e,
+      id: nanoid(),
+      source: idMap[e.source],
+      target: idMap[e.target],
+    }));
+    // 3) 기존 노드들은 선택 해제
+    const unselectedOld = nodes.map(n => ({ ...n, selected: false }));
+
+    set({
+      nodes: [...unselectedOld, ...newNodes],
+      edges: [...edges, ...newEdges],
+    });
+  },
+
 }));
