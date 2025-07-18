@@ -28,12 +28,12 @@ export const nodeCategories: NodeCategory[] = [
         description: 'Define a prompt template for LLM interaction',
         icon: (className = '') => <MessageSquare size={20} className={className} />
       },
-      {
-        type: 'systemPromptNode',
-        label: 'System Prompt',
-        description: 'Define system and user prompts for LLM interaction',
-        icon: (className = '') => <Settings size={20} className={className} />
-      },
+      // {
+      //   type: 'systemPromptNode',
+      //   label: 'System Prompt',
+      //   description: 'Define system and user prompts for LLM interaction',
+      //   icon: (className = '') => <Settings size={20} className={className} />
+      // },
       {
         type: 'agentNode',
         label: 'Agent',
