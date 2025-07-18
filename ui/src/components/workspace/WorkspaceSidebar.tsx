@@ -37,6 +37,15 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           <span className="flex-1 text-left">Chatflows</span>
         </button>
         <button
+          onClick={() => setActiveMenu('deployment')}
+          className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'deployment'
+            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+        >
+          <span className="flex-1 text-left">Deployment</span>
+        </button>
+        <button
           onClick={() => setActiveMenu('rag')}
           className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'rag'
             ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50'

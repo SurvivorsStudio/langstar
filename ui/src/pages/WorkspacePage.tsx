@@ -6,6 +6,7 @@ import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar';
 import WorkflowList from '../components/workspace/WorkflowList';
 import RagConfigList from '../components/workspace/RagConfigList';
 import RagConfigForm from '../components/workspace/RagConfigForm';
+import DeploymentList from '../components/workspace/DeploymentList';
 import AIConnectionList from '../components/workspace/AIConnectionList';
 import AIConnectionWizard from '../components/workspace/AIConnectionWizard';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
@@ -94,7 +95,7 @@ const WorkspacePage: React.FC = () => {
     setShowWizard(false);
     setEditingConnection(null);
 
-    if (activeMenu === 'chatflows') {
+    if (activeMenu === 'chatflows' || activeMenu === 'deployment') {
       fetchAvailableWorkflows();
     } else if (
       activeMenu === 'ai-language' ||
@@ -233,12 +234,23 @@ const WorkspacePage: React.FC = () => {
       return (
         <AIConnectionWizard
           onBack={handleWizardBack}
-          onSave={handleWizardSave}
+          onSave={ handleWizardSave }
           activeMenu={activeMenu}
           editingConnection={editingConnection}
         />
       );
     }
+
+    const handleNewDeployment = () => {
+      // Implement new agent creation logic
+      console.log('Create new deployment clicked');
+    };
+
+    const handleDeleteDeployment = async (deploymentName: string, event: React.MouseEvent) => {
+      event.stopPropagation();
+      // Implement delete agent logic
+      console.log(`Delete deployment ${deploymentName} clicked`);
+    };
     
     switch (activeMenu) {
       case 'chatflows':
@@ -252,6 +264,16 @@ const WorkspacePage: React.FC = () => {
             handleDeleteWorkflow={handleDeleteWorkflow}
           />
         );
+      case 'deployment':
+        return (
+          <DeploymentList
+            availableDeployments={availableWorkflows}
+            isLoading={isStoreLoading}
+            loadError={loadError}
+            handleNewDeployment={handleNewDeployment}
+            handleDeleteDeployment={handleDeleteDeployment}
+          />
+        );        
       case 'rag':
         return selectedRag ? (
           <RagConfigForm
