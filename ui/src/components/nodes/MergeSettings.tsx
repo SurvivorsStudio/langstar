@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import CustomSelect from '../Common/CustomSelect';
 
 interface MergeMapping {
   id: string;
@@ -119,19 +120,12 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
           {/* Source Value 선택 드롭다운 */}
           <div>
             <label htmlFor={`source-value-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Source Value</label>
-            <select
-              id={`source-value-${mapping.id}`}
+            <CustomSelect
               value={mapping.sourceNodeId ? `${mapping.sourceNodeId}.${mapping.sourceNodeKey}` : ''}
-              onChange={(e) => handleMappingChange(index, 'sourceNodeId', e.target.value)} // 'sourceNodeId' is a placeholder, actual logic splits it
-              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="">Select Source Value</option>
-              {availableSourceOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={value => handleMappingChange(index, 'sourceNodeId', value)}
+              options={availableSourceOptions}
+              placeholder="Select Source Value"
+            />
           </div>
           {/* 삭제 버튼 */}
           <div className="flex justify-end">
