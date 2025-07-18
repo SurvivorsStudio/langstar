@@ -170,6 +170,14 @@ const ChatBot: React.FC = () => {
           const newUuid = crypto.randomUUID();
           setChatId(newUuid);
           console.log(`[ChatBot] New Chat ID generated: ${newUuid}`);
+          // Reset chat history to the initial message
+          setMessages([
+            {
+              type: 'bot',
+              content: 'Hello! How can I help you with your workflow today?',
+              timestamp: new Date()
+            }
+          ]);
           setIsOpen(true);
         }}
         className="fixed bottom-6 right-6 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors"
