@@ -13,7 +13,11 @@ import {
   applyEdgeChanges,
   Viewport, // Viewport 타입을 가져옵니다.
 } from 'reactflow';
-import { nanoid } from 'nanoid';
+import { customAlphabet } from 'nanoid';
+
+// 특수문자(_-)를 제외한 알파벳과 숫자로만 구성된 고유 ID 생성기
+// 기본 nanoid와 비슷한 충돌 저항성을 갖도록 길이를 21자로 유지합니다.
+const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 21);
 
 export interface NodeData {
   label: string;
@@ -66,6 +70,7 @@ export interface AIConnection {
 
 
 export interface FlowState {
+  projectId: string | null; // 워크플로우의 고유 ID
   nodes: Node<NodeData>[];
   edges: Edge[];
   projectName: string;
@@ -381,6 +386,7 @@ const openDB = (): Promise<IDBDatabase> => {
 };
 
 export const useFlowStore = create<FlowState>((set, get) => ({
+  projectId: null, // projectId 초기값 추가
   nodes: initialNodes,
   edges: initialEdges,
   projectName: DEFAULT_PROJECT_NAME,
@@ -1191,7 +1197,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   saveWorkflow: async () => {
     set({ isSaving: true, saveError: null });
-    const { projectName, nodes, edges, viewport } = get();
+    const { projectId, projectName, nodes, edges, viewport } = get();
 
     if (!projectName || projectName.trim() === "") {
       const errorMsg = "Project name cannot be empty.";
@@ -1200,7 +1206,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw new Error(errorMsg);
     }
     
-    console.log(`FlowStore: Saving workflow "${projectName}" to IndexedDB...`);
+    const currentProjectId = projectId || nanoid();
+    if (!projectId) {
+      // 새로 생성되거나 ID가 없는 워크플로우를 처음 저장할 때 상태에 projectId를 설정합니다.
+      set({ projectId: currentProjectId });
+    }
+
+    console.log(`FlowStore: Saving workflow "${projectName}" (ID: ${currentProjectId}) to IndexedDB...`);
 
     const nodesToSave = nodes.map(node => {
       const { icon, ...restOfData } = node.data;
@@ -1216,6 +1228,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
 
       const workflowData = {
+        projectId: currentProjectId,
         projectName,
         nodes: nodesToSave,
         edges,
@@ -1263,6 +1276,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const workflowData = request.result;
           if (workflowData) {
             set({
+              projectId: workflowData.projectId || null, // 구 버전 데이터 호환을 위해 projectId 로드
               projectName: workflowData.projectName,
               nodes: workflowData.nodes || [],
               edges: workflowData.edges || [],
