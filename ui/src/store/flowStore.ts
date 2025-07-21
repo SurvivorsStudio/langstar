@@ -419,6 +419,73 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 포커스 관리 초기 상태
   focusedElement: { type: null, id: null },
 
+  // ── 여기서부터 붙여넣기 기능을 위한 상태 추가 ─────────────────
+  /** 복사한 노드를 임시 저장 */
+  clipboardNodes: [] as Node<NodeData>[],
+  /** 복사한 엣지를 임시 저장 */
+  clipboardEdges: [] as Edge[],
+
+  /** 선택된 노드들 복사 (Start/End 노드는 제외) */
+  copyNodes: (nodeIds: string[]) => {
+    const allNodes = get().nodes
+    const allEdges = get().edges
+
+    const nodesToCopy = allNodes.filter(n =>
+        nodeIds.includes(n.id) &&
+        n.type !== 'startNode' &&
+        n.type !== 'endNode'
+    )
+    const idSet = new Set(nodesToCopy.map(n => n.id))
+
+    const edgesToCopy = allEdges.filter(e =>
+        idSet.has(e.source as string) &&
+        idSet.has(e.target as string)
+    )
+
+    set({ clipboardNodes: nodesToCopy, clipboardEdges: edgesToCopy })
+  },
+
+  /** 클립보드에 있는 노드·엣지 붙여넣기 */
+  pasteNodes: () => {
+    const { clipboardNodes, clipboardEdges, nodes, edges } = get();
+    if (clipboardNodes.length === 0) return;
+
+    const idMap: Record<string, string> = {};
+
+    // 1) 노드 복제 (offset 적용, 선택 상태)
+    const newNodes = clipboardNodes.map(n => {
+      const newId = nanoid();
+      idMap[n.id] = newId;
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + 20, y: n.position.y + 20 },
+        selected: true,
+      } as Node<NodeData>;
+    });
+
+    // 2) 엣지 복제 (source/target 매핑)
+    const newEdges = clipboardEdges.map(e => ({
+      ...e,
+      id: nanoid(),
+      source: idMap[e.source],
+      target: idMap[e.target],
+    }));
+
+    // 3) 기존 노드 선택 해제
+    const unselectedOld = nodes.map(n => ({ ...n, selected: false }));
+
+    // 4) 붙여넣기 직후 첫 노드에 포커스/선택 상태 반영
+    const firstNewId = newNodes[0]?.id || null;
+    set({
+      nodes: [...unselectedOld, ...newNodes],
+      edges: [...edges, ...newEdges],
+      // 만약 useFlowStore 에 setSelectedNode, setFocusedElement 가 정의되어 있다면:
+      selectedNode: firstNewId,
+      focusedElement: { type: 'node', id: firstNewId },
+    });
+  },
+  // ── 붙여넣기 기능 끝 ─────────────────────────────────────────────
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
