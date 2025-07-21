@@ -7,6 +7,7 @@ import ReactFlow, {
   MiniMap,
   Panel,
   useReactFlow,
+  ReactFlowInstance,
   Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -24,12 +25,31 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, copyNodes, pasteNodes } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [synced, setSynced] = useState(false);
+
+  // Ctrl+C / Ctrl+V 로 복사·붙여넣기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const selectedIds = rfInstance
+            ?.getNodes()
+            .filter(n => n.selected)
+            .map(n => n.id) || [];
+        copyNodes(selectedIds);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        pasteNodes();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [rfInstance, copyNodes, pasteNodes]);
 
   // id와 projectName이 다를 때만 setProjectName (동기화 플래그 사용)
   useEffect(() => {
@@ -161,19 +181,20 @@ const FlowBuilder: React.FC = () => {
       )}
       <div className="flex-grow h-full" ref={reactFlowWrapper}>
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onKeyDown={onKeyDown}
+            onInit={inst => setRfInstance(inst)}
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onKeyDown={onKeyDown}
         >
           <Background 
             color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 

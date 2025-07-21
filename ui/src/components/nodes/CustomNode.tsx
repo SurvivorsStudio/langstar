@@ -305,7 +305,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   return (
     <div
       className={`${getNodeStyle()} border-2 rounded-md p-4 w-64 shadow-sm relative transition-all duration-200 ${
-        isNodeFocused ? 'border-white dark:border-white shadow-lg ring-2 ring-white dark:ring-white ring-opacity-50' : ''
+        isNodeFocused ? 'border-blue-500 dark:border-white ring-2 ring-blue-500 dark:ring-white' : ''}
       }`}
     >
       {/* 시작 노드와 그룹 노드가 아닌 경우 상단 핸들 (입력) 표시 */}
