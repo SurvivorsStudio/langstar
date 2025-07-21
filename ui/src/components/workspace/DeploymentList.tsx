@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Workflow } from '../../store/flowStore';
 import { PlusCircle, Code, ArrowRightCircle, ListChecks, X } from 'lucide-react';
 
@@ -20,11 +20,24 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
   handleDeleteDeployment,
 }) => {
   // This state is for demonstration purposes to make the toggle switch interactive.
+
+  useEffect(() => {
+    console.log('[DeploymentList] ➡️ 컴포넌트가 새로운 props로 렌더링됩니다.');
+    if (isLoading) {
+      console.log('[DeploymentList] ⏳ 상태: 로딩 중...');
+    } else if (loadError) {
+      console.error('[DeploymentList] ❌ 상태: 오류 발생.', loadError);
+    } else {
+      console.log(`[DeploymentList] ✅ 상태: 성공. ${availableDeployments.length}개의 배포 목록을 받았습니다.`);
+      console.log('[DeploymentList] 수신된 데이터:', JSON.parse(JSON.stringify(availableDeployments)));
+    }
+  }, [availableDeployments, isLoading, loadError]);
+
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
 
   // It should be replaced with actual deployment status data from your backend.
   const [deploymentStatuses, setDeploymentStatuses] = React.useState<Record<string, boolean>>(
-    () => availableDeployments.reduce((acc, name) => ({ ...acc, [name]: true }), {})
+    () => availableDeployments.reduce((acc, wf) => ({ ...acc, [wf.projectName]: true }), {})
   );
 
   const handleStatusToggle = (e: React.MouseEvent, deploymentName: string) => {
@@ -36,7 +49,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     // In a real application, you would also make an API call here to update the status.
   };
 
-  const handleViewCode = async () => {
+  const handleViewCode = () => {
     setApiResponseModalContent('print("hello world")');
   };
   if (isLoading) {
@@ -83,23 +96,23 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {availableDeployments.map((deployment) => (
                 <tr
-                  key={deployment}
+                  key={deployment.projectId}
                   className="hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 text-center">
-                    {deployment} 
+                    {deployment.projectName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                    {/* TODO: Replace with actual workflow ID */} Workflow ID
+                    {deployment.projectId}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox" 
                         className="sr-only peer"
-                        checked={deploymentStatuses[deployment] ?? false}
+                        checked={deploymentStatuses[deployment.projectName] ?? false}
                         onChange={() => {}} // Required for a controlled component, logic is in onClick
-                        onClick={(e) => handleStatusToggle(e, deployment)}
+                        onClick={(e) => handleStatusToggle(e, deployment.projectName)}
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                     </label>
@@ -109,7 +122,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
                       <button title="View API Code" onClick={(e) => { e.stopPropagation(); handleViewCode(); }}>
                         <Code className="h-5 w-5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" />
                       </button>
-                      <a href={`/flow/${encodeURIComponent(deployment)}`} target="_blank" rel="noopener noreferrer" title="Go to Workflow">
+                      <a href={`/flow/${encodeURIComponent(deployment.projectName)}`} target="_blank" rel="noopener noreferrer" title="Go to Workflow">
                         <ArrowRightCircle className="h-5 w-5 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300" />
                       </a>
                       <button title="View Logs" onClick={(e) => e.stopPropagation()}>

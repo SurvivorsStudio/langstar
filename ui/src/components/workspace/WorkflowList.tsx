@@ -1,8 +1,9 @@
 import React from 'react';
 import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { Workflow } from '../../store/flowStore';
 
 interface WorkflowListProps {
-  availableWorkflows: string[];
+  availableWorkflows: Workflow[];
   isLoading: boolean;
   loadError: string | null;
   handleNewWorkflow: () => void;
@@ -48,20 +49,20 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
     )}
     {!isLoading && !loadError && availableWorkflows.length > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableWorkflows.map((workflowName) => (
+        {availableWorkflows.map((workflow) => (
           <div
-            key={workflowName}
-            onClick={() => handleWorkflowClick(workflowName)}
+            key={workflow.projectId}
+            onClick={() => handleWorkflowClick(workflow.projectName)}
             className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
           >
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">{workflowName}</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">{workflow.projectName}</h3>
               </div>
               <button
-                onClick={(e) => handleDeleteWorkflow(workflowName, e)}
+                onClick={(e) => handleDeleteWorkflow(workflow.projectName, e)}
                 className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity absolute top-2 right-2"
-                title={`Delete ${workflowName}`}
+                title={`Delete ${workflow.projectName}`}
               >
                 <Trash2 size={16} />
               </button>
