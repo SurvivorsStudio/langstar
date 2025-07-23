@@ -40,13 +40,52 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     () => availableDeployments.reduce((acc, wf) => ({ ...acc, [wf.projectName]: true }), {})
   );
 
-  const handleStatusToggle = (e: React.MouseEvent, deploymentName: string) => {
+  const handleStatusToggle = async (e: React.MouseEvent, deploymentName: string) => {
     e.stopPropagation(); // Prevents the row's onClick handler from being triggered.
-    setDeploymentStatuses(prev => ({
-      ...prev,
-      [deploymentName]: !prev[deploymentName]
-    }));
-    // In a real application, you would also make an API call here to update the status.
+
+    const deployment = availableDeployments.find(d => d.projectName === deploymentName);
+    if (!deployment) {
+      console.error(`Deployment with name "${deploymentName}" not found.`);
+      alert(`Error: Deployment with name "${deploymentName}" not found.`);
+      return;
+    }
+
+    // Header.tsx의 getWorkflowAsJSONString와 동일한 포맷을 보장하기 위해
+    // 필요한 필드만 명시적으로 포함하는 페이로드를 생성합니다.
+    const payload = {
+      projectId: deployment.projectId,
+      projectName: deployment.projectName,
+      nodes: deployment.nodes,
+      edges: deployment.edges,
+      viewport: deployment.viewport,
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/workflow/deploy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API call failed: ${response.status} ${response.statusText}. Body: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Deployment API call successful:', result);
+
+      // On successful API call, update the local state to reflect the change.
+      setDeploymentStatuses(prev => ({
+        ...prev,
+        [deploymentName]: !prev[deploymentName],
+      }));
+    } catch (error) {
+      console.error('Failed to toggle deployment status:', error);
+      alert(`Failed to toggle deployment status for ${deploymentName}. See console for details.`);
+    }
   };
 
   const handleViewCode = () => {
