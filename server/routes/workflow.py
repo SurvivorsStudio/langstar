@@ -75,7 +75,7 @@ def run_chatflow(msg: dict = Body(...)):
         logger.info("run_chatflow request processed successfully")
         return result
     except Exception as e:
-        logger.error(f"Error in LangGraph export endpoint: {str(e)}", exc_info=True)
+        logger.error(f"Error in workflow run endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) 
 
 
@@ -89,5 +89,35 @@ def run_chatflow_list(msg: dict = Body(...)):
         logger.info("Run workflow list request processed successfully")
         return result
     except Exception as e:
-        logger.error(f"Error in LangGraph export endpoint: {str(e)}", exc_info=True)
+        logger.error(f"Error in workflow list endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 
+
+
+@router.post('/workflow/deploy')
+def deploy_workflow(msg: dict = Body(...)):
+    """Deploy workflow by generating python code and saving it as a file."""
+    try:
+        logger.info("Received workflow deploy request")
+        print( msg )
+        pycode = export_langgraph( msg )
+        print( pycode ) 
+        # result = WorkflowService.model_deploy(msg)
+        logger.info("Workflow deployed successfully")
+        return {'a' : 1}
+    except Exception as e:
+        logger.error(f"Error in workflow deploy endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 
+
+
+@router.post('/workflow/undeploy')
+def undeploy_workflow(msg: dict = Body(...)):
+    """workflow undeploy"""
+    try:
+        logger.info("Received workflow undeploy request")
+        return msg 
+        # result = WorkflowService.deploy(msg)
+        # logger.info("Run workflow deploy request processed successfully")
+        # return result
+    except Exception as e:
+        logger.error(f"Error in workflow undeploy endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) 

@@ -1,7 +1,8 @@
 import React from 'react';
+import { Workflow } from '../../store/flowStore';
 
 interface DeploymentManagementProps {
-  availableWorkflows: string[];
+  availableWorkflows: Workflow[];
   isLoading: boolean;
   loadError: string | null;
 }
@@ -34,10 +35,10 @@ const DeploymentManagement: React.FC<DeploymentManagementProps> = ({
             </tr>
           </thead>
           <tbody>
-            {availableWorkflows.map((workflowName, index) => (
-              <tr key={index} className="hover:bg-gray-100">
-                <td className="px-4 py-2 border-b">{index + 1}</td>
-                <td className="px-4 py-2 border-b">{workflowName}</td>
+            {availableWorkflows.map((workflow) => (
+              <tr key={workflow.projectId} className="hover:bg-gray-100">
+                <td className="px-4 py-2 border-b">{workflow.projectId}</td>
+                <td className="px-4 py-2 border-b">{workflow.projectName}</td>
                 <td className="px-4 py-2 border-b">
                   <input type="checkbox" />
                 </td>

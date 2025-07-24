@@ -64,6 +64,15 @@ export interface AIConnection {
   lastModified: string; // ISO string
 }
 
+export interface Workflow {
+  projectId: string;
+  projectName: string;
+  nodes: Node<NodeData>[];
+  edges: Edge[];
+  viewport: Viewport;
+  lastModified: string;
+}
+
 
 export interface FlowState {
   nodes: Node<NodeData>[];
@@ -101,14 +110,14 @@ export interface FlowState {
   lastSaved: Date | null;
   isLoading: boolean;
   loadError: string | null;
-  availableWorkflows: string[];
+  availableWorkflows: Workflow[];
   saveWorkflow: () => Promise<void>;
   loadWorkflow: (projectName: string) => Promise<void>;
   fetchAvailableWorkflows: () => Promise<void>;
   deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
 
-  getWorkflowAsJSONString: () => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
+  getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
   // AI Connections 관련 상태 및 함수
   aiConnections: AIConnection[];
   isLoadingAIConnections: boolean;
@@ -1362,27 +1371,47 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   fetchAvailableWorkflows: async () => {
-    set({ isLoading: true, loadError: null });
-    console.log('FlowStore: Fetching available workflows...');
+    set({ isLoading: true, loadError: null }); // 로딩 시작 상태 설정
+    console.log('[FlowStore/fetch] ➡️ 워크플로우 목록 로딩을 시작합니다...');
     try {
       const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readonly');
+      // 'readwrite' 트랜잭션을 사용하여 오래된 데이터에 projectId를 추가하는 마이그레이션을 수행합니다.
+      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
       const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      const request = store.getAllKeys();
+      const request = store.getAll();
 
       request.onsuccess = () => {
-        set({ availableWorkflows: request.result as string[], isLoading: false, loadError: null });
-        console.log(`FlowStore: Found ${request.result.length} workflows:`, request.result);
+        const rawWorkflows = request.result as Workflow[];
+        console.log(`[FlowStore/fetch] ✅ IndexedDB에서 데이터를 성공적으로 가져왔습니다. (총 ${rawWorkflows.length}개)`);
+        // 보기 쉬운 테이블 형태로 주요 정보를 출력합니다.
+        console.table(rawWorkflows.map(wf => ({ projectName: wf.projectName, projectId: wf.projectId || 'N/A', lastModified: wf.lastModified })));
+        // 전체 값(value)을 확인하기 위해 객체 전체를 로그로 남깁니다.
+        console.log('[FlowStore/fetch] 🕵️  가져온 전체 워크플로우 값(value) 목록:', JSON.parse(JSON.stringify(rawWorkflows)));
+
+        console.log('[FlowStore/fetch] 🔄 데이터 마이그레이션을 확인하고 필요한 경우 projectId를 할당합니다...');
+        // projectId가 없는 워크플로우가 있는지 확인하고, 있다면 새로 할당하고 DB를 업데이트합니다.
+        const migratedWorkflows = rawWorkflows.map(wf => {
+          if (!wf.projectId) {
+            console.warn(`[FlowStore/fetch] ⚠️ 워크플로우 "${wf.projectName}"에 projectId가 없습니다. 새로 할당하고 DB를 업데이트합니다.`);
+            const newWf = { ...wf, projectId: nanoid() };
+            store.put(newWf); // IndexedDB에 업데이트된 레코드 저장
+            return newWf;
+          }
+          return wf;
+        });
+
+        set({ availableWorkflows: migratedWorkflows, isLoading: false, loadError: null });
+        console.log(`[FlowStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, migratedWorkflows);
       };
       request.onerror = (event) => {
         const error = (event.target as IDBRequest).error;
         set({ loadError: error?.message || 'Failed to fetch workflow list', isLoading: false });
-        console.error('FlowStore: Error fetching workflow list:', error);
+        console.error('[FlowStore/fetch] ❌ 워크플로우 목록을 가져오는 중 오류 발생:', error);
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadError: errorMessage || 'Failed to open DB to fetch list', isLoading: false });
-      console.error('FlowStore: Error opening DB for fetching list:', error);
+      console.error('[FlowStore/fetch] ❌ DB를 열거나 트랜잭션을 시작하는 중 오류 발생:', error);
     }
   },
 
@@ -1418,9 +1447,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       console.error('FlowStore: Error opening DB for fetching AI connections list:', error);
     }
   },
-    getWorkflowAsJSONString: () => {
+    getWorkflowAsJSONString: (deploymentData?: Workflow) => {
 
-    const { projectName, nodes, edges, viewport, aiConnections } = get();
+    // deployment 데이터가 전달되면 해당 데이터를 사용, 그렇지 않으면 현재 상태 사용
+    const { projectName, nodes, edges, viewport, aiConnections } = deploymentData ? {
+      projectName: deploymentData.projectName,
+      nodes: deploymentData.nodes,
+      edges: deploymentData.edges,
+      viewport: deploymentData.viewport,
+      aiConnections: get().aiConnections // AI 연결 정보는 여전히 flowStore에서 가져옴
+    } : get();
 
     // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
     // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
@@ -1532,7 +1568,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: nodesToSave,
       edges,
       viewport,
-      lastModified: new Date().toISOString(),
+      lastModified: deploymentData?.lastModified || new Date().toISOString(),
     };
 
     try {
