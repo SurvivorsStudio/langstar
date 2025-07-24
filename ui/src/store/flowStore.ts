@@ -117,7 +117,7 @@ export interface FlowState {
   deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
 
-  getWorkflowAsJSONString: () => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
+  getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
   // AI Connections 관련 상태 및 함수
   aiConnections: AIConnection[];
   isLoadingAIConnections: boolean;
@@ -1380,9 +1380,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       console.error('FlowStore: Error opening DB for fetching AI connections list:', error);
     }
   },
-    getWorkflowAsJSONString: () => {
+    getWorkflowAsJSONString: (deploymentData?: Workflow) => {
 
-    const { projectName, nodes, edges, viewport, aiConnections } = get();
+    // deployment 데이터가 전달되면 해당 데이터를 사용, 그렇지 않으면 현재 상태 사용
+    const { projectName, nodes, edges, viewport, aiConnections } = deploymentData ? {
+      projectName: deploymentData.projectName,
+      nodes: deploymentData.nodes,
+      edges: deploymentData.edges,
+      viewport: deploymentData.viewport,
+      aiConnections: get().aiConnections // AI 연결 정보는 여전히 flowStore에서 가져옴
+    } : get();
 
     // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
     // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
@@ -1494,7 +1501,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: nodesToSave,
       edges,
       viewport,
-      lastModified: new Date().toISOString(),
+      lastModified: deploymentData?.lastModified || new Date().toISOString(),
     };
 
     try {

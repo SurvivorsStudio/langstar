@@ -53,6 +53,7 @@ const WorkspacePage: React.FC = () => {
     deleteAIConnection,
     isLoadingAIConnections,
     loadErrorAIConnections,
+    getWorkflowAsJSONString,
   } = useFlowStore(state => ({
     availableWorkflows: state.availableWorkflows,
     fetchAvailableWorkflows: state.fetchAvailableWorkflows,
@@ -68,6 +69,7 @@ const WorkspacePage: React.FC = () => {
     deleteAIConnection: state.deleteAIConnection,
     isLoadingAIConnections: state.isLoadingAIConnections,
     loadErrorAIConnections: state.loadErrorAIConnections,
+    getWorkflowAsJSONString: state.getWorkflowAsJSONString,
   }));
 
   const [activeMenu, setActiveMenu] = React.useState('chatflows');
@@ -201,7 +203,7 @@ const WorkspacePage: React.FC = () => {
   const handleNewWorkflow = () => {
     let newProjectName = defaultProjectName;
     let counter = 1;
-    while (availableWorkflows.includes(newProjectName)) {
+    while (availableWorkflows.some(workflow => workflow.projectName === newProjectName)) {
       newProjectName = `${defaultProjectName} (${counter})`;
       counter++;
     }
@@ -267,6 +269,7 @@ const WorkspacePage: React.FC = () => {
       case 'deployment':
         return (
           <DeploymentList
+            getWorkflowAsJSONString={getWorkflowAsJSONString}
             availableDeployments={availableWorkflows}
             isLoading={isStoreLoading}
             loadError={loadError}

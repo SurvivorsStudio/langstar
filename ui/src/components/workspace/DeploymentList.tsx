@@ -3,7 +3,7 @@ import { Workflow } from '../../store/flowStore';
 import { PlusCircle, Code, ArrowRightCircle, ListChecks, X } from 'lucide-react';
 
 interface DeploymentListProps {
-  getWorkflowAsJSONString: () => string | null;
+  getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null;
   availableDeployments: Workflow[];
   isLoading: boolean;
   loadError: string | null;
@@ -50,15 +50,17 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
       return;
     }
 
-    // Header.tsx의 getWorkflowAsJSONString와 동일한 포맷을 보장하기 위해
-    // 필요한 필드만 명시적으로 포함하는 페이로드를 생성합니다.
-    const payload = {
-      projectId: deployment.projectId,
-      projectName: deployment.projectName,
-      nodes: deployment.nodes,
-      edges: deployment.edges,
-      viewport: deployment.viewport,
-    };
+    // Header.tsx와 완전히 동일한 방식으로 getWorkflowAsJSONString() 호출
+    // deployment 데이터를 파라미터로 전달하여 동일한 로직으로 JSON 생성
+    const jsonString = getWorkflowAsJSONString(deployment);
+    if (!jsonString) {
+      console.error('Failed to generate workflow JSON string');
+      alert(`Failed to generate workflow JSON for ${deploymentName}.`);
+      return;
+    }
+
+    console.log("888889999999");
+    console.log('jsonString', jsonString);
 
     try {
       const response = await fetch('http://localhost:8000/workflow/deploy', {
@@ -66,7 +68,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: jsonString,
       });
 
       if (!response.ok) {
