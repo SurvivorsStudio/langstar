@@ -1,0 +1,15 @@
+{
+  "id": "7e370c60-6ba1-4ca6-bebd-ac07a8bec855",
+  "name": "TEST33333",
+  "version": "1.0.0",
+  "description": "ㅂㅈㄷㅂㅈㄷ",
+  "workflowId": "df2d3b49-c373-40dd-a3d0-cb77875387a6",
+  "workflowName": "New Workflow (2)",
+  "status": "active",
+  "environment": "dev",
+  "createdAt": "2025-07-24T05:31:50.349000",
+  "updatedAt": "2025-07-24T06:31:45.390347",
+  "deployedAt": "2025-07-24T06:31:45.390347",
+  "deploymentUrl": null,
+  "config": {}
+}

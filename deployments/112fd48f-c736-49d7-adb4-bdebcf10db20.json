@@ -1,0 +1,15 @@
+{
+  "id": "112fd48f-c736-49d7-adb4-bdebcf10db20",
+  "name": "ㅆㄸㄴㅆ",
+  "version": "1.0.0",
+  "description": "aaaa",
+  "workflowId": "b70f4f58-9159-415d-813a-299047dcfe2a",
+  "workflowName": "New Workflow (1)",
+  "status": "active",
+  "environment": "dev",
+  "createdAt": "2025-07-24T07:08:00.355901",
+  "updatedAt": "2025-07-24T07:08:08.264180",
+  "deployedAt": "2025-07-24T07:08:08.264180",
+  "deploymentUrl": null,
+  "config": {}
+}

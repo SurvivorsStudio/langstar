@@ -14,6 +14,9 @@ import {
   Viewport, // Viewport 타입을 가져옵니다.
 } from 'reactflow';
 import { nanoid } from 'nanoid';
+import { Deployment, DeploymentVersion, DeploymentStatus, DeploymentEnvironment, DeploymentFormData } from '../types/deployment';
+import { deploymentStore } from './deploymentStore';
+import { apiService } from '../services/apiService';
 
 export interface NodeData {
   label: string;
@@ -118,6 +121,7 @@ export interface FlowState {
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
 
   getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
+  
   // AI Connections 관련 상태 및 함수
   aiConnections: AIConnection[];
   isLoadingAIConnections: boolean;
@@ -130,6 +134,30 @@ export interface FlowState {
   // 포커스 관리
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
+
+  // 클립보드 관련 상태
+  clipboardNodes: Node<NodeData>[];
+  clipboardEdges: Edge[];
+  copyNodes: (nodeIds: string[]) => void;
+  pasteNodes: () => void;
+
+  // 배포 관련 상태 및 함수
+  deployments: Deployment[];
+  activeDeployment: Deployment | null;
+  deploymentVersions: DeploymentVersion[];
+  isLoadingDeployments: boolean;
+  loadErrorDeployments: string | null;
+  
+  // 배포 관련 함수들
+  createDeployment: (deploymentData: DeploymentFormData) => Promise<Deployment>;
+  updateDeployment: (id: string, updates: Partial<Omit<Deployment, 'id' | 'createdAt'>>) => Promise<Deployment>;
+  deleteDeployment: (id: string) => Promise<void>;
+  activateDeployment: (id: string) => Promise<void>;
+  deactivateDeployment: (id: string) => Promise<void>;
+  fetchDeployments: () => Promise<void>;
+  getDeploymentVersions: (deploymentId: string) => Promise<DeploymentVersion[]>;
+  createDeploymentVersion: (deploymentId: string, workflowSnapshot: Workflow, version: string, changelog?: string) => Promise<DeploymentVersion>;
+  activateDeploymentVersion: (deploymentId: string, versionId: string) => Promise<void>;
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -1765,5 +1793,182 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => set({ focusedElement: { type, id } }),
 
-  
+  // ── 배포 관련 초기 상태 ─────────────────
+  deployments: [],
+  activeDeployment: null,
+  deploymentVersions: [],
+  isLoadingDeployments: false,
+  loadErrorDeployments: null,
+
+  // ── 배포 관련 함수들 ─────────────────
+  createDeployment: async (deploymentData: DeploymentFormData) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      const { projectName, nodes, edges, viewport } = get();
+      const workflowSnapshot: Workflow = {
+        projectId: nanoid(),
+        projectName,
+        nodes,
+        edges,
+        viewport,
+        lastModified: new Date().toISOString(),
+      };
+
+      // API를 통해 배포 생성
+      const deployment = await apiService.createDeployment(deploymentData, workflowSnapshot);
+
+      // 배포 목록 새로고침
+      get().fetchDeployments();
+      
+      return deployment;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  updateDeployment: async (id: string, updates: Partial<Omit<Deployment, 'id' | 'createdAt'>>) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      // API를 통해 배포 업데이트 (상태 업데이트만 지원)
+      if (updates.status) {
+        const deployment = await apiService.updateDeploymentStatus(id, updates.status);
+        
+        // 배포 목록 새로고침
+        get().fetchDeployments();
+        
+        return deployment;
+      } else {
+        throw new Error('Only status updates are supported via API');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  deleteDeployment: async (id: string) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      await apiService.deleteDeployment(id);
+      
+      // 배포 목록 새로고침
+      get().fetchDeployments();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  activateDeployment: async (id: string) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      await apiService.activateDeployment(id);
+      
+      // 배포 목록 새로고침
+      get().fetchDeployments();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  deactivateDeployment: async (id: string) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      await apiService.deactivateDeployment(id);
+      
+      // 배포 목록 새로고침
+      get().fetchDeployments();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  fetchDeployments: async () => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      const deployments = await apiService.getDeployments();
+      set({ deployments, isLoadingDeployments: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    }
+  },
+
+  getDeploymentVersions: async (deploymentId: string) => {
+    try {
+      const { versions } = await apiService.getDeploymentStatus(deploymentId);
+      set({ deploymentVersions: versions });
+      return versions;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage });
+      throw error;
+    }
+  },
+
+  createDeploymentVersion: async (deploymentId: string, workflowSnapshot: Workflow, version: string, changelog?: string) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      const deploymentVersion = await apiService.createDeploymentVersion(
+        deploymentId, 
+        workflowSnapshot, 
+        version, 
+        changelog
+      );
+      
+      // 버전 목록 새로고침
+      get().getDeploymentVersions(deploymentId);
+      
+      return deploymentVersion;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
+
+  activateDeploymentVersion: async (deploymentId: string, versionId: string) => {
+    try {
+      set({ isLoadingDeployments: true, loadErrorDeployments: null });
+      
+      await apiService.rollbackDeployment(deploymentId, versionId);
+      
+      // 버전 목록 새로고침
+      get().getDeploymentVersions(deploymentId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
+      throw error;
+    } finally {
+      set({ isLoadingDeployments: false });
+    }
+  },
 }));
