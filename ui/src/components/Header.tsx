@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import homeLogo from '../assets/common/home_logo.png';
 import { apiService } from '../services/apiService';
 import { DeploymentFormData, Deployment } from '../types/deployment';
@@ -11,6 +11,7 @@ import DeploymentSuccessModal from './DeploymentSuccessModal';
 import CodeEditor from './CodeEditor';
 
 const Header: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     projectName, 
     setProjectName, 
@@ -19,19 +20,100 @@ const Header: React.FC = () => {
     saveWorkflow, 
     isSaving,
     getWorkflowAsJSONString,
-    nodes
+    nodes,
+    renameWorkflow
   } = useFlowStore(state => ({ 
-    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes
+    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes, renameWorkflow: state.renameWorkflow
   }));
 
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
   const [editableModalContent, setEditableModalContent] = useState<string>('');
+  
+  // 워크플로우 이름 편집 관련 상태
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState(projectName);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isProcessingRename, setIsProcessingRename] = useState(false);
+  
+  // projectName이 변경될 때 editingName도 업데이트
+  React.useEffect(() => {
+    setEditingName(projectName);
+  }, [projectName]);
+
+  // 편집 중일 때 포커스를 잃으면 편집 취소
+  const handleBlur = () => {
+    if (isEditingName) {
+      // 약간의 지연을 두어 버튼 클릭이 처리될 수 있도록 함
+      setTimeout(() => {
+        if (isEditingName) {
+          handleCancelEditName();
+        }
+      }, 100);
+    }
+  };
   
   // 배포 관련 상태
   const [isDeploymentModalOpen, setIsDeploymentModalOpen] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentSuccessModalOpen, setDeploymentSuccessModalOpen] = useState(false);
   const [createdDeployment, setCreatedDeployment] = useState<Deployment | null>(null);
+
+  // 워크플로우 이름 편집 시작
+  const handleStartEditName = () => {
+    setEditingName(projectName);
+    setIsEditingName(true);
+  };
+
+  // 워크플로우 이름 편집 완료
+  const handleFinishEditName = async () => {
+    // 중복 호출 방지
+    if (isProcessingRename) {
+      return;
+    }
+
+    if (!editingName.trim()) {
+      alert('워크플로우 이름은 비워둘 수 없습니다.');
+      return;
+    }
+
+    if (editingName.trim() === projectName) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsProcessingRename(true);
+    setIsRenaming(true);
+    
+    try {
+      // 먼저 현재 워크플로우를 저장 (아직 저장되지 않은 경우)
+      if (saveWorkflow) {
+        await saveWorkflow();
+      }
+      
+      await renameWorkflow(projectName, editingName.trim());
+      
+      const newName = editingName.trim();
+      setProjectName(newName);
+      setIsEditingName(false);
+      
+      // URL 업데이트
+      navigate(`/flow/${encodeURIComponent(newName)}`, { replace: true });
+      
+      alert('워크플로우 이름이 변경되었습니다.');
+    } catch (error) {
+      console.error('Failed to rename workflow:', error);
+      alert(`워크플로우 이름 변경에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsRenaming(false);
+      setIsProcessingRename(false);
+    }
+  };
+
+  // 워크플로우 이름 편집 취소
+  const handleCancelEditName = () => {
+    setEditingName(projectName);
+    setIsEditingName(false);
+  };
 
   // 배포 생성 함수
   const handleCreateDeployment = async (deploymentData: DeploymentFormData) => {
@@ -66,13 +148,56 @@ const Header: React.FC = () => {
             </div>
           </Link>
           <div className="relative">
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="font-medium text-gray-800 dark:text-gray-200 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded"
-              placeholder="Untitled Project"
-            />
+            {isEditingName ? (
+              <div className="flex items-center space-x-2 workflow-name-edit-area">
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={handleBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFinishEditName();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleCancelEditName();
+                    }
+                  }}
+                  className="font-medium text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-700 border border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded"
+                  placeholder="워크플로우 이름"
+                  autoFocus
+                />
+                <button
+                  onClick={handleFinishEditName}
+                  disabled={isRenaming}
+                  className="text-green-600 hover:text-green-700 disabled:opacity-50"
+                  title="저장"
+                >
+                  {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓'}
+                </button>
+                <button
+                  onClick={handleCancelEditName}
+                  disabled={isRenaming}
+                  className="text-red-600 hover:text-red-700 disabled:opacity-50"
+                  title="취소"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <span
+                  onClick={handleStartEditName}
+                  className="font-medium text-gray-800 dark:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  title="클릭하여 이름 변경"
+                >
+                  {projectName}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
