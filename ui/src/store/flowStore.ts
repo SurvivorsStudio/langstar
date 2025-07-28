@@ -193,8 +193,39 @@ export const initialNodes: Node<NodeData>[] = [
   }
 ];
 
-// 새 워크플로우를 위한 빈 초기 상태
-export const emptyInitialNodes: Node<NodeData>[] = [];
+// 새 워크플로우를 위한 기본 초기 상태 (Start, End 노드 포함)
+export const emptyInitialNodes: Node<NodeData>[] = [
+  {
+    id: 'start',
+    type: 'startNode',
+    position: { x: 100, y: 100 },
+    data: { 
+      label: 'Start',
+      description: 'Starting point of the workflow',
+      output: null,
+      isExecuting: false,
+      config: {
+        className: '',
+        classType: 'TypedDict',
+        variables: []
+      }
+    },
+  },
+  {
+    id: 'end',
+    type: 'endNode',
+    position: { x: 100, y: 300 },
+    data: {
+      label: 'End',
+      description: 'End point of the workflow',
+      output: null,
+      isExecuting: false,
+      config: {
+        receiveKey: ''
+      }
+    },
+  }
+];
 export const emptyInitialEdges: Edge[] = [];
 
 export const initialEdges: Edge[] = [];
