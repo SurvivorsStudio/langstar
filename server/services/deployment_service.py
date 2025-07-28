@@ -10,6 +10,7 @@ from server.models.deployment import (
 )
 from server.services.workflow_service import WorkflowService
 from server.services.code_excute import flower_manager
+from server.utils.execution_logger import create_langgraph_with_logging, execution_logger
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ class DeploymentService:
 
 {langgraph_code}
 
-# 배포 실행 함수
+# 배포 실행 함수 (로컬 실행)
 def run_deployment_{deployment_id.replace('-', '_')}(input_data):
     try:
         result = app.invoke(input_data, {{"configurable": {{"thread_id": 1}}}})
@@ -117,6 +118,47 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             "deployment_id": "{deployment_id}",
             "error": str(e)
         }}
+
+# API를 통한 배포 실행 함수
+def run_deployment_via_api(input_data):
+    import requests
+    import json
+    
+    url = "http://localhost:8000/api/deployment/{deployment_id}/run"
+    
+    payload = {{
+        "input_data": input_data
+    }}
+    
+    headers = {{
+        "Content-Type": "application/json"
+    }}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        if result.get("success"):
+            print("Deployment execution successful:", result["result"])
+            return result["result"]
+        else:
+            print("Deployment execution failed:", result.get("error"))
+            raise Exception(result.get("error"))
+            
+    except requests.exceptions.RequestException as e:
+        print("API call error:", e)
+        raise e
+
+# 사용 예시
+if __name__ == "__main__":
+    try:
+        # API를 통한 실행
+        result = run_deployment_via_api("Hello! This is a test message.")
+        print("Result:", result)
+    except Exception as e:
+        print("Error:", e)
 """
             
             # 4. flower_manager에 배포 등록 (임시로 비활성화)
@@ -147,7 +189,7 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             logger.error(f"Error saving deployment code: {str(e)}")
             raise
     
-    def run_deployment(self, deployment_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def run_deployment(self, deployment_id: str, input_data: Dict[str, Any], api_call_info: Optional[Dict[str, Any]] = None, execution_source: str = "internal") -> Dict[str, Any]:
         """배포를 실행합니다."""
         try:
             # 1. 배포 존재 확인
@@ -159,14 +201,152 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             if deployment.status != DeploymentStatus.ACTIVE:
                 raise ValueError(f"Deployment {deployment_id} is not active (status: {deployment.status})")
             
-            # 3. 임시로 기존 워크플로우 실행 방식 사용
-            # TODO: flower_manager.run_deployment(deployment_id, input_data)
-            logger.info(f"Running deployment {deployment_id} with input: {input_data}")
+            # 3. 실행 기록 생성
+            execution_id = str(uuid.uuid4())
+            execution_name = f"{deployment.name}_execution_{int(datetime.utcnow().timestamp())}"
+            start_time = datetime.utcnow().isoformat()
             
-            # 임시 응답 (실제로는 생성된 코드를 실행해야 함)
+            # 4. 워크플로우 스냅샷에서 노드 정보 추출
+            workflow_snapshot = None
+            versions = self.get_deployment_versions(deployment_id)
+            if versions:
+                workflow_snapshot = versions[0].workflowSnapshot
+            
+            # 5. 노드별 실행 히스토리 생성
+            node_execution_history = []
+            if workflow_snapshot:
+                for node in workflow_snapshot.nodes:
+                    node_history = {
+                        "node_id": node["id"],
+                        "node_type": node["type"],
+                        "node_name": node["data"].get("label", node["id"]),
+                        "status": "succeeded",
+                        "start_time": start_time,
+                        "end_time": start_time,
+                        "duration_ms": 0,
+                        "input": input_data if node["type"] == "startNode" else {},
+                        "output": node["data"].get("output", {}),
+                        "error_message": None,
+                        "position": node.get("position", {"x": 0, "y": 0})
+                    }
+                    node_execution_history.append(node_history)
+            
+            # 6. 실제 LangGraph 실행 (로깅 포함)
+            try:
+                if workflow_snapshot:
+                    # 로깅이 포함된 LangGraph 생성
+                    app = create_langgraph_with_logging(
+                        workflow_snapshot.dict(),
+                        execution_id,
+                        deployment_id,
+                        versions[0].id
+                    )
+                    
+                    # LangGraph 실행
+                    result = app.invoke(input_data)
+                    
+                    # 실행 완료 시간 기록
+                    end_time = datetime.utcnow().isoformat()
+                    duration_ms = int((datetime.utcnow() - datetime.fromisoformat(start_time)).total_seconds() * 1000)
+                    
+                    # 노드 실행 히스토리 조회
+                    node_execution_logs = execution_logger.get_execution_logs(
+                        deployment_id, 
+                        versions[0].id, 
+                        execution_id
+                    )
+                    
+                    # 노드 실행 히스토리 변환
+                    node_execution_history = []
+                    for log in node_execution_logs:
+                        node_history = {
+                            "node_id": log.node_id,
+                            "node_type": log.node_type,
+                            "node_name": log.node_name,
+                            "status": log.status.value,
+                            "start_time": log.start_time.isoformat(),
+                            "end_time": log.end_time.isoformat() if log.end_time else None,
+                            "duration_ms": log.duration_ms,
+                            "input": log.input_data,
+                            "output": log.output_data,
+                            "error_message": log.error_message,
+                            "position": log.position
+                        }
+                        node_execution_history.append(node_history)
+                    
+                    output_result = {
+                        "message": f"Deployment {deployment.name} executed successfully",
+                        "input_received": input_data,
+                        "result": result,
+                        "status": "executed"
+                    }
+                else:
+                    output_result = {
+                        "message": f"Deployment {deployment.name} executed successfully",
+                        "input_received": input_data,
+                        "status": "executed"
+                    }
+                    end_time = start_time
+                    duration_ms = 0
+                    
+            except Exception as e:
+                # 에러 발생 시
+                end_time = datetime.utcnow().isoformat()
+                duration_ms = int((datetime.utcnow() - datetime.fromisoformat(start_time)).total_seconds() * 1000)
+                
+                output_result = {
+                    "message": f"Deployment {deployment.name} execution failed",
+                    "input_received": input_data,
+                    "error": str(e),
+                    "status": "failed"
+                }
+                
+                logger.error(f"Error executing deployment {deployment_id}: {str(e)}")
+            
+            # 7. 실행 기록 저장
+            execution_record = {
+                "id": execution_id,
+                "name": execution_name,
+                "workflow_id": deployment.workflowId,
+                "deployment_id": deployment_id,
+                "status": "succeeded" if "error" not in output_result else "failed",
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration_ms": duration_ms,
+                "input": input_data,
+                "output": output_result,
+                "error_message": output_result.get("error"),
+                "workflow_snapshot": workflow_snapshot.dict() if workflow_snapshot else None,
+                "node_execution_history": node_execution_history,
+                "state_transitions": [
+                    {
+                        "timestamp": start_time,
+                        "state": "started",
+                        "node_id": "workflow",
+                        "node_name": "Workflow",
+                        "input": input_data
+                    },
+                    {
+                        "timestamp": end_time,
+                        "state": "succeeded" if "error" not in output_result else "failed",
+                        "node_id": "workflow",
+                        "node_name": "Workflow",
+                        "output": output_result
+                    }
+                ],
+                # 외부 API 호출 정보 추가
+                "api_call_info": api_call_info,
+                "execution_source": execution_source
+            }
+            
+            # 8. 실행 기록을 파일로 저장
+            self._save_execution_record(execution_record)
+            
+            # 7. 응답 반환
             return {
                 "success": True,
                 "deployment_id": deployment_id,
+                "execution_id": execution_id,
                 "result": {
                     "message": f"Deployment {deployment.name} executed successfully",
                     "input_received": input_data,
@@ -363,8 +543,73 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             # WorkflowService를 사용하여 LangGraph 코드 생성
             langgraph_code = WorkflowService.generate_langgraph_code(workflow_data)
             
+            # API 호출 코드 추가
+            deployment_code = f"""
+# Deployment ID: {deployment_id}
+# Generated at: {datetime.utcnow().isoformat()}
+
+{langgraph_code}
+
+# 배포 실행 함수 (로컬 실행)
+def run_deployment_{deployment_id.replace('-', '_')}(input_data):
+    try:
+        result = app.invoke(input_data, {{"configurable": {{"thread_id": 1}}}})
+        return {{
+            "success": True,
+            "deployment_id": "{deployment_id}",
+            "result": result
+        }}
+    except Exception as e:
+        return {{
+            "success": False,
+            "deployment_id": "{deployment_id}",
+            "error": str(e)
+        }}
+
+# API를 통한 배포 실행 함수
+def run_deployment_via_api(input_data):
+    import requests
+    import json
+    
+    url = "http://localhost:8000/api/deployment/{deployment_id}/run"
+    
+    payload = {{
+        "input_data": input_data
+    }}
+    
+    headers = {{
+        "Content-Type": "application/json"
+    }}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        if result.get("success"):
+            print("Deployment execution successful:", result["result"])
+            return result["result"]
+        else:
+            print("Deployment execution failed:", result.get("error"))
+            raise Exception(result.get("error"))
+            
+    except requests.exceptions.RequestException as e:
+        print("API call error:", e)
+        raise e
+
+# 사용 예시
+if __name__ == "__main__":
+    try:
+        # API를 통한 실행
+        result = run_deployment_via_api("Hello! This is a test message.")
+        print("Result:", result)
+    except Exception as e:
+        print("Error:", e)
+"""
+            
             logger.info(f"Generated code for deployment {deployment_id} version {version_id}")
-            return langgraph_code
+            return deployment_code
             
         except Exception as e:
             logger.error(f"Error generating deployment code: {str(e)}")
@@ -408,6 +653,24 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             logger.error(f"Error saving deployment version to file: {str(e)}")
             raise
     
+    def _save_execution_record(self, execution_record: Dict[str, Any]):
+        """실행 기록을 파일로 저장합니다."""
+        try:
+            executions_dir = os.path.join(self.deployments_dir, "executions")
+            if not os.path.exists(executions_dir):
+                os.makedirs(executions_dir)
+            
+            # 실행 기록을 파일로 저장
+            execution_file = os.path.join(executions_dir, f"{execution_record['id']}.json")
+            with open(execution_file, 'w', encoding='utf-8') as f:
+                json.dump(execution_record, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Saved execution record: {execution_record['id']}")
+            
+        except Exception as e:
+            logger.error(f"Error saving execution record: {str(e)}")
+            raise
+
     def delete_deployment(self, deployment_id: str) -> bool:
         """배포를 삭제합니다."""
         try:

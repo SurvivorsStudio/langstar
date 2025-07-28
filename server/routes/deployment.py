@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
 from server.models.deployment import (
     CreateDeploymentRequest, CreateDeploymentResponse,
     DeploymentsResponse, UpdateDeploymentStatusRequest,
@@ -276,7 +276,7 @@ def deactivate_deployment(deployment_id: str):
         raise HTTPException(status_code=500, detail=str(e)) 
 
 @router.post('/deployment/{deployment_id}/run')
-def run_deployment(deployment_id: str, msg: dict = Body(...)):
+def run_deployment(deployment_id: str, msg: dict = Body(...), request: Request = None):
     """배포를 실행합니다."""
     try:
         logger.info(f"Running deployment {deployment_id}")
@@ -285,7 +285,31 @@ def run_deployment(deployment_id: str, msg: dict = Body(...)):
         if not input_data:
             raise HTTPException(status_code=400, detail="input_data is required")
         
-        result = deployment_service.run_deployment(deployment_id, input_data)
+        # API 호출 정보 수집
+        api_call_info = {}
+        if request:
+            api_call_info = {
+                "client_ip": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+                "referer": request.headers.get("referer"),
+                "origin": request.headers.get("origin"),
+                "content_type": request.headers.get("content-type"),
+                "accept": request.headers.get("accept"),
+                "request_method": request.method,
+                "request_url": str(request.url),
+                "headers": dict(request.headers)
+            }
+        
+        # 실행 소스 판단 (Referer나 Origin으로 내부/외부 구분)
+        execution_source = "internal"
+        if request and request.headers.get("referer"):
+            referer = request.headers.get("referer", "")
+            if "localhost:5173" in referer or "127.0.0.1:5173" in referer:
+                execution_source = "internal"
+            else:
+                execution_source = "external"
+        
+        result = deployment_service.run_deployment(deployment_id, input_data, api_call_info, execution_source)
         
         logger.info(f"Successfully executed deployment {deployment_id}")
         

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import FlowBuilder from './pages/FlowBuilder';
 import WorkspacePage from './pages/WorkspacePage';
+import DeploymentDetail from './components/deployment/DeploymentDetail';
 import { useThemeStore } from './store/themeStore';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/" element={<Navigate to="/workspace" replace />} />
           <Route path="/workspace" element={<WorkspacePage />} />
           <Route path="/flow/:id" element={<FlowBuilder />} />
+          <Route path="/deployment/:deploymentId" element={<DeploymentDetail />} />
         </Routes>
       </BrowserRouter>
     </div>

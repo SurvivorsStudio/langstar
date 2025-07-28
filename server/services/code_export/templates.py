@@ -15,7 +15,7 @@ def init_state_code( config_json ) :
             code_lines.append(code_token)
     code_lines = "\n".join(code_lines) + "\n"
 
-    code = f"""
+    code = f'''
 from pydantic import BaseModel
 from typing import Annotated
 import operator
@@ -25,12 +25,67 @@ from langgraph.graph import StateGraph, START, END
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from typing import Optional
 from langchain_core.tools import StructuredTool
-from langgraph.checkpoint.memory import InMemorySaver 
+from langgraph.checkpoint.memory import InMemorySaver
+import logging
+from functools import wraps
+from typing import Any, Dict
+import time
+from datetime import datetime
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def log_node_execution(node_id: str, node_name: str, node_type: str):
+    """
+    LangGraph node function execution logging decorator.
+    Records node start/end, input/output (partial), and detailed error information.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 노드 실행 시작 로깅
+            start_time = time.time()
+            node_name_display = func.__name__
+            
+            # LangGraph 노드는 보통 첫 번째 인자로 'state'를 받습니다.
+            state: Dict[str, Any] = kwargs.get('state', args[0] if args else {{}})
+            
+            # 입력 상태 로깅 (민감 정보 보호 및 성능을 위해 일부만 로깅)
+            input_log_str = str(state.get('messages', state))[:100] + "..." if state else "None"
+            
+            if logger.isEnabledFor(logging.INFO):
+                logger.info("[" + node_name_display + "] Node started. Input state (partial): " + input_log_str)
+            
+            try:
+                # 원본 노드 함수 실행
+                result = func(*args, **kwargs)
+                
+                # 실행 완료 시간 계산
+                end_time = time.time()
+                duration_ms = int((end_time - start_time) * 1000)
+                
+                # 출력 결과 로깅 (민감 정보 보호 및 성능을 위해 일부만 로깅)
+                output_log_str = str(result)[:100] + "..." if result else "None"
+                if logger.isEnabledFor(logging.INFO):
+                    logger.info("[" + node_name_display + "] Node finished. Output result (partial): " + output_log_str)
+                    logger.info("[" + node_name_display + "] Execution time: " + str(duration_ms) + "ms")
+                
+                return result
+            except Exception as e:
+                # 에러 발생 시, 노드 이름과 함께 상세 에러 정보(스택 트레이스 포함) 로깅
+                end_time = time.time()
+                duration_ms = int((end_time - start_time) * 1000)
+                logger.exception("[" + node_name_display + "] Error in node. Original error: " + str(e))
+                logger.error("[" + node_name_display + "] Execution time before error: " + str(duration_ms) + "ms")
+                raise # 에러를 다시 발생시켜 LangGraph의 에러 핸들링으로 전달
+        return wrapper
+    return decorator
 
 class MyState(BaseModel):
     response:dict = {{}}
 {code_lines}
-"""
+'''
     return code 
 
 # return_next_node
@@ -59,12 +114,13 @@ def return_next_node( my_node, next_node_list, return_value, node_cofing = {} ):
 """
     return code 
 
-
-
 # start_node_code
 def start_node_code(node) :
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     node_label = "{node_name}" # 노드 레이블을 직접 사용
 
@@ -90,11 +146,12 @@ def node_{node_name}(state):
 """
     return code
 
-
-
 def prompt_node_code( node ) : 
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     my_name = "{node_name}" 
     node_name = my_name
@@ -126,10 +183,12 @@ def node_{node_name}(state):
 """
     return code 
 
-
 def merge_node_code( node ) : 
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     my_name = "{node_name}" 
     node_name = my_name
@@ -139,13 +198,17 @@ def node_{node_name}(state):
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
     node_config = state_dict[node_config_key]
-                        
+    
+    # merge 노드 처리
+    merged_data = {{}}
+    for key, value in node_input.items():
+        if isinstance(value, dict):
+            merged_data.update(value)
+        else:
+            merged_data[key] = value
+    
     # 다음 노드에 전달하는 값 
-    return_value = {{}} 
-    for key, value  in node_config['config'].items():
-        match_node  = value['node_name'] 
-        match_value = value['node_value'] 
-        return_value[key]  = node_input[match_node][match_value]
+    return_value = merged_data
 
     # 전달하고자 하는 타겟 node 리스트 
     next_node_list = node_config.get('next_node', []) 
@@ -155,10 +218,12 @@ def node_{node_name}(state):
 """
     return code 
 
-
 def end_node_code( node ) : 
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
     my_name = "{node_name}" 
     node_name = my_name
@@ -184,7 +249,6 @@ def node_{node_name}( state ) :
     return return_next_node( node_name, next_node_list, return_value, return_config )   
     """
     return code 
-
 
 # create_branch
 def condition_sub1_node_code(function_name, condition_config):
@@ -220,7 +284,6 @@ def node_branch_{function_name}(state):
 
     return function_node_code
 
-
 # create_condition_node
 def condition_sub2_node_code (function_name, condition_config):
     tmp_function_name = "tmp_" + function_name
@@ -253,23 +316,21 @@ def node_{function_name}(state):
     
 """
     return function_node_code
-    
 
 def condition_node_code( node, node_id_to_node_label ) :
     node_name = node['data']['label']
-    condition_config = []
-    for row in node['data']['config']['conditions']:
-        row['next_node'] = [node_id_to_node_label[row['targetNodeId']]]
-        condition_config.append(row)
-    code = ""
-    code += condition_sub1_node_code(node_name, condition_config)
-    code += condition_sub2_node_code(node_name, condition_config)
-    return code 
-
+    condition_config = node['data']['config']['conditions']
+    
+    code = condition_sub1_node_code( node_name, condition_config )
+    code += condition_sub2_node_code( node_name, condition_config )
+    
+    return code
 
 # create_function_node
 def python_function_node_code( node ):
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     py_code = node['data']['code']
     parsed = ast.parse(py_code)
     func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
@@ -277,6 +338,7 @@ def python_function_node_code( node ):
 
     indented_code = textwrap.indent(py_code, "    ")
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     my_name = "{node_name}"
     node_name = my_name
@@ -299,7 +361,6 @@ def node_{node_name}(state):
 
 """
     return code 
-
 
 def agent_node_code( node ):
     print( node )
@@ -338,7 +399,6 @@ def agent_node_code( node ):
         elif memory_type !="" and len(tools) != 0: 
             return aws_templates.memory_tool_agent_code( node )
 
-
 def create_start_node_code( node ) : 
     node_name = node['data']['label']
     return f"""
@@ -346,12 +406,10 @@ graph = StateGraph(MyState)
 graph.add_node("_{node_name}", node_{node_name})
 """
 
-
 def create_node_code( node ) : 
     node_name = node['data']['label']
     return f"""graph.add_node("_{node_name}", node_{node_name})
 """
-
 
 def create_condition_node_code( node ) : 
     node_name = node['data']['label']
@@ -364,5 +422,4 @@ def create_condition_node_code( node ) :
     node_branch = str(node_branch)
     code += f"""graph.add_conditional_edges("_{node_name}", node_branch_{node_name}, {node_branch}  )
 """
-    return code
-
+    return code 

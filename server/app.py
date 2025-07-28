@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 # Import structured modules
 from server.utils.logger import setup_logger
-from server.routes import health, workflow, deployment
+from server.routes import health, workflow, deployment, execution
 
 # Setup logger
 logger = setup_logger()
@@ -42,6 +42,7 @@ sys.stdout.flush()
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(workflow.router, tags=["workflow"])
-app.include_router(deployment.router, tags=["deployment"])
+app.include_router(deployment.router, prefix="/api", tags=["deployment"])
+app.include_router(execution.router, prefix="/api", tags=["execution"])
 
 

@@ -39,6 +39,7 @@ export interface Deployment {
     environment?: Record<string, string>; // 환경 변수
     [key: string]: any;
   };
+  versions?: DeploymentVersion[]; // 배포 버전 목록
 }
 
 // 배포 버전 정보 인터페이스

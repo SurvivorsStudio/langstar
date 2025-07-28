@@ -47,6 +47,12 @@ class Deployment(BaseModel):
     deployedAt: Optional[str] = None
     deploymentUrl: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    # AWS Step Functions 스타일 필드 추가
+    arn: Optional[str] = None  # LangStar ARN 형식
+    type: str = "STANDARD"
+    xray_tracing: bool = False
+    execution_count: int = 0
+    last_execution_time: Optional[str] = None
 
 class DeploymentFormData(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)

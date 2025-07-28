@@ -90,7 +90,7 @@ class ApiService {
     deploymentData: DeploymentFormData, 
     workflowData: Workflow
   ): Promise<Deployment> {
-    const response = await this.request<CreateDeploymentResponse>('/deployment/create', {
+    const response = await this.request<CreateDeploymentResponse>('/api/deployment/create', {
       method: 'POST',
       body: JSON.stringify({
         deploymentData,
@@ -109,7 +109,7 @@ class ApiService {
    * 모든 배포 목록 조회
    */
   async getDeployments(): Promise<Deployment[]> {
-    const response = await this.request<DeploymentsResponse>('/deployment/list', {
+    const response = await this.request<DeploymentsResponse>('/api/deployment/list', {
       method: 'GET'
     });
 
@@ -127,7 +127,7 @@ class ApiService {
     deployment: Deployment;
     versions: DeploymentVersion[];
   }> {
-    const response = await this.request<DeploymentStatusResponse>(`/deployment/${deploymentId}`, {
+    const response = await this.request<DeploymentStatusResponse>(`/api/deployment/${deploymentId}`, {
       method: 'GET'
     });
 
@@ -149,7 +149,7 @@ class ApiService {
     status: DeploymentStatus
   ): Promise<Deployment> {
     const response = await this.request<{ success: boolean; deployment: Deployment; message: string }>(
-      `/deployment/${deploymentId}/status`,
+      `/api/deployment/${deploymentId}/status`,
       {
         method: 'PUT',
         body: JSON.stringify({ deploymentId, status })
@@ -173,7 +173,7 @@ class ApiService {
     changelog?: string
   ): Promise<DeploymentVersion> {
     const response = await this.request<{ success: boolean; version: DeploymentVersion; message: string }>(
-      `/deployment/${deploymentId}/version`,
+      `/api/deployment/${deploymentId}/version`,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -199,7 +199,7 @@ class ApiService {
     versionId: string
   ): Promise<{ code: string; deploymentUrl?: string }> {
     const response = await this.request<DeploymentCodeResponse>(
-      `/deployment/${deploymentId}/generate-code`,
+      `/api/deployment/${deploymentId}/generate-code`,
       {
         method: 'POST',
         body: JSON.stringify({ deploymentId, versionId })
@@ -229,7 +229,7 @@ class ApiService {
       activeVersion: DeploymentVersion;
       message: string;
     }>(
-      `/deployment/${deploymentId}/rollback`,
+      `/api/deployment/${deploymentId}/rollback`,
       {
         method: 'POST',
         body: JSON.stringify({ deploymentId, versionId })
@@ -251,7 +251,7 @@ class ApiService {
    */
   async deleteDeployment(deploymentId: string): Promise<void> {
     const response = await this.request<{ success: boolean; message: string }>(
-      `/deployment/${deploymentId}`,
+      `/api/deployment/${deploymentId}`,
       {
         method: 'DELETE'
       }
@@ -267,7 +267,7 @@ class ApiService {
    */
   async activateDeployment(deploymentId: string): Promise<Deployment> {
     const response = await this.request<{ success: boolean; deployment: Deployment; message: string }>(
-      `/deployment/${deploymentId}/activate`,
+      `/api/deployment/${deploymentId}/activate`,
       {
         method: 'POST'
       }
@@ -285,7 +285,7 @@ class ApiService {
    */
   async deactivateDeployment(deploymentId: string): Promise<Deployment> {
     const response = await this.request<{ success: boolean; deployment: Deployment; message: string }>(
-      `/deployment/${deploymentId}/deactivate`,
+      `/api/deployment/${deploymentId}/deactivate`,
       {
         method: 'POST'
       }
@@ -299,7 +299,7 @@ class ApiService {
   }
 
   async runDeployment(deploymentId: string, inputData: any): Promise<{ success: boolean; deployment_id: string; result: any }> {
-    return this.request(`/deployment/${deploymentId}/run`, {
+    return this.request(`/api/deployment/${deploymentId}/run`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

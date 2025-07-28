@@ -3,7 +3,10 @@ import textwrap
 
 def base_base_agent_code(node) : 
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_aws import ChatBedrockConverse

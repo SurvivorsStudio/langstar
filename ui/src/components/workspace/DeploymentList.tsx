@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Deployment, DeploymentStatus, DeploymentEnvironment } from '../../types/deployment';
-import { PlusCircle, Code, ArrowRightCircle, ListChecks, X, Play, Pause, Trash2, Rocket, Grid, List, AlertCircle, ChevronRight, ChevronDown, Folder, FileText, ExternalLink } from 'lucide-react';
+import { PlusCircle, Code, ArrowRightCircle, ListChecks, X, Play, Pause, Trash2, Rocket, Grid, List, AlertCircle, ChevronRight, ChevronDown, Folder, FileText, ExternalLink, Zap, Activity } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import DeploymentPlayground from '../DeploymentPlayground';
 import Editor from '@monaco-editor/react';
@@ -38,6 +38,13 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [workflowGroups, setWorkflowGroups] = useState<WorkflowGroup[]>([]);
+  const [isExecutionModalOpen, setIsExecutionModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedExecutionDeployment, setSelectedExecutionDeployment] = useState<Deployment | null>(null);
+  const [executionInput, setExecutionInput] = useState<string>('{}');
+  const [executionResult, setExecutionResult] = useState<any>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
   const expandedStatesRef = useRef<Map<string, boolean>>(new Map());
   const navigate = useNavigate();
   
@@ -155,6 +162,105 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     navigate(`/flow/${encodeURIComponent(deployment.workflowName)}`);
   };
 
+  const handleExecuteDeployment = (deployment: Deployment) => {
+    setSelectedExecutionDeployment(deployment);
+    setExecutionInput('{}');
+    setExecutionResult(null);
+    setExecutionLogs([]);
+    setIsExecutionModalOpen(true);
+  };
+
+  const handleViewLogs = (deployment: Deployment) => {
+    setSelectedExecutionDeployment(deployment);
+    fetchExecutionLogs(deployment.id);
+    setIsLogModalOpen(true);
+  };
+
+  const fetchExecutionLogs = async (deploymentId: string) => {
+    try {
+      const response = await fetch(`/api/workflows/${deploymentId}/executions`);
+      const data = await response.json();
+      if (data.success) {
+        setExecutionLogs(data.executions.map((exec: any) => 
+          `[${new Date(exec.start_time).toLocaleString()}] ${exec.status.toUpperCase()}: ${exec.name}`
+        ));
+      }
+    } catch (error) {
+      console.error('Error fetching execution logs:', error);
+      setExecutionLogs(['Error fetching logs']);
+    }
+  };
+
+  const executeDeployment = async () => {
+    if (!selectedExecutionDeployment) return;
+
+    setIsExecuting(true);
+    setExecutionLogs([]);
+    
+    try {
+      // 입력 데이터 파싱
+      const inputData = JSON.parse(executionInput);
+      
+      // 실행 시작
+      const response = await fetch(`/api/workflows/${selectedExecutionDeployment.id}/executions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `execution-${Date.now()}`,
+          input: inputData
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setExecutionResult(data.execution);
+        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Started execution: ${data.execution.name}`]);
+        
+        // 실행 상태 모니터링
+        monitorExecution(data.execution.id);
+      } else {
+        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${data.message}`]);
+      }
+    } catch (error) {
+      console.error('Error executing deployment:', error);
+              setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${error}`]);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const monitorExecution = async (executionId: string) => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/executions/${executionId}/status`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Status: ${data.status}`]);
+          
+          if (data.status === 'succeeded' || data.status === 'failed' || data.status === 'aborted') {
+            // 실행 완료
+            if (data.status === 'succeeded') {
+              setExecutionResult((prev: any) => ({ ...prev, status: data.status, output: data.output }));
+            }
+            return; // 모니터링 중단
+          }
+          
+          // 1초 후 다시 체크
+          setTimeout(checkStatus, 1000);
+        }
+      } catch (error) {
+        console.error('Error monitoring execution:', error);
+        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error monitoring: ${error}`]);
+      }
+    };
+    
+    checkStatus();
+  };
+
   const handleTabChange = (language: 'javascript' | 'python' | 'curl') => {
     if (selectedDeployment) {
       setApiModalTab(language);
@@ -188,7 +294,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
         return `// Execute deployment
 const runDeployment = async (inputData) => {
   try {
-    const response = await fetch('${baseUrl}/deployment/${deploymentId}/run', {
+    const response = await fetch('${baseUrl}/api/deployment/${deploymentId}/run', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -232,7 +338,7 @@ def run_deployment(input_data):
     Returns:
         dict: Execution result
     """
-    url = "${baseUrl}/deployment/${deploymentId}/run"
+    url = "${baseUrl}/api/deployment/${deploymentId}/run"
     
     payload = {
         "input_data": input_data
@@ -269,7 +375,7 @@ if __name__ == "__main__":
 
       case 'curl':
         return `# Execute deployment
-curl -X POST "${baseUrl}/deployment/${deploymentId}/run" \\
+curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
   -H "Content-Type: application/json" \\
   -d '{
     "input_data": "Hello! This is a test message."
@@ -459,10 +565,13 @@ curl -X POST "${baseUrl}/deployment/${deploymentId}/run" \\
                   {group.isExpanded && group.deployments.map((deployment) => (
                     <tr key={deployment.id} className="bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800">
                       <td className="px-6 py-3 pl-16">
-                        <div className="flex items-center">
+                        <div 
+                          className="flex items-center cursor-pointer"
+                          onClick={() => navigate(`/deployment/${deployment.id}`)}
+                        >
                           <FileText className="h-4 w-4 text-gray-400 mr-3" />
                           <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600">
                               {deployment.name}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -520,6 +629,20 @@ curl -X POST "${baseUrl}/deployment/${deploymentId}/run" \\
                             </button>
                           )}
                           <button 
+                            title="Execute Deployment" 
+                            onClick={(e) => { e.stopPropagation(); handleExecuteDeployment(deployment); }}
+                            className="p-1 text-orange-600 hover:text-orange-800"
+                          >
+                            <Zap className="h-4 w-4" />
+                          </button>
+                          <button 
+                            title="View Logs" 
+                            onClick={(e) => { e.stopPropagation(); handleViewLogs(deployment); }}
+                            className="p-1 text-purple-600 hover:text-purple-800"
+                          >
+                            <Activity className="h-4 w-4" />
+                          </button>
+                          <button 
                             title="Open Workflow" 
                             onClick={(e) => { e.stopPropagation(); handleOpenWorkflow(deployment); }}
                             className="p-1 text-blue-600 hover:text-blue-800"
@@ -548,6 +671,148 @@ curl -X POST "${baseUrl}/deployment/${deploymentId}/run" \\
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Execution Modal */}
+      {isExecutionModalOpen && selectedExecutionDeployment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-4">
+                <Zap className="h-6 w-6 text-orange-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Execute Deployment
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedExecutionDeployment.name} (v{selectedExecutionDeployment.version})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExecutionModalOpen(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-hidden flex">
+              {/* Input Panel */}
+              <div className="w-1/2 p-6 border-r border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  Input Parameters
+                </h4>
+                <Editor
+                  height="300px"
+                  language="json"
+                  value={executionInput}
+                  onChange={(value) => setExecutionInput(value || '{}')}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    theme: isDarkMode() ? 'vs-dark' : 'vs-light'
+                  }}
+                />
+                <div className="mt-4">
+                  <button
+                    onClick={executeDeployment}
+                    disabled={isExecuting}
+                    className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isExecuting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Executing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        <span>Execute</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Output Panel */}
+              <div className="w-1/2 p-6">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  Execution Logs
+                </h4>
+                <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 h-64 overflow-y-auto font-mono text-xs">
+                  {executionLogs.length === 0 ? (
+                    <div className="text-gray-500 dark:text-gray-400">
+                      No logs yet. Click Execute to start...
+                    </div>
+                  ) : (
+                    executionLogs.map((log, index) => (
+                      <div key={index} className="mb-1">
+                        <span className="text-gray-600 dark:text-gray-400">{log}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {executionResult && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      Result
+                    </h4>
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 max-h-32 overflow-y-auto">
+                      <pre className="text-xs text-gray-700 dark:text-gray-300">
+                        {JSON.stringify(executionResult, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logs Modal */}
+      {isLogModalOpen && selectedExecutionDeployment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-4">
+                <Activity className="h-6 w-6 text-purple-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Execution Logs
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedExecutionDeployment.name} (v{selectedExecutionDeployment.version})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsLogModalOpen(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 p-6 overflow-hidden">
+              <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 h-full overflow-y-auto font-mono text-xs">
+                {executionLogs.length === 0 ? (
+                  <div className="text-gray-500 dark:text-gray-400">
+                    No execution logs found.
+                  </div>
+                ) : (
+                  executionLogs.map((log, index) => (
+                    <div key={index} className="mb-1">
+                      <span className="text-gray-600 dark:text-gray-400">{log}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
