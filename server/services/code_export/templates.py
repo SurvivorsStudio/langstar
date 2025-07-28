@@ -373,12 +373,15 @@ def agent_node_code( node ):
     )
         
     # memory_type = node['data']['config']['memoryGroup']['memoryType']
-    memory_type = (
+    memory_group = (
     node.get('data', {})
         .get('config', {})
         .get('memoryGroup', {})
-        .get('memoryType', '')
     )
+    
+    memory_type = ''
+    if isinstance(memory_group, dict) and memory_group.get('memoryType'):
+        memory_type = memory_group.get('memoryType', '')
 
     if provider == "aws": 
         if memory_type =="" and len(tools) == 0: 

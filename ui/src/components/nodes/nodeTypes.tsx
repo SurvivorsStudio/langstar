@@ -93,9 +93,9 @@ const ToolsMemoryNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Group size={16} />,
-      nodeType: 'toolsMemoryNode',
-      description: 'Tools and Memory groups management'
+              icon: <Group size={16} />,
+        nodeType: 'toolsMemoryNode',
+        description: 'Tools groups management'
     }}
   />
 );

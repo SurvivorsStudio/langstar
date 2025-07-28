@@ -3,7 +3,6 @@ import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
 import { Group, NodeData } from '../../types/node';
-import CustomSelect from '../Common/CustomSelect';
 
 interface ToolsMemorySettingsProps {
   nodeId: string;
@@ -113,22 +112,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
             )}
           </div>
 
-          {selectedGroup.type === 'memory' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-                Memory Type
-              </label>
-              <CustomSelect
-                value={selectedGroup.memoryType || 'ConversationBufferMemory'}
-                onChange={value => handleUpdateGroup(selectedGroup.id, { memoryType: value as 'ConversationBufferMemory' | 'ConversationBufferWindowMemory' })}
-                options={[
-                  { value: 'ConversationBufferMemory', label: 'Conversation Buffer Memory' },
-                  { value: 'ConversationBufferWindowMemory', label: 'Conversation Buffer Window Memory' }
-                ]}
-                placeholder="Select memory type"
-              />
-            </div>
-          )}
+
 
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
@@ -145,20 +129,18 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
         </div>
       </div>
 
-      {selectedGroup.type === 'tools' && (
-        <div className="flex-1 overflow-hidden">
-          <div className="p-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800">
-            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Python Code</h3>
-          </div>
-          <div className="h-[calc(100vh-380px)]">
-            <CodeEditor
-              value={selectedGroup.code || '# Write your Python code here\n'}
-              onChange={(value) => handleUpdateGroup(selectedGroup.id, { code: value })}
-              language="python"
-            />
-          </div>
+      <div className="flex-1 overflow-hidden">
+        <div className="p-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800">
+          <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Python Code</h3>
         </div>
-      )}
+        <div className="h-[calc(100vh-380px)]">
+          <CodeEditor
+            value={selectedGroup.code || '# Write your Python code here\n'}
+            onChange={(value) => handleUpdateGroup(selectedGroup.id, { code: value })}
+            language="python"
+          />
+        </div>
+      </div>
     </div>
   );
 };

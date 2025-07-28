@@ -575,7 +575,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       model: '',
       userPromptInputKey: 'user_input',
       systemPromptInputKey: 'system_message',
-      memoryGroup: '',
+      memoryGroup: {
+        id: 'group-1751010925148',
+        name: 'New Memory Group',
+        memoryType: 'ConversationBufferMemory',
+        memoryOption: {}
+      },
       tools: [],
       agentOutputVariable: 'agent_response'
     } : type === 'mergeNode' ? {
@@ -1020,28 +1025,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
           let memoryTypeForAPI: string | undefined = undefined;
           let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
-          if (memoryGroup) { // memoryGroup is the ID of the selected group
-            const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
-            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
-              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; memoryType?: string; [key: string]: any }>;
-              const selectedGroupDetails = allGroups.find(g => g.id === memoryGroup);
-              if (selectedGroupDetails && selectedGroupDetails.type === 'memory') {
-                // groupsNode에 저장된 memoryType 값을 우선 사용합니다.
-                if (typeof selectedGroupDetails.memoryType !== 'undefined') {
-                  memoryTypeForAPI = selectedGroupDetails.memoryType;
-                } else {
-                  // 만약 groupsNode에 memoryType이 undefined라면,
-                  // GroupsSettings.tsx UI에서 기본으로 표시되는 'ConversationBufferMemory'를 사용합니다.
-                  // 이는 저장된 데이터를 변경하는 것이 아니라, 실행 시점에 해석하는 방식입니다.
-                  memoryTypeForAPI = 'ConversationBufferMemory'; 
-                  console.log(`[AgentNode ${nodeId}] Memory Type for group '${selectedGroupDetails.name}' (ID: ${selectedGroupDetails.id}) was undefined in store. Using default '${memoryTypeForAPI}' (as per GroupsSettings.tsx display).`);
-                }
-                memoryGroupNameForAPI = selectedGroupDetails.name; // 메모리 그룹 이름 저장
-                console.log(`[AgentNode ${nodeId}] 선택된 Memory Group: ${selectedGroupDetails.name}, Memory Type: ${memoryTypeForAPI}`);
-              } else {
-                console.log(`[AgentNode ${nodeId}] Selected group ID ${memoryGroup} is not a memory type or not found.`);
-              }
-            }
+          if (memoryGroup && memoryGroup.memoryType) { // memoryGroup is the object with memoryType
+            memoryTypeForAPI = memoryGroup.memoryType;
+            memoryGroupNameForAPI = memoryGroup.name;
+            console.log(`[AgentNode ${nodeId}] 선택된 Memory Group: ${memoryGroup.name}, Memory Type: ${memoryTypeForAPI}`);
           }
 
           // API 페이로드용 tools_for_api 구성
@@ -1072,7 +1059,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             modelSetting, // 모델 설정 추가
             system_prompt: systemPromptForAPI,
             user_prompt: userPromptForAPI,
-            memory_group: memoryGroup ? memoryGroup : undefined, 
+            memory_group: memoryGroup ? memoryGroup.id : undefined, 
             memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송
             memory_type: memoryTypeForAPI, // This sends the actual memory type string
@@ -1540,19 +1527,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           // Memory Group 정보를 실제 구성 정보로 변환
           let memoryConfigForExport: any = undefined;
           if (finalNodeData.config?.memoryGroup) {
-            const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
-            if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
-              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; memoryType?: string; [key: string]: any }>;
-              const selectedMemoryGroup = allGroups.find(g => g.id === finalNodeData.config!.memoryGroup && g.type === 'memory');
-              if (selectedMemoryGroup) {
-                memoryConfigForExport = {
-                  id: selectedMemoryGroup.id,
-                  name: selectedMemoryGroup.name,
-                  description: selectedMemoryGroup.description || '',
-                  memoryType: selectedMemoryGroup.memoryType || 'ConversationBufferMemory'
-                };
-              }
-            }
+            memoryConfigForExport = finalNodeData.config.memoryGroup;
           }
 
           // Tools 정보를 실제 구성 정보로 변환
