@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X } from 'lucide-react';
+import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { Link } from 'react-router-dom';
 import homeLogo from '../assets/common/home_logo.png';
+import { apiService } from '../services/apiService';
+import { DeploymentFormData, Deployment } from '../types/deployment';
+import DeploymentModal from './DeploymentModal';
+import DeploymentSuccessModal from './DeploymentSuccessModal';
 
 import CodeEditor from './CodeEditor';
 
@@ -14,13 +18,43 @@ const Header: React.FC = () => {
     isWorkflowRunning, 
     saveWorkflow, 
     isSaving,
-    getWorkflowAsJSONString
+    getWorkflowAsJSONString,
+    nodes
   } = useFlowStore(state => ({ 
-    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString 
+    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes
   }));
 
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
   const [editableModalContent, setEditableModalContent] = useState<string>('');
+  
+  // 배포 관련 상태
+  const [isDeploymentModalOpen, setIsDeploymentModalOpen] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentSuccessModalOpen, setDeploymentSuccessModalOpen] = useState(false);
+  const [createdDeployment, setCreatedDeployment] = useState<Deployment | null>(null);
+
+  // 배포 생성 함수
+  const handleCreateDeployment = async (deploymentData: DeploymentFormData) => {
+    setIsDeploying(true);
+    try {
+      const jsonString = getWorkflowAsJSONString();
+      if (!jsonString) {
+        throw new Error('워크플로우 데이터를 생성할 수 없습니다.');
+      }
+
+      const workflowData = JSON.parse(jsonString);
+      const deployment = await apiService.createDeployment(deploymentData, workflowData);
+      
+      setCreatedDeployment(deployment);
+      setDeploymentSuccessModalOpen(true);
+      setIsDeploymentModalOpen(false);
+    } catch (error) {
+      console.error('Deployment creation failed:', error);
+      alert(`배포 생성에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsDeploying(false);
+    }
+  };
 
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-2 px-4 flex items-center justify-between shadow-sm">
@@ -58,39 +92,12 @@ const Header: React.FC = () => {
             if (jsonString) {
               console.log("Workflow JSON:\n", jsonString);
               try {
-                const response = await fetch('http://127.0.0.1:8000/workflow/export/python/langgraph', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: jsonString,
-                });
-
-                if (response.ok) {
-                  try {
-                    const responseData = await response.json();
-                    if (typeof responseData === 'object' && responseData !== null) {
-                      const keys = Object.keys(responseData);
-                      const extractedContent = (keys.length > 0 && typeof responseData[keys[0]] === 'string')
-                        ? responseData[keys[0]]
-                        : JSON.stringify(responseData, null, 2);
-                      setApiResponseModalContent(extractedContent);
-                      setEditableModalContent(extractedContent);
-                    } else {
-                      const stringContent = String(responseData);
-                      setApiResponseModalContent(stringContent);
-                      setEditableModalContent(stringContent);
-                    }
-                  } catch {
-                    const textResponse = await response.text();
-                    console.log('API call successful, but response was not JSON:', textResponse);
-                    setApiResponseModalContent(textResponse);
-                    setEditableModalContent(textResponse);
-                  }
-                } else {
-                  const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                  alert(`Failed to export workflow JSON. Server responded with: ${errorData.message || response.statusText}`);
-                }
+                // JSON 문자열을 파싱하여 Workflow 객체로 변환
+                const workflowData = JSON.parse(jsonString);
+                const langgraphCode = await apiService.generateLangGraphCode(workflowData);
+                
+                setApiResponseModalContent(langgraphCode);
+                setEditableModalContent(langgraphCode);
               } catch (error) {
                 console.error('Header.tsx: Error exporting workflow JSON via API:', error);
                 alert(`Failed to export workflow JSON. An error occurred: ${error instanceof Error ? error.message : String(error)}`);
@@ -124,6 +131,15 @@ const Header: React.FC = () => {
         >
           {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
           {isSaving ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          onClick={() => setIsDeploymentModalOpen(true)}
+          disabled={nodes.length === 0 || isDeploying}
+          className="hidden sm:flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          title={nodes.length === 0 ? "워크플로우에 노드를 추가한 후 배포하세요" : "Deploy Workflow"}
+        >
+          <Rocket className="h-4 w-4 mr-1" />
+          Deploy
         </button>
         <button
           onClick={() => {
@@ -194,6 +210,24 @@ const Header: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* 배포 모달 */}
+      <DeploymentModal
+        isOpen={isDeploymentModalOpen}
+        onClose={() => setIsDeploymentModalOpen(false)}
+        onSubmit={handleCreateDeployment}
+        isLoading={isDeploying}
+      />
+
+      {/* 배포 성공 모달 */}
+      <DeploymentSuccessModal
+        isOpen={deploymentSuccessModalOpen}
+        onClose={() => {
+          setDeploymentSuccessModalOpen(false);
+          setCreatedDeployment(null);
+        }}
+        deployment={createdDeployment}
+      />
     </header>
   );
 };

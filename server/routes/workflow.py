@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Body, HTTPException
 from server.models.workflow import PromptNodeInput
 from server.services.workflow_service import WorkflowService
+from server.services.deployment_service import deployment_service
+from server.models.deployment import DeploymentFormData, DeploymentStatus, DeploymentEnvironment
 import logging
 import traceback
+import uuid
+from datetime import datetime
 
 
 # 로거 설정
@@ -95,15 +99,36 @@ def run_chatflow_list(msg: dict = Body(...)):
 
 @router.post('/workflow/deploy')
 def deploy_workflow(msg: dict = Body(...)):
-    """Deploy workflow by generating python code and saving it as a file."""
+    """Deploy workflow by generating python code and creating deployment record."""
     try:
         logger.info("Received workflow deploy request")
-        print( msg )
-        pycode = export_langgraph( msg )
-        print( pycode ) 
-        # result = WorkflowService.model_deploy(msg)
-        logger.info("Workflow deployed successfully")
-        return {'a' : 1}
+        
+        # 기본 배포 데이터 생성
+        deployment_data = DeploymentFormData(
+            name=msg.get("name", f"Deployment-{datetime.now().strftime('%Y%m%d-%H%M%S')}"),
+            version=msg.get("version", "1.0.0"),
+            description=msg.get("description", "Auto-generated deployment"),
+            environment=DeploymentEnvironment.DEV,
+            config=msg.get("config", {})
+        )
+        
+        # 워크플로우 데이터 (기존 msg에서 추출)
+        workflow_data = msg
+        
+        # 새로운 배포 생성
+        deployment = deployment_service.create_deployment(deployment_data, workflow_data)
+        
+        # 배포 상태를 ACTIVE로 변경
+        deployment = deployment_service.update_deployment_status(deployment.id, DeploymentStatus.ACTIVE)
+        
+        logger.info(f"Workflow deployed successfully: {deployment.id}")
+        
+        return {
+            "success": True,
+            "deployment": deployment,
+            "message": f"Workflow deployed successfully as '{deployment.name}'"
+        }
+        
     except Exception as e:
         logger.error(f"Error in workflow deploy endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) 

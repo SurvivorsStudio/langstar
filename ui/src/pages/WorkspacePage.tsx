@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 // import logoImage from '../assets/common/langstar_logo.png';
 import { useFlowStore, DEFAULT_PROJECT_NAME, emptyInitialNodes, emptyInitialEdges } from '../store/flowStore';
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar';
@@ -10,6 +10,7 @@ import DeploymentList from '../components/workspace/DeploymentList';
 import AIConnectionList from '../components/workspace/AIConnectionList';
 import AIConnectionWizard from '../components/workspace/AIConnectionWizard';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
+import { Deployment } from '../types/deployment';
 
 const mockRagConfigs = [
   {
@@ -38,6 +39,7 @@ const mockRagConfigs = [
 
 const WorkspacePage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     availableWorkflows,
     fetchAvailableWorkflows,
@@ -54,6 +56,14 @@ const WorkspacePage: React.FC = () => {
     isLoadingAIConnections,
     loadErrorAIConnections,
     getWorkflowAsJSONString,
+    // 배포 관련 상태와 함수들
+    deployments,
+    fetchDeployments,
+    isLoadingDeployments,
+    loadErrorDeployments,
+    deleteDeployment,
+    activateDeployment,
+    deactivateDeployment,
   } = useFlowStore(state => ({
     availableWorkflows: state.availableWorkflows,
     fetchAvailableWorkflows: state.fetchAvailableWorkflows,
@@ -70,9 +80,20 @@ const WorkspacePage: React.FC = () => {
     isLoadingAIConnections: state.isLoadingAIConnections,
     loadErrorAIConnections: state.loadErrorAIConnections,
     getWorkflowAsJSONString: state.getWorkflowAsJSONString,
+    // 배포 관련 상태와 함수들
+    deployments: state.deployments,
+    fetchDeployments: state.fetchDeployments,
+    isLoadingDeployments: state.isLoadingDeployments,
+    loadErrorDeployments: state.loadErrorDeployments,
+    deleteDeployment: state.deleteDeployment,
+    activateDeployment: state.activateDeployment,
+    deactivateDeployment: state.deactivateDeployment,
   }));
 
-  const [activeMenu, setActiveMenu] = React.useState('chatflows');
+  const [activeMenu, setActiveMenu] = React.useState(() => {
+    const tab = searchParams.get('tab');
+    return tab === 'deployment' ? 'deployment' : 'chatflows';
+  });
   const [selectedRag, setSelectedRag] = React.useState<string | null>(null);
   const [showWizard, setShowWizard] = React.useState(false);
   const [editingConnection, setEditingConnection] = React.useState<AIConnection | null>(null);
@@ -97,8 +118,10 @@ const WorkspacePage: React.FC = () => {
     setShowWizard(false);
     setEditingConnection(null);
 
-    if (activeMenu === 'chatflows' || activeMenu === 'deployment') {
+    if (activeMenu === 'chatflows') {
       fetchAvailableWorkflows();
+    } else if (activeMenu === 'deployment') {
+      fetchDeployments();
     } else if (
       activeMenu === 'ai-language' ||
       activeMenu === 'ai-embedding' ||
@@ -243,15 +266,32 @@ const WorkspacePage: React.FC = () => {
       );
     }
 
-    const handleNewDeployment = () => {
-      // Implement new agent creation logic
-      console.log('Create new deployment clicked');
+
+
+    const handleDeleteDeployment = async (deploymentId: string) => {
+      if (window.confirm('Are you sure you want to delete this deployment?')) {
+        try {
+          await deleteDeployment(deploymentId);
+        } catch (error) {
+          alert(`Error deleting deployment: ${(error as Error).message}`);
+        }
+      }
     };
 
-    const handleDeleteDeployment = async (deploymentName: string, event: React.MouseEvent) => {
-      event.stopPropagation();
-      // Implement delete agent logic
-      console.log(`Delete deployment ${deploymentName} clicked`);
+    const handleActivateDeployment = async (deploymentId: string) => {
+      try {
+        await activateDeployment(deploymentId);
+      } catch (error) {
+        alert(`Error activating deployment: ${(error as Error).message}`);
+      }
+    };
+
+    const handleDeactivateDeployment = async (deploymentId: string) => {
+      try {
+        await deactivateDeployment(deploymentId);
+      } catch (error) {
+        alert(`Error deactivating deployment: ${(error as Error).message}`);
+      }
     };
     
     switch (activeMenu) {
@@ -269,12 +309,12 @@ const WorkspacePage: React.FC = () => {
       case 'deployment':
         return (
           <DeploymentList
-            getWorkflowAsJSONString={getWorkflowAsJSONString}
-            availableDeployments={availableWorkflows}
-            isLoading={isStoreLoading}
-            loadError={loadError}
-            handleNewDeployment={handleNewDeployment}
+            deployments={deployments}
+            isLoading={isLoadingDeployments}
+            loadError={loadErrorDeployments}
             handleDeleteDeployment={handleDeleteDeployment}
+            handleActivateDeployment={handleActivateDeployment}
+            handleDeactivateDeployment={handleDeactivateDeployment}
           />
         );        
       case 'rag':
