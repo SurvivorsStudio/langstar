@@ -1063,6 +1063,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송
             memory_type: memoryTypeForAPI, // This sends the actual memory type string
+            memory_option: memoryGroup?.memoryOption || {}, // 메모리 옵션 추가
             return_key: finalAgentOutputVariable // API에 Output Variable 값을 "return_key"로 전달
           } as any; // chat_id를 동적으로 추가하기 위해 any 타입으로 캐스팅
 
