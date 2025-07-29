@@ -52,12 +52,12 @@ export const nodeCategories: NodeCategory[] = [
         description: 'Execute custom Python function',
         icon: (className = '') => <FileCode size={20} className={className} />
       },
-      {
-        type: 'toolsMemoryNode',
-        label: 'Tools&Memory',
-        description: 'Tools and Memory groups management',
-        icon: (className = '') => <FolderOpen size={20} className={className} />
-      },
+                  {
+              type: 'toolsMemoryNode',
+              label: 'Tools',
+              description: 'Tools groups management',
+              icon: (className = '') => <FolderOpen size={20} className={className} />
+            },
       {
         type: 'mergeNode',
         label: 'Merge',

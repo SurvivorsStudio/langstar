@@ -319,12 +319,14 @@ def node_{function_name}(state):
 
 def condition_node_code( node, node_id_to_node_label ) :
     node_name = node['data']['label']
-    condition_config = node['data']['config']['conditions']
-    
-    code = condition_sub1_node_code( node_name, condition_config )
-    code += condition_sub2_node_code( node_name, condition_config )
-    
-    return code
+    condition_config = []
+    for row in node['data']['config']['conditions']:
+        row['next_node'] = [node_id_to_node_label[row['targetNodeId']]]  # 여기서 next_node 추가!
+        condition_config.append(row)
+    code = ""
+    code += condition_sub1_node_code(node_name, condition_config)
+    code += condition_sub2_node_code(node_name, condition_config)
+    return code 
 
 # create_function_node
 def python_function_node_code( node ):
@@ -373,12 +375,15 @@ def agent_node_code( node ):
     )
         
     # memory_type = node['data']['config']['memoryGroup']['memoryType']
-    memory_type = (
+    memory_group = (
     node.get('data', {})
         .get('config', {})
         .get('memoryGroup', {})
-        .get('memoryType', '')
     )
+    
+    memory_type = ''
+    if isinstance(memory_group, dict) and memory_group.get('memoryType'):
+        memory_type = memory_group.get('memoryType', '')
 
     if provider == "aws": 
         if memory_type =="" and len(tools) == 0: 

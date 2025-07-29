@@ -75,9 +75,8 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     }
   }, [nodes, edges, nodeId, getNodeById]); // getNodeById는 store에서 오므로 직접적인 의존성은 아니지만, nodes/edges 변경 시 재계산 필요
 
-  // Get all groups nodes and extract memory and tools groups
+  // Get all groups nodes and extract tools groups
   const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
-  const memoryGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'memory') || [];
   const toolsGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'tools') || [];
 
   // Get selected tools from node config
@@ -174,17 +173,36 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   };
 
 
-  const handleMemoryGroupChange = (groupId: string) => {
-    const selectedGroup = memoryGroups.find(g => g.id === groupId);
-    const memoryTypeString = selectedGroup?.memoryType || '';
-
+  const handleMemoryTypeChange = (value: string) => {
     updateNodeData(nodeId, {
       config: {
-        ...node?.data.config, // 기존 값 보존
-        memoryGroup: groupId,
-        memoryTypeString: memoryTypeString
+        ...node?.data.config,
+        memoryGroup: {
+          id: 'group-1751010925148',
+          name: 'New Memory Group',
+          memoryType: value,
+          memoryOption: value === 'ConversationBufferWindowMemory' ? { k: 5 } : {}
+        }
       }
     });
+  };
+
+  const handleMemoryOptionKChange = (value: string) => {
+    const currentMemoryGroup = node?.data.config?.memoryGroup;
+    if (currentMemoryGroup) {
+      updateNodeData(nodeId, {
+        config: {
+          ...node?.data.config,
+          memoryGroup: {
+            ...currentMemoryGroup,
+            memoryOption: {
+              ...currentMemoryGroup.memoryOption,
+              k: parseInt(value) || 5
+            }
+          }
+        }
+      });
+    }
   };
 
   const toggleTool = (toolId: string) => {
@@ -224,7 +242,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const selectedConnection = activeConnections.find(conn => conn.id === selectedModelId);
 
-  const selectedMemoryGroup = memoryGroups.find(g => g.id === node?.data.config?.memoryGroup);
+
 
   return (
     <div className="space-y-6">
@@ -386,35 +404,45 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-            Memory Group
+            Memory Type
           </label>
           <CustomSelect
-            value={node?.data.config?.memoryGroup || ''}
-            onChange={handleMemoryGroupChange}
-            options={memoryGroups.map(group => ({ value: group.id, label: group.name }))}
-            placeholder="Select memory group"
-            disabled={memoryGroups.length === 0}
+            value={node?.data.config?.memoryGroup?.memoryType || ''}
+            onChange={handleMemoryTypeChange}
+            options={[
+              { value: 'ConversationBufferMemory', label: 'Conversation Buffer Memory' },
+              { value: 'ConversationBufferWindowMemory', label: 'Conversation Buffer Window Memory' }
+            ]}
+            placeholder="Select memory type"
           />
-          {node?.data.config?.memoryGroup && (
+          {node?.data.config?.memoryGroup?.memoryType && (
             <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md space-y-1">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Name</span>
-                <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
-                  {selectedMemoryGroup?.name || 'Unknown'}
-                </span>
-              </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Type</span>
                 <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
-                  {selectedMemoryGroup?.memoryType || 'Unknown'}
+                  {node?.data.config?.memoryGroup?.memoryType}
                 </span>
               </div>
+              {node?.data.config?.memoryGroup?.memoryType === 'ConversationBufferWindowMemory' && (
+                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                    Window Size (k)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={node?.data.config?.memoryGroup?.memoryOption?.k || 5}
+                    onChange={(e) => handleMemoryOptionKChange(e.target.value)}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    placeholder="5"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Number of conversation turns to keep in memory
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-          {memoryGroups.length === 0 && (
-            <p className="text-xs text-amber-500">
-              No memory groups found. Add memory groups in the Groups node.
-            </p>
           )}
         </div>
 

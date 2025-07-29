@@ -28,7 +28,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
 
   // ToolsMemoryNode일 경우, 설정에서 그룹 목록 가져오기
   const groups: any[] = data.config?.groups || [];
-  const memoryGroups = groups.filter((g: any) => g.type === 'memory');
   const toolsGroups = groups.filter((g: any) => g.type === 'tools');
 
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
@@ -197,22 +196,21 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    * @param {'memory' | 'tools'} type - 그룹 타입 ('memory' 또는 'tools').
    * @returns {boolean} 이름이 존재하면 true, 그렇지 않으면 false.
    */
-  const checkNameExists = (name: string, type: 'memory' | 'tools'): boolean => {
-    const existingGroups = groups.filter((g: any) => g.type === type);
+  const checkNameExists = (name: string): boolean => {
+    const existingGroups = groups.filter((g: any) => g.type === 'tools');
     return existingGroups.some((g: any) => g.name.toLowerCase() === name.toLowerCase());
   };
 
   /**
    * 새로운 그룹을 추가합니다.
    * 그룹 이름이 중복되지 않도록 기본 이름에 숫자를 붙여 생성합니다.
-   * @param {'memory' | 'tools'} type - 생성할 그룹의 타입.
    */
-  const handleAddGroup = (type: 'memory' | 'tools') => {
-    const defaultName = `New ${type === 'memory' ? 'Memory' : 'Tools'} Group`;
+  const handleAddGroup = () => {
+    const defaultName = 'New Tools Group';
     let newName = defaultName;
     let counter = 1;
     // 중복되지 않는 이름 찾기
-    while (checkNameExists(newName, type)) {
+    while (checkNameExists(newName)) {
       newName = `${defaultName} ${counter}`;
       counter++;
     }
@@ -222,8 +220,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       name: newName,
       description: '',
       nodes: [],
-      type,
-      ...(type === 'memory' && { memoryType: 'ConversationBufferMemory' }) // memory 그룹일 때만 기본값 추가
+      type: 'tools'
     };
     // 노드 데이터 업데이트 (새 그룹 추가)
     updateNodeData(id, {
@@ -254,15 +251,14 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   };
 
   /**
-   * 지정된 타입의 그룹 목록을 렌더링합니다.
+   * 도구 그룹 목록을 렌더링합니다.
    * @param {any[]} groups - 렌더링할 그룹 객체 배열.
-   * @param {'memory' | 'tools'} type - 그룹 타입.
    * @returns {JSX.Element} 그룹 목록을 나타내는 JSX.
    */
-  const renderGroups = (groups: any[], type: 'memory' | 'tools') => (
+  const renderGroups = (groups: any[]) => (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-gray-700 dark:text-gray-300">{type === 'memory' ? 'Memory' : 'Tools'}</span>
+        <span className="font-medium text-gray-700 dark:text-gray-300">Tools</span>
       </div>
       {groups.map((group) => (
         <div 
@@ -290,11 +286,11 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
         </div>
       ))}
       <button
-        onClick={() => handleAddGroup(type)}
+        onClick={() => handleAddGroup()}
         className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
       >
         <Plus size={14} className="mr-1" />
-        Add {type === 'memory' ? 'Memory' : 'Tools'} Group
+        Add Tools Group
       </button>
     </div>
   );
@@ -405,11 +401,10 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{data.description}</div>
       )}
 
-      {/* ToolsMemoryNode일 경우 메모리 및 도구 그룹 렌더링 */}
+      {/* ToolsMemoryNode일 경우 도구 그룹 렌더링 */}
       {isToolsMemoryNode && (
         <div className="mt-4 space-y-4">
-          {renderGroups(memoryGroups, 'memory')}
-          {renderGroups(toolsGroups, 'tools')}
+          {renderGroups(toolsGroups)}
         </div>
       )}
 
