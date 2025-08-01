@@ -14,11 +14,15 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
   const node = nodes.find(n => n.id === nodeId);
   const groups = (node?.data.config?.groups as Group[]) || [];
   const [nameError, setNameError] = useState<string | null>(null);
+  const [nameValidationError, setNameValidationError] = useState<string | null>(null);
   
   useEffect(() => {
     const selectedGroupId = (node?.data as NodeData)?.selectedGroupId;
     if (selectedGroupId) {
       setSelectedGroupId(selectedGroupId);
+      // 그룹이 변경될 때 에러 상태 초기화
+      setNameError(null);
+      setNameValidationError(null);
     }
   }, [(node?.data as NodeData)?.selectedGroupId]);
 
@@ -32,9 +36,23 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
     );
   };
 
+  const validateEnglishName = (name: string): boolean => {
+    // 영어 문자, 숫자, 공백, 언더스코어만 허용
+    const englishRegex = /^[a-zA-Z0-9_\s]+$/;
+    return englishRegex.test(name);
+  };
+
   const handleUpdateGroup = (groupId: string, updates: Partial<Group>) => {
     if ('name' in updates) {
       const newName = updates.name as string;
+      
+      // 영어 이름 검증
+      if (!validateEnglishName(newName)) {
+        setNameValidationError('Group name must contain only English letters, numbers, spaces, and underscores');
+        return;
+      }
+      setNameValidationError(null);
+      
       if (checkNameExists(newName, groupId)) {
         setNameError('A group with this name already exists');
         return;
@@ -99,12 +117,18 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
               value={selectedGroup.name}
               onChange={(e) => handleUpdateGroup(selectedGroup.id, { name: e.target.value })}
               className={`w-full px-3 py-2 border ${
-                nameError ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                nameError || nameValidationError ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
               } rounded-md focus:outline-none focus:ring-2 ${
-                nameError ? 'focus:ring-red-500' : 'focus:ring-blue-500'
+                nameError || nameValidationError ? 'focus:ring-red-500' : 'focus:ring-blue-500'
               } text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
-              placeholder="Enter group name"
+              placeholder="Enter group name (English only)"
             />
+            {nameValidationError && (
+              <p className="mt-1 text-xs text-red-500 flex items-center">
+                <AlertCircle size={12} className="mr-1" />
+                {nameValidationError}
+              </p>
+            )}
             {nameError && (
               <p className="mt-1 text-xs text-red-500 flex items-center">
                 <AlertCircle size={12} className="mr-1" />

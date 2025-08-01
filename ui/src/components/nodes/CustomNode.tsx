@@ -285,7 +285,17 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
             </div>
           </div>
           {group.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{group.description}</p>
+            <p 
+              className="text-xs text-gray-500 dark:text-gray-400 mt-1 overflow-hidden"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 10,
+                WebkitBoxOrient: 'vertical',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {group.description}
+            </p>
           )}
         </div>
       ))}
