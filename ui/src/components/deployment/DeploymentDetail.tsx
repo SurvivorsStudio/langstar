@@ -13,6 +13,7 @@ import Editor from '@monaco-editor/react';
 import { Deployment, DeploymentStatus } from '../../types/deployment';
 import ExecutionList from '../execution/ExecutionList';
 import ExecutionDetail from '../execution/ExecutionDetail.tsx';
+import { useThemeStore } from '../../store/themeStore';
 
 interface Execution {
   id: string;
@@ -29,6 +30,7 @@ interface Execution {
 const DeploymentDetail: React.FC = () => {
   const { deploymentId } = useParams<{ deploymentId: string }>();
   const navigate = useNavigate();
+  const { isDarkMode } = useThemeStore();
   
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [activeTab, setActiveTab] = useState<'executions'>('executions');
@@ -265,7 +267,7 @@ const DeploymentDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 bg-gray-50 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -273,11 +275,11 @@ const DeploymentDetail: React.FC = () => {
 
   if (error || !deployment) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error</h3>
-          <p className="text-gray-600">{error || 'Deployment not found'}</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Error</h3>
+          <p className="text-gray-600 dark:text-gray-400">{error || 'Deployment not found'}</p>
           <button
             onClick={() => navigate('/workspace')}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -290,21 +292,21 @@ const DeploymentDetail: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/workspace')}
-                className="p-2 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100"
+                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{deployment.name}</h1>
-                <p className="text-sm text-gray-500">Deployment Details</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{deployment.name}</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Deployment Details</p>
               </div>
             </div>
 
@@ -312,28 +314,28 @@ const DeploymentDetail: React.FC = () => {
         </div>
 
         {/* Deployment Info */}
-        <div className="px-6 py-4 bg-gray-50">
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-gray-500">Name:</span>
-              <p className="font-mono text-xs text-gray-700 mt-1">
+              <span className="text-gray-500 dark:text-gray-400">Name:</span>
+              <p className="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">
                 {deployment.workflowName || 'Unknown Workflow'}:{deployment.name}
               </p>
             </div>
             <div>
-              <span className="text-gray-500">ID:</span>
-              <p className="mt-1">{deployment.id}</p>
+              <span className="text-gray-500 dark:text-gray-400">ID:</span>
+              <p className="mt-1 text-gray-900 dark:text-gray-100">{deployment.id}</p>
             </div>
             <div>
-              <span className="text-gray-500">Status:</span>
+              <span className="text-gray-500 dark:text-gray-400">Status:</span>
               <div className="flex items-center space-x-2 mt-1">
                 {getStatusIcon(deployment.status)}
-                <span>{getStatusText(deployment.status)}</span>
+                <span className="text-gray-900 dark:text-gray-100">{getStatusText(deployment.status)}</span>
               </div>
             </div>
             <div>
-              <span className="text-gray-500">Creation date:</span>
-              <p className="mt-1">{new Date(deployment.createdAt).toLocaleString()}</p>
+              <span className="text-gray-500 dark:text-gray-400">Creation date:</span>
+              <p className="mt-1 text-gray-900 dark:text-gray-100">{new Date(deployment.createdAt).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -341,7 +343,7 @@ const DeploymentDetail: React.FC = () => {
         {/* Tabs */}
         <div className="px-6">
           <nav className="flex space-x-8">
-            <button className="flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600">
+            <button className="flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600 dark:text-blue-400">
               <Activity className="w-4 h-4" />
               <span>Executions</span>
             </button>
@@ -356,10 +358,10 @@ const DeploymentDetail: React.FC = () => {
 
 
             {/* Execution History */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b border-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Execution History</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Execution History</h3>
                   <button
                     onClick={handleStartExecution}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-2"
@@ -374,7 +376,7 @@ const DeploymentDetail: React.FC = () => {
                   <div className="flex items-center justify-center py-12">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Loading execution details...</p>
+                      <p className="text-gray-600 dark:text-gray-400">Loading execution details...</p>
                     </div>
                   </div>
                 ) : selectedExecution ? (
@@ -397,19 +399,19 @@ const DeploymentDetail: React.FC = () => {
         {/* Execution Modal */}
         {isExecutionModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     Execute Deployment: {deployment?.name}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     Configure input data and execute the workflow
                   </p>
                 </div>
                 <button
                   onClick={() => setIsExecutionModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <XCircle className="w-6 h-6" />
                 </button>
@@ -417,7 +419,7 @@ const DeploymentDetail: React.FC = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Input Data (JSON) <span className="text-red-500">*</span>
                   </label>
                   <Editor
@@ -431,21 +433,21 @@ const DeploymentDetail: React.FC = () => {
                     options={{
                       minimap: { enabled: false },
                       fontSize: 12,
-                      theme: 'vs-light',
+                      theme: isDarkMode ? 'vs-dark' : 'vs-light',
                       lineNumbers: 'on',
                       folding: true,
                       wordWrap: 'on'
                     }}
                   />
                   {inputError && (
-                    <div className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
+                    <div className="mt-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800">
                       <div className="flex items-center space-x-2">
                         <XCircle className="w-4 h-4" />
                         <span>{inputError}</span>
                       </div>
                     </div>
                   )}
-                  <div className="mt-2 text-xs text-gray-500">
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     * Required variables are automatically populated based on the workflow's Start node configuration.
                   </div>
                 </div>
@@ -454,7 +456,7 @@ const DeploymentDetail: React.FC = () => {
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     onClick={() => setIsExecutionModalOpen(false)}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
                     disabled={isExecuting}
                   >
                     Cancel

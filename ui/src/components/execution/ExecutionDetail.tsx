@@ -29,6 +29,7 @@ import ReactFlow, {
   Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { useThemeStore } from '../../store/themeStore';
 
 interface Execution {
   id: string;
@@ -56,7 +57,7 @@ interface ExecutionDetailProps {
 
 // Execution용 커스텀 노드 컴포넌트
 const ExecutionNode = ({ data, isConnectable }: any) => {
-  const { status, nodeLog } = data;
+  const { status, nodeLog, getNodeColorClass } = data;
   const [expandedInput, setExpandedInput] = useState(false);
   const [expandedOutput, setExpandedOutput] = useState(false);
   
@@ -90,27 +91,9 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
     }
   };
 
-  const getNodeColorClass = (nodeType: string, status: string) => {
-    if (status === 'failed') return 'bg-red-100 border-red-300 text-red-800';
-    if (status === 'running') return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-    if (status === 'succeeded') {
-      switch (nodeType) {
-        case 'startNode':
-          return 'bg-green-100 border-green-300 text-green-800';
-        case 'promptNode':
-          return 'bg-blue-100 border-blue-300 text-blue-800';
-        case 'endNode':
-          return 'bg-purple-100 border-purple-300 text-purple-800';
-        default:
-          return 'bg-green-100 border-green-300 text-green-800';
-      }
-    }
-    return 'bg-gray-100 border-gray-300 text-gray-800';
-  };
-
   return (
     <div 
-      className={`bg-white rounded-lg border-2 shadow-lg transition-all duration-300 hover:shadow-xl ${getNodeColorClass(data.nodeType, status)} ${data.selected ? 'ring-4 ring-blue-400 ring-opacity-50 shadow-2xl scale-105' : ''}`} 
+      className={`bg-white dark:bg-gray-800 rounded-lg border-2 shadow-lg transition-all duration-300 hover:shadow-xl ${getNodeColorClass(data.nodeType, status)} ${data.selected ? 'ring-4 ring-blue-400 ring-opacity-50 shadow-2xl scale-105' : ''}`} 
       style={{ width: '100%', height: '100%', boxSizing: 'border-box' }}
     >
       {/* Input Handle (Top Center) */}
@@ -121,10 +104,10 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
       />
       
       {/* Node Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200">
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-600">
         <div className="flex items-center space-x-2">
           {getNodeIcon(data.nodeType)}
-          <span className="font-medium text-gray-900">{data.label}</span>
+          <span className="font-medium text-gray-900 dark:text-gray-100">{data.label}</span>
         </div>
         <div className="flex items-center space-x-1">
           {getNodeStatusIcon(status)}
@@ -133,7 +116,7 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
 
       {/* Node Content */}
       <div className="p-3 flex-1 flex flex-col">
-        <p className="text-sm text-gray-600 mb-2">{data.description || 'No description'}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{data.description || 'No description'}</p>
         
 
         
@@ -145,15 +128,15 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
               <div className="text-xs">
                 <button 
                   onClick={() => setExpandedInput(!expandedInput)}
-                  className="flex items-center space-x-1 text-gray-700 hover:text-gray-900 transition-colors"
+                  className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                 >
                   {expandedInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   <span className="font-medium">Input:</span>
-                  <span className="text-gray-500">({Object.keys(nodeLog.input_data).length} fields)</span>
+                  <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.input_data).length} fields)</span>
                 </button>
                 {expandedInput && (
-                  <div className="bg-gray-50 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200">
-                    <pre className="text-xs">{JSON.stringify(nodeLog.input_data, null, 2)}</pre>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-600">
+                    <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.input_data, null, 2)}</pre>
                   </div>
                 )}
               </div>
@@ -163,15 +146,15 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
               <div className="text-xs">
                 <button 
                   onClick={() => setExpandedOutput(!expandedOutput)}
-                  className="flex items-center space-x-1 text-gray-700 hover:text-gray-900 transition-colors"
+                  className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                 >
                   {expandedOutput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   <span className="font-medium">Output:</span>
-                  <span className="text-gray-500">({Object.keys(nodeLog.output_data).length} fields)</span>
+                  <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.output_data).length} fields)</span>
                 </button>
                 {expandedOutput && (
-                  <div className="bg-gray-50 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200">
-                    <pre className="text-xs">{JSON.stringify(nodeLog.output_data, null, 2)}</pre>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-600">
+                    <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.output_data, null, 2)}</pre>
                   </div>
                 )}
               </div>
@@ -204,9 +187,28 @@ const nodeTypes: NodeTypes = {
 
 
 const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) => {
+  const { isDarkMode } = useThemeStore();
   const [detailedLogs, setDetailedLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
+  const getNodeColorClass = (nodeType: string, status: string) => {
+    if (status === 'failed') return isDarkMode ? 'bg-red-900/20 border-red-600 text-red-300' : 'bg-red-100 border-red-300 text-red-800';
+    if (status === 'running') return isDarkMode ? 'bg-yellow-900/20 border-yellow-600 text-yellow-300' : 'bg-yellow-100 border-yellow-300 text-yellow-800';
+    if (status === 'succeeded') {
+      switch (nodeType) {
+        case 'startNode':
+          return isDarkMode ? 'bg-green-900/20 border-green-600 text-green-300' : 'bg-green-100 border-green-300 text-green-800';
+        case 'promptNode':
+          return isDarkMode ? 'bg-blue-900/20 border-blue-600 text-blue-300' : 'bg-blue-100 border-blue-300 text-blue-800';
+        case 'endNode':
+          return isDarkMode ? 'bg-purple-900/20 border-purple-600 text-purple-300' : 'bg-purple-100 border-purple-300 text-purple-800';
+        default:
+          return isDarkMode ? 'bg-green-900/20 border-green-600 text-green-300' : 'bg-green-100 border-green-300 text-green-800';
+      }
+    }
+    return isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-800';
+  };
 
 
 
@@ -254,7 +256,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status: 'succeeded',
             nodeLog: null,
             config: {},
-            selected: selectedNodeId === 'start'
+            selected: selectedNodeId === 'start',
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         },
@@ -269,7 +272,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status: 'succeeded',
             nodeLog: null,
             config: {},
-            selected: selectedNodeId === 'end'
+            selected: selectedNodeId === 'end',
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         }
@@ -282,7 +286,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
           target: 'end',
           type: 'default',
           style: { 
-            stroke: '#6B7280', 
+            stroke: isDarkMode ? '#9CA3AF' : '#6B7280', 
             strokeWidth: 2, 
             strokeDasharray: '5,5',
             animation: 'flowAnimation 2s linear infinite'
@@ -340,7 +344,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status,
             nodeLog,
             config: node.data?.config || {},
-            selected: selectedNodeId === node.id
+            selected: selectedNodeId === node.id,
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         });
@@ -365,7 +370,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status,
             nodeLog,
             config: node.data?.config || {},
-            selected: selectedNodeId === node.id
+            selected: selectedNodeId === node.id,
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         });
@@ -399,7 +405,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status,
             nodeLog,
             config: node.data?.config || {},
-            selected: selectedNodeId === node.id
+            selected: selectedNodeId === node.id,
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         });
@@ -424,7 +431,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status,
             nodeLog,
             config: node.data?.config || {},
-            selected: selectedNodeId === node.id
+            selected: selectedNodeId === node.id,
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         });
@@ -467,7 +475,8 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
             status,
             nodeLog,
             config: node.data?.config || {},
-            selected: selectedNodeId === node.id
+            selected: selectedNodeId === node.id,
+            getNodeColorClass
           },
           style: { width: nodeWidth, height: nodeHeight }
         };
@@ -481,7 +490,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
       target: edge.target,
       type: 'default',
       style: { 
-        stroke: '#6B7280', 
+        stroke: isDarkMode ? '#9CA3AF' : '#6B7280', 
         strokeWidth: 2, 
         strokeDasharray: '5,5',
         animation: 'flowAnimation 2s linear infinite'
@@ -712,32 +721,32 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={onBack}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <ArrowLeft className="w-5 h-5" />
               <span>Back to Executions</span>
             </button>
-            <div className="h-6 w-px bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
             <div className="flex items-center space-x-3">
               {getStatusIcon(execution.status)}
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   Execution {execution.id}
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {getStatusText(execution.status)} • {formatDateTime(execution.start_time)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-4 text-sm text-gray-600">
+          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
             <span>Duration: {formatDuration(execution.duration_ms)}</span>
           </div>
         </div>
@@ -746,12 +755,12 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
       {/* Main Content - 2 Column Layout */}
       <div className="flex-1 flex">
         {/* Left Panel - Workflow Graph */}
-        <div className="w-1/2 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Workflow Graph</h3>
+        <div className="w-1/2 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Workflow Graph</h3>
           </div>
           <div className="flex-1 p-6">
-            <div className="relative bg-gray-50 rounded-lg h-full">
+            <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg h-full">
               <style>
                 {`
                   @keyframes flowAnimation {
@@ -769,13 +778,13 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                   
                   /* 화살표 마커 스타일 */
                   .react-flow__edge-marker {
-                    fill: #6B7280;
+                    fill: ${isDarkMode ? '#9CA3AF' : '#6B7280'};
                   }
                   
                   /* Handle 위치 조정 */
                   .react-flow__handle {
                     border: none !important;
-                    background: #6B7280 !important;
+                    background: ${isDarkMode ? '#9CA3AF' : '#6B7280'} !important;
                     width: 6px !important;
                     height: 6px !important;
                     border-radius: 50% !important;
@@ -832,21 +841,21 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                   }
                 `}
               </style>
-              <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-                <defs>
-                  <marker
-                    id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="9"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto"
-                  >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7280" />
-                  </marker>
-                </defs>
-              </svg>
+                                <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+                    <defs>
+                      <marker
+                        id="arrow"
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="6"
+                        markerHeight="6"
+                        orient="auto"
+                      >
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill={isDarkMode ? "#9CA3AF" : "#6B7280"} />
+                      </marker>
+                    </defs>
+                  </svg>
               {nodes.length > 0 ? (
                 <>
                   {/* <div className="absolute top-2 left-2 z-10 bg-white p-2 rounded text-xs">
@@ -893,7 +902,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                       variant={BackgroundVariant.Dots}
                       gap={20}
                       size={1}
-                      color="#e5e7eb"
+                      color={isDarkMode ? "#374151" : "#e5e7eb"}
                     />
                     <Controls />
                     <MiniMap
@@ -912,7 +921,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                 </>
               ) : (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">No workflow snapshot available</p>
+                  <p className="text-gray-500 dark:text-gray-400">No workflow snapshot available</p>
                 </div>
               )}
             </div>
@@ -920,9 +929,9 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
         </div>
 
         {/* Right Panel - Execution Timeline and Node Details */}
-        <div className="w-1/2 bg-gray-900 text-white flex flex-col">
+        <div className="w-1/2 bg-gray-900 dark:bg-gray-950 text-white flex flex-col">
           {/* Header Section */}
-          <div className="p-4 border-b border-gray-700">
+          <div className="p-4 border-b border-gray-700 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center space-x-2">
@@ -1190,7 +1199,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
           </div>
 
           {/* Footer Section */}
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-gray-700 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <span className={`px-2 py-1 text-white text-xs rounded ${

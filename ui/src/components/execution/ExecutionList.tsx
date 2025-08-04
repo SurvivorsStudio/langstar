@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, RefreshCw, Eye, Clock, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { useThemeStore } from '../../store/themeStore';
 
 interface Execution {
   id: string;
@@ -24,6 +25,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
   workflowName,
   onExecutionSelect
 }) => {
+  const { isDarkMode } = useThemeStore();
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -248,15 +250,15 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {workflowName} - Executions
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {executions.length} executions
             </p>
           </div>
@@ -274,7 +276,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
             )}
             <button
               onClick={fetchExecutions}
-              className="p-2 text-gray-500 hover:text-gray-700"
+              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
@@ -284,19 +286,19 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-4">
           <input
             type="text"
             placeholder="Filter executions by property or value"
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           />
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All</option>
             <option value="running">Running</option>
@@ -307,7 +309,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
           <select
             value={filters.timeRange}
             onChange={(e) => setFilters({ ...filters, timeRange: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           >
             <option value="last-15-months">Last 15 months</option>
             <option value="last-30-days">Last 30 days</option>
@@ -319,45 +321,45 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
 
       {/* Executions Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 <input
                   type="checkbox"
                   checked={selectedExecutions.size === executions.length && executions.length > 0}
                   onChange={handleSelectAll}
                   onClick={(e) => e.stopPropagation()}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-600"
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Start Time
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Duration
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   Loading executions...
                 </td>
               </tr>
             ) : executions.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No executions found
                 </td>
               </tr>
@@ -365,7 +367,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
               executions.map((execution) => (
                 <tr
                   key={execution.id}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => onExecutionSelect(execution)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -377,24 +379,24 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
                         handleSelectExecution(execution.id);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-600"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-800">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                     {execution.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(execution.status)}
-                      <span className="text-sm text-gray-900">
+                      <span className="text-sm text-gray-900 dark:text-gray-100">
                         {getStatusText(execution.status)}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {formatDateTime(execution.start_time)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {formatDuration(execution.duration_ms)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
