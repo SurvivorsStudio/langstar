@@ -3,6 +3,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
+from langchain.agents import create_tool_calling_agent, AgentExecutor
 import types
 import uuid
 import ast
@@ -26,9 +27,12 @@ logger = logging.getLogger(__name__)
 flower_manager = flower_manager.FlowerManager()
 
 def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[]):
+    
+    
     # 도구 없이, 메모리 없이
     llm = ChatBedrockConverse(
-            model=modelName,
+            # model=modelName,
+            model='us.anthropic.claude-3-5-sonnet-20241022-v2:0',
             temperature=temperature,
             max_tokens=max_token
         )
@@ -63,11 +67,23 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             ("placeholder", "{agent_scratchpad}"),
         ])
 
-        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
+        tools = [WorkflowService.create_tool_from_api(**tool_data) for tool_data in tool_info]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+        
+        # 안전한 응답 파싱
+        try:
+            response_text = response["output"][0]['text']
+            if '</thinking>\n\n' in response_text:
+                response = response_text.split('</thinking>\n\n')[1]
+            else:
+                response = response_text
+        except (KeyError, IndexError) as e:
+            logger.warning(f"Failed to parse response with expected format: {e}")
+            # fallback: 전체 응답 반환
+            response = str(response)
+        
         return response
 
     # 도구 있어, 메모리 있어
@@ -79,11 +95,23 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             ("placeholder", "{agent_scratchpad}"),
         ])
 
-        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
+        tools = [WorkflowService.create_tool_from_api(**tool_data) for tool_data in tool_info]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, memory=memory, verbose=False)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+        
+        # 안전한 응답 파싱
+        try:
+            response_text = response["output"][0]['text']
+            if '</thinking>\n\n' in response_text:
+                response = response_text.split('</thinking>\n\n')[1]
+            else:
+                response = response_text
+        except (KeyError, IndexError) as e:
+            logger.warning(f"Failed to parse response with expected format: {e}")
+            # fallback: 전체 응답 반환
+            response = str(response)
+        
         return response
 
 
@@ -193,6 +221,14 @@ class WorkflowService:
         """Create LangChain Tool from API string"""
         try:
             logger.info(f"Creating tool: {tool_name}")
+            
+            # Sanitize tool name to match AWS Bedrock requirements: [a-zA-Z0-9_-]+
+            import re
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_-]', '_', tool_name)
+            if sanitized_name != tool_name:
+                logger.warning(f"Tool name '{tool_name}' sanitized to '{sanitized_name}' for AWS Bedrock compatibility")
+                tool_name = sanitized_name
+            
             tool_namespace = {}
 
             exec(tool_code, tool_namespace)
@@ -208,11 +244,19 @@ class WorkflowService:
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
-            tool = Tool.from_function(
+            # tool = Tool.from_function(
+            #     name=tool_name,
+            #     description=tool_description,
+            #     func=tool_func
+            # )
+
+            tool = StructuredTool.from_function(
                 name=tool_name,
                 description=tool_description,
                 func=tool_func
             )
+
+            
             logger.info(f"Tool {tool_name} created successfully")
             return tool
         except Exception as e:
@@ -250,6 +294,9 @@ class WorkflowService:
                 
                 
             if msg['model']['providerName'] == 'aws' : 
+                print("---------------------------------")
+                print( tools ) 
+                print("---------------------------------")
                 return run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory, tools )
                 
             elif msg['providerName'] == 'openai' : 

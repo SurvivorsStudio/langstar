@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, X, Search, Sun, Moon } from 'lucide-react';
 import { nodeCategories } from '../data/nodeCategories';
 import { useThemeStore } from '../store/themeStore';
+import { useFlowStore } from '../store/flowStore';
 
 interface NodeSidebarProps {
   onClose: () => void;
@@ -9,10 +10,14 @@ interface NodeSidebarProps {
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+  const { nodes } = useFlowStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     'Sequential Agents': true
   });
+
+  // 현재 워크플로우에 tool 노드가 이미 존재하는지 확인
+  const hasToolsNode = nodes.some(node => node.type === 'toolsMemoryNode');
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
@@ -85,22 +90,34 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
             </button>
             {expandedCategories[category.title] && (
               <div className="px-4 pb-3">
-                {category.nodes.map((node) => (
-                  <div
-                    key={node.type}
-                    className="flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
-                    draggable
-                    onDragStart={(event) => handleNodeDragStart(event, node.type, node.label)}
-                  >
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
-                      {node.icon(isDarkMode ? 'text-white' : 'text-gray-700')}
+                {category.nodes.map((node) => {
+                  // tool 노드가 이미 존재하고 현재 노드가 tool 노드인 경우 비활성화
+                  const isDisabled = node.type === 'toolsMemoryNode' && hasToolsNode;
+                  
+                  return (
+                    <div
+                      key={node.type}
+                      className={`flex flex-row items-center p-2 rounded-md mb-2 ${
+                        isDisabled 
+                          ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' 
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                      }`}
+                      draggable={!isDisabled}
+                      onDragStart={isDisabled ? undefined : (event) => handleNodeDragStart(event, node.type, node.label)}
+                      title={isDisabled ? 'Only one Tools node is allowed per workflow' : undefined}
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
+                        {node.icon(isDarkMode ? 'text-white' : 'text-gray-700')}
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{node.label}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                          {isDisabled ? 'Already exists in workflow' : node.description}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-start">
-                      <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{node.label}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 text-left">{node.description}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

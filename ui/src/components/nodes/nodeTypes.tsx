@@ -76,17 +76,7 @@ const PromptNode = (props: any) => (
   />
 );
 
-const SystemPromptNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Settings size={16} />,
-      nodeType: 'systemPromptNode',
-      description: 'Define system and user prompts for LLM interaction'
-    }}
-  />
-);
+
 
 const ToolsMemoryNode = (props: any) => (
   <CustomNode 
@@ -143,7 +133,6 @@ export const nodeTypes = {
   startNode: StartNode,
   endNode: EndNode,
   promptNode: PromptNode,
-  systemPromptNode: SystemPromptNode,
   toolsMemoryNode: ToolsMemoryNode,
   embeddingNode: EmbeddingNode,
   ragNode: RAGNode,

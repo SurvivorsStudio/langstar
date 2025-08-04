@@ -32,7 +32,7 @@ export interface NodeData {
       defaultValue: any;
       selectVariable: string;
     }>;
-    repetitions?: number;
+
     template?: string;
     model?: string | AIConnection | { connName: string; providerName: string; modelName: string; apiKey: string | undefined; };
     inputColumn?: string;
@@ -119,6 +119,7 @@ export interface FlowState {
   fetchAvailableWorkflows: () => Promise<void>;
   deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
   renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
+  copyWorkflows: (workflowNames: string[]) => Promise<void>; // 워크플로 복사 함수 추가
 
   getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
   
@@ -135,11 +136,7 @@ export interface FlowState {
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
 
-  // 클립보드 관련 상태
-  clipboardNodes: Node<NodeData>[];
-  clipboardEdges: Edge[];
-  copyNodes: (nodeIds: string[]) => void;
-  pasteNodes: () => void;
+
 
   // 배포 관련 상태 및 함수
   deployments: Deployment[];
@@ -276,7 +273,7 @@ const getUniqueNodeName = (nodes: Node<NodeData>[], baseLabel: string): string =
   let counter = 1;
 
   while (existingNames.includes(newName)) {
-    newName = `${baseLabel} ${counter}`;
+    newName = `${baseLabel}_${counter}`;
     counter++;
   }
 
@@ -487,73 +484,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 포커스 관리 초기 상태
   focusedElement: { type: null, id: null },
 
-  // ── 여기서부터 붙여넣기 기능을 위한 상태 추가 ─────────────────
-  /** 복사한 노드를 임시 저장 */
-  clipboardNodes: [] as Node<NodeData>[],
-  /** 복사한 엣지를 임시 저장 */
-  clipboardEdges: [] as Edge[],
 
-  /** 선택된 노드들 복사 (Start/End 노드는 제외) */
-  copyNodes: (nodeIds: string[]) => {
-    const allNodes = get().nodes
-    const allEdges = get().edges
-
-    const nodesToCopy = allNodes.filter(n =>
-        nodeIds.includes(n.id) &&
-        n.type !== 'startNode' &&
-        n.type !== 'endNode'
-    )
-    const idSet = new Set(nodesToCopy.map(n => n.id))
-
-    const edgesToCopy = allEdges.filter(e =>
-        idSet.has(e.source as string) &&
-        idSet.has(e.target as string)
-    )
-
-    set({ clipboardNodes: nodesToCopy, clipboardEdges: edgesToCopy })
-  },
-
-  /** 클립보드에 있는 노드·엣지 붙여넣기 */
-  pasteNodes: () => {
-    const { clipboardNodes, clipboardEdges, nodes, edges } = get();
-    if (clipboardNodes.length === 0) return;
-
-    const idMap: Record<string, string> = {};
-
-    // 1) 노드 복제 (offset 적용, 선택 상태)
-    const newNodes = clipboardNodes.map(n => {
-      const newId = nanoid();
-      idMap[n.id] = newId;
-      return {
-        ...n,
-        id: newId,
-        position: { x: n.position.x + 20, y: n.position.y + 20 },
-        selected: true,
-      } as Node<NodeData>;
-    });
-
-    // 2) 엣지 복제 (source/target 매핑)
-    const newEdges = clipboardEdges.map(e => ({
-      ...e,
-      id: nanoid(),
-      source: idMap[e.source],
-      target: idMap[e.target],
-    }));
-
-    // 3) 기존 노드 선택 해제
-    const unselectedOld = nodes.map(n => ({ ...n, selected: false }));
-
-    // 4) 붙여넣기 직후 첫 노드에 포커스/선택 상태 반영
-    const firstNewId = newNodes[0]?.id || null;
-    set({
-      nodes: [...unselectedOld, ...newNodes],
-      edges: [...edges, ...newEdges],
-      // 만약 useFlowStore 에 setSelectedNode, setFocusedElement 가 정의되어 있다면:
-      selectedNode: firstNewId,
-      focusedElement: { type: 'node', id: firstNewId },
-    });
-  },
-  // ── 붙여넣기 기능 끝 ─────────────────────────────────────────────
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
@@ -597,8 +528,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
       outputVariable: 'python_function_output',
       // code는 newNode 생성 시 data에 직접 설정합니다.
-    } : type === 'loopNode' ? {
-      repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
       template: '# Enter your prompt template here\n\nSystem: You are a helpful AI assistant.\n\nUser: {user_input}\n\nAssistant:',
       outputVariable: 'user_input'
@@ -618,19 +547,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       mergeMappings: []
     } : type === 'endNode' ? {
       receiveKey: ''
+    } : type === 'toolsMemoryNode' ? {
+      groups: [],
+      selectedGroupId: null
     } : {};
 
     // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
     const initialNodeData = { ...data };
     if (type === 'functionNode' && !initialNodeData.code) {
       initialNodeData.code =
-        '# Write your Python code here\n' +
-        '# Input data from the previous node is in the `input_params` dictionary.\n' +
-        '# Example: value = input_params.get("some_key")\n' +
-        '# To return data, assign it to a dictionary named `result`.\n' +
-        '# This `result` dictionary will be the output of this node.\n' +
-        '# Example: result = {"my_custom_output": value * 2}\n' +
-        'result = {}';
+        'def sample_code(state):\n' +
+        '    # Input data from the previous node is in the `state` dictionary.\n' +
+        '    # Access input variables like this:\n' +
+        '    # aaa = state.get("aaa")\n' +
+        '    # bbb = state.get("bbb")\n' +
+        '    \n' +
+        '    # Add your custom logic here\n' +
+        '    \n' +
+        '    # Return the modified state\n' +
+        '    return state';
     }
 
     const newNode: Node<NodeData> = {
@@ -1191,14 +1126,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           output = input; 
           break;
         }
-        case 'loopNode':
-          output = { 
-            message: `Loop will execute ${node.data.config?.repetitions || 1} times`,
-            repetitions: node.data.config?.repetitions || 1,
-            currentIteration: 0,
-            input 
-          };
-          break;
+
         case 'mergeNode': {
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
           const allInputsFromEdges: Record<string, any> = {};
@@ -1801,6 +1729,85 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           reject(error);
         };
       });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadError: errorMessage });
+      throw error;
+    }
+  },
+
+  copyWorkflows: async (workflowNames: string[]) => {
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
+      
+      for (const workflowName of workflowNames) {
+        const getRequest = store.get(workflowName);
+        await new Promise<void>((resolve, reject) => {
+          getRequest.onsuccess = () => {
+            const originalWorkflow = getRequest.result;
+            
+            if (!originalWorkflow) {
+              reject(new Error(`Workflow '${workflowName}' not found.`));
+              return;
+            }
+            
+            // 복사된 워크플로우 이름 생성
+            let newName = `${workflowName}_copy`;
+            let counter = 1;
+            
+            // 데이터베이스에서 직접 중복 체크
+            const checkDuplicate = (name: string): Promise<boolean> => {
+              return new Promise((resolve) => {
+                const checkRequest = store.get(name);
+                checkRequest.onsuccess = () => {
+                  resolve(!!checkRequest.result);
+                };
+                checkRequest.onerror = () => {
+                  resolve(false);
+                };
+              });
+            };
+            
+            // 중복되지 않는 이름 찾기
+            const findUniqueName = async (): Promise<string> => {
+              let testName = newName;
+              while (await checkDuplicate(testName)) {
+                testName = `${workflowName}_copy_${counter}`;
+                counter++;
+              }
+              return testName;
+            };
+            
+            // 고유한 이름 찾기 후 저장
+            findUniqueName().then((uniqueName) => {
+              // 새로운 워크플로우 객체 생성
+              const copiedWorkflow = {
+                ...originalWorkflow,
+                projectName: uniqueName,
+                projectId: nanoid(), // 새로운 ID 생성
+                lastModified: new Date().toISOString()
+              };
+              
+              // 복사된 워크플로우 저장
+              const addRequest = store.add(copiedWorkflow);
+              addRequest.onsuccess = () => resolve();
+              addRequest.onerror = (event) => {
+                const error = (event.target as IDBRequest).error;
+                reject(error);
+              };
+            });
+          };
+          getRequest.onerror = (event) => {
+            const error = (event.target as IDBRequest).error;
+            reject(error);
+          };
+        });
+      }
+      
+      // 복사 완료 후 워크플로우 목록 새로고침
+      get().fetchAvailableWorkflows();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadError: errorMessage });

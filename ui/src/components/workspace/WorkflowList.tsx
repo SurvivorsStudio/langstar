@@ -1,5 +1,5 @@
-import React from 'react';
-import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { PlusCircle, Trash2, Loader2, Copy } from 'lucide-react';
 import { Workflow } from '../../store/flowStore';
 
 interface WorkflowListProps {
@@ -9,6 +9,7 @@ interface WorkflowListProps {
   handleNewWorkflow: () => void;
   handleWorkflowClick: (workflowName: string) => void;
   handleDeleteWorkflow: (workflowName: string, event: React.MouseEvent) => void;
+  handleCopyWorkflows: (workflowNames: string[]) => void;
 }
 
 const WorkflowList: React.FC<WorkflowListProps> = ({
@@ -18,17 +19,58 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
   handleNewWorkflow,
   handleWorkflowClick,
   handleDeleteWorkflow,
-}) => (
-  <div className="p-8">
+  handleCopyWorkflows,
+}) => {
+  const [selectedWorkflows, setSelectedWorkflows] = useState<Set<string>>(new Set());
+
+  const handleCheckboxChange = (workflowName: string, checked: boolean) => {
+    const newSelected = new Set(selectedWorkflows);
+    if (checked) {
+      newSelected.add(workflowName);
+    } else {
+      newSelected.delete(workflowName);
+    }
+    setSelectedWorkflows(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedWorkflows.size === availableWorkflows.length) {
+      setSelectedWorkflows(new Set());
+    } else {
+      setSelectedWorkflows(new Set(availableWorkflows.map(w => w.projectName)));
+    }
+  };
+
+  const handleCopySelected = () => {
+    if (selectedWorkflows.size > 0) {
+      handleCopyWorkflows(Array.from(selectedWorkflows));
+      setSelectedWorkflows(new Set());
+    }
+  };
+
+  return (
+    <div className="p-8">
     <div className="flex justify-between items-center mb-6">
       <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Workflows</h1>
-      <button
-        onClick={handleNewWorkflow}
-        className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-      >
-        <PlusCircle className="w-5 h-5 mr-2" />
-        New Workflow
-      </button>
+      <div className="flex items-center space-x-2">
+        {selectedWorkflows.size > 0 && (
+          <button
+            onClick={handleCopySelected}
+            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+            title={`Copy ${selectedWorkflows.size} selected workflow${selectedWorkflows.size > 1 ? 's' : ''}`}
+          >
+            <Copy className="w-5 h-5 mr-2" />
+            Copy ({selectedWorkflows.size})
+          </button>
+        )}
+        <button
+          onClick={handleNewWorkflow}
+          className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          <PlusCircle className="w-5 h-5 mr-2" />
+          New Workflow
+        </button>
+      </div>
     </div>
     {isLoading && (
       <div className="flex justify-center items-center h-32">
@@ -48,20 +90,41 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
       </div>
     )}
     {!isLoading && !loadError && availableWorkflows.length > 0 && (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableWorkflows.map((workflow) => (
+      <>
+        <div className="mb-4">
+          <label className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={selectedWorkflows.size === availableWorkflows.length && availableWorkflows.length > 0}
+              onChange={handleSelectAll}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span>Select All ({selectedWorkflows.size}/{availableWorkflows.length})</span>
+          </label>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {availableWorkflows.map((workflow) => (
           <div
             key={workflow.projectId}
             onClick={() => handleWorkflowClick(workflow.projectName)}
-            className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
+            className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all group relative cursor-pointer"
           >
             <div className="flex items-center justify-between mb-2">
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">{workflow.projectName}</h3>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={selectedWorkflows.has(workflow.projectName)}
+                  onChange={(e) => handleCheckboxChange(workflow.projectName, e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">{workflow.projectName}</h3>
+                </div>
               </div>
               <button
                 onClick={(e) => handleDeleteWorkflow(workflow.projectName, e)}
-                className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity absolute top-2 right-2"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
                 title={`Delete ${workflow.projectName}`}
               >
                 <Trash2 size={16} />
@@ -74,9 +137,11 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      </>
     )}
-  </div>
-);
+    </div>
+  );
+};
 
 export default WorkflowList; 

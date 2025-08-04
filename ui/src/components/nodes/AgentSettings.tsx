@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
+import { X, ChevronDown, AlertCircle, Pencil, Check, Eye, EyeOff } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import type { AIConnection } from '../../store/flowStore';
-import CustomSelect from '../Common/CustomSelect';
+import CustomSelect, { EnhancedSelect } from '../Common/CustomSelect';
 
 // Define an interface for the group objects for better type safety
 interface GroupData {
@@ -36,14 +36,15 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   }));
 
   const node = nodes.find(n => n.id === nodeId);
-  const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
+  const [toolsSearchTerm, setToolsSearchTerm] = useState('');
   
   // 이전 노드에서 사용 가능한 입력 키 및 연결 상태 가져오기
   const [availableInputKeys, setAvailableInputKeys] = useState<string[]>([]);
   const [isSourceConnected, setIsSourceConnected] = useState<boolean>(false);
   const [hasValidSourceOutput, setHasValidSourceOutput] = useState<boolean>(false);
+  const [sourceOutput, setSourceOutput] = useState<any>(null);
 
   const DEFAULT_TOP_K = 40;
   const DEFAULT_TOP_P = 1;
@@ -61,17 +62,20 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
     if (incomingEdge) {
       const sourceNode = getNodeById(incomingEdge.source);
-      const sourceOutput = sourceNode?.data?.output;
-      if (sourceOutput && typeof sourceOutput === 'object' && sourceOutput !== null && !Array.isArray(sourceOutput) && Object.keys(sourceOutput).length > 0) {
+      const sourceOutputData = sourceNode?.data?.output;
+      if (sourceOutputData && typeof sourceOutputData === 'object' && sourceOutputData !== null && !Array.isArray(sourceOutputData) && Object.keys(sourceOutputData).length > 0) {
         setHasValidSourceOutput(true);
-        setAvailableInputKeys(Object.keys(sourceNode.data.output));
+        setAvailableInputKeys(Object.keys(sourceOutputData));
+        setSourceOutput(sourceOutputData);
       } else {
         setHasValidSourceOutput(false);
         setAvailableInputKeys([]);
+        setSourceOutput(null);
       }
     } else {
       setHasValidSourceOutput(false);
       setAvailableInputKeys([]);
+      setSourceOutput(null);
     }
   }, [nodes, edges, nodeId, getNodeById]); // getNodeById는 store에서 오므로 직접적인 의존성은 아니지만, nodes/edges 변경 시 재계산 필요
 
@@ -82,16 +86,17 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsToolsOpen(false);
-      }
-    };
+  // Filter tools based on search term
+  const filteredTools = toolsGroups.filter((tool: GroupData) => {
+    if (!toolsSearchTerm) return true;
+    const searchLower = toolsSearchTerm.toLowerCase();
+    return (
+      tool.name.toLowerCase().includes(searchLower) ||
+      (tool.description && tool.description.toLowerCase().includes(searchLower))
+    );
+  });
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
 
   const handleModelChange = (value: string) => {
     // Find the full connection object from activeConnections
@@ -217,23 +222,13 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     });
   };
 
-  const removeTool = (event: React.MouseEvent, toolId: string) => {
-    event.stopPropagation();
-    const newTools = currentTools.filter((id: string) => id !== toolId);
-    updateNodeData(nodeId, {
-      config: {
-        tools: newTools // 'selectedTools' -> 'tools'로 변경
-      }
-    });
-  };
+
 
   // Filter active AI connections
   // 스토어에서 가져온 AI 연결 중 언어 모델(active)만 필터링
   const activeConnections = aiConnections.filter(
       conn => conn.type === 'language' && conn.status === 'active'
   );
-
-
 
   const selectedModelId =
     node?.data.config?.model && typeof node.data.config.model === 'object'
@@ -242,7 +237,41 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const selectedConnection = activeConnections.find(conn => conn.id === selectedModelId);
 
+  // 값 미리보기 함수
+  const getValuePreview = (key: string) => {
+    if (!sourceOutput || !sourceOutput[key]) return 'undefined';
+    
+    const value = sourceOutput[key];
+    if (typeof value === 'string') {
+      return value.length > 50 ? value.substring(0, 50) + '...' : value;
+    } else if (typeof value === 'object') {
+      const jsonStr = JSON.stringify(value);
+      return jsonStr.length > 50 ? jsonStr.substring(0, 50) + '...' : jsonStr;
+    }
+    return String(value);
+  };
 
+  // 값 타입 표시 함수
+  const getValueType = (key: string) => {
+    if (!sourceOutput || !sourceOutput[key]) return 'undefined';
+    const value = sourceOutput[key];
+    if (typeof value === 'string') return 'string';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'boolean';
+    if (Array.isArray(value)) return 'array';
+    if (typeof value === 'object') return 'object';
+    return typeof value;
+  };
+
+  // EnhancedSelect용 옵션 생성
+  const createEnhancedOptions = () => {
+    return availableInputKeys.map(key => ({
+      value: key,
+      label: key,
+      type: getValueType(key),
+      preview: getValuePreview(key)
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -364,41 +393,63 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           )}
         </div>
 
+        {/* System Prompt Input Key - EnhancedSelect 사용 */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             System Prompt (Input Key)
           </label>
-          <CustomSelect
-            value={node?.data.config?.systemPromptInputKey || ''}
-            onChange={handleSystemPromptInputKeyChange}
-            options={availableInputKeys.map(key => ({ value: key, label: key }))}
-            placeholder="Select an input key for system prompt"
-            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
-          />
-          {!isSourceConnected && (
-            <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
-          )}
-          {isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0 && (
-            <p className="text-xs text-amber-500 mt-1">Execute the connected node to populate input keys.</p>
+          {!isSourceConnected ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center text-amber-600 dark:text-amber-400 text-sm">
+                <AlertCircle size={14} className="mr-2" />
+                Connect an input node to see available keys.
+              </div>
+            </div>
+          ) : !hasValidSourceOutput ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center text-amber-600 dark:text-amber-400 text-sm">
+                <AlertCircle size={14} className="mr-2" />
+                Execute the connected node to populate input keys.
+              </div>
+            </div>
+          ) : (
+            <EnhancedSelect
+              value={node?.data.config?.systemPromptInputKey || ''}
+              onChange={handleSystemPromptInputKeyChange}
+              options={createEnhancedOptions()}
+              placeholder="Select an input key for system prompt"
+              disabled={false}
+            />
           )}
         </div>
 
+        {/* User Prompt Input Key - EnhancedSelect 사용 */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             User Prompt (Input Key)
           </label>
-          <CustomSelect
-            value={node?.data.config?.userPromptInputKey || ''}
-            onChange={handleUserPromptInputKeyChange}
-            options={availableInputKeys.map(key => ({ value: key, label: key }))}
-            placeholder="Select an input key for user prompt"
-            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
-          />
-          {!isSourceConnected && (
-            <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
-          )}
-          {isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0 && (
-            <p className="text-xs text-amber-500 mt-1">Execute the connected node to populate input keys.</p>
+          {!isSourceConnected ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center text-amber-600 dark:text-amber-400 text-sm">
+                <AlertCircle size={14} className="mr-2" />
+                Connect an input node to see available keys.
+              </div>
+            </div>
+          ) : !hasValidSourceOutput ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center text-amber-600 dark:text-amber-400 text-sm">
+                <AlertCircle size={14} className="mr-2" />
+                Execute the connected node to populate input keys.
+              </div>
+            </div>
+          ) : (
+            <EnhancedSelect
+              value={node?.data.config?.userPromptInputKey || ''}
+              onChange={handleUserPromptInputKeyChange}
+              options={createEnhancedOptions()}
+              placeholder="Select an input key for user prompt"
+              disabled={false}
+            />
           )}
         </div>
 
@@ -446,71 +497,130 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           )}
         </div>
 
-        <div className="space-y-2" ref={dropdownRef}>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-            Tools
-          </label>
-          <div
-            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 min-h-[42px] flex flex-wrap items-center cursor-pointer"
-            onClick={() => setIsToolsOpen(!isToolsOpen)}
-          >
-            {currentTools.length > 0 ? ( // 'selectedTools' -> 'currentTools'로 변경
-              toolsGroups
-                .filter((tool: GroupData) => currentTools.includes(tool.id)) // 'selectedTools' -> 'currentTools'로 변경
-                .map((tool: GroupData) => (
-                  <span
-                    key={tool.id}
-                    className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm mr-2 mb-1 flex items-center"
-                  >
-                    {tool.name}
-                    <button
-                      onClick={(e) => removeTool(e, tool.id)}
-                      className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
-                    >
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))
-            ) : (
-              <span className="text-gray-500 dark:text-gray-400 text-sm">Select tools</span>
-            )}
-            <div className="ml-auto">
-              <ChevronDown size={16} className="text-gray-400 dark:text-gray-500" />
-            </div>
+        {/* Tools - Collapsible Section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+              Tools ({currentTools.length} selected)
+            </label>
+            <button
+              onClick={() => setIsToolsExpanded(!isToolsExpanded)}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+            >
+              {isToolsExpanded ? 'Collapse' : 'Expand'}
+            </button>
           </div>
-          {isToolsOpen && (
-            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-              {toolsGroups.length > 0 ? (
-                toolsGroups.map((tool: GroupData) => (
-                  <div
-                    key={tool.id}
-                    className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      currentTools.includes(tool.id) ? 'bg-gray-50 dark:bg-gray-700' : '' // 'selectedTools' -> 'currentTools'로 변경
-                    }`}
-                    onClick={() => toggleTool(tool.id)}
-                  >
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={currentTools.includes(tool.id)} // 'selectedTools' -> 'currentTools'로 변경
-                        onChange={() => {}}
-                        className="mr-2"
-                      />
-                      <div>
-                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{tool.name}</div>
-                        {tool.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</div>
-                        )}
+          
+          {toolsGroups.length === 0 ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center text-amber-600 dark:text-amber-400 text-sm">
+                <AlertCircle size={14} className="mr-2" />
+                No tools available. Add tools in the Tools Memory node.
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Available Tools List (Expandable) */}
+              {isToolsExpanded && (
+                <div className="space-y-2 max-h-48 overflow-y-auto mb-3">
+                  {/* Search Input */}
+                  <div className="sticky top-0 bg-white dark:bg-gray-800 pb-2">
+                    <input
+                      type="text"
+                      value={toolsSearchTerm}
+                      onChange={(e) => setToolsSearchTerm(e.target.value)}
+                      placeholder="Search tools by name or description..."
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                    {toolsSearchTerm && (
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {filteredTools.length} of {toolsGroups.length} tools found
                       </div>
-                    </div>
+                    )}
                   </div>
-                ))
-              ) : (
-                <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
-                  No tools available. Add tools in the Groups node.
+                  
+                  {/* Tools List */}
+                  <div className="space-y-2">
+                    {filteredTools.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                        {toolsSearchTerm ? 'No tools found matching your search.' : 'No tools available.'}
+                      </div>
+                    ) : (
+                      filteredTools.map((tool: GroupData) => (
+                        <div
+                          key={tool.id}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            currentTools.includes(tool.id)
+                              ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
+                              : 'bg-white dark:bg-gray-600 border-gray-200 dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                          onClick={() => toggleTool(tool.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={currentTools.includes(tool.id)}
+                                  onChange={() => {}}
+                                  className="mr-3"
+                                />
+                                <div>
+                                  <h4 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-1">
+                                    {tool.name}
+                                  </h4>
+                                  {tool.description && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 overflow-hidden">
+                                      {tool.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
+              
+              {/* Selected Tools Summary - Always visible at bottom */}
+              {currentTools.length > 0 && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      Selected Tools
+                    </span>
+                    <span className="text-xs text-blue-600 dark:text-blue-400">
+                      {currentTools.length} selected
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {currentTools.map((toolId: string) => {
+                      const tool = toolsGroups.find(t => t.id === toolId);
+                      return tool ? (
+                        <span
+                          key={tool.id}
+                          className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-xs flex items-center"
+                        >
+                          {tool.name}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTool(tool.id);
+                            }}
+                            className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 

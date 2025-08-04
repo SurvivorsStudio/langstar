@@ -48,6 +48,7 @@ const WorkspacePage: React.FC = () => {
     loadError,
     setProjectName,
     deleteWorkflow,
+    copyWorkflows,
     aiConnections,
     fetchAIConnections,
     addAIConnection,
@@ -72,6 +73,7 @@ const WorkspacePage: React.FC = () => {
     loadError: state.loadError,
     setProjectName: state.setProjectName,
     deleteWorkflow: state.deleteWorkflow,
+    copyWorkflows: state.copyWorkflows,
     aiConnections: state.aiConnections,
     fetchAIConnections: state.fetchAIConnections,
     addAIConnection: state.addAIConnection,
@@ -254,6 +256,17 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
+  const handleCopyWorkflows = async (workflowNames: string[]) => {
+    try {
+      await copyWorkflows(workflowNames);
+      // Success notification
+      alert(`Successfully copied ${workflowNames.length} workflow${workflowNames.length > 1 ? 's' : ''}.`);
+    } catch (error) {
+      console.error('WorkspacePage: Failed to copy workflows:', error);
+      alert(`Error copying workflows. Check console for details.`);
+    }
+  };
+
   const renderMainContent = () => {
     if (showWizard) {
       return (
@@ -304,6 +317,7 @@ const WorkspacePage: React.FC = () => {
             handleNewWorkflow={handleNewWorkflow}
             handleWorkflowClick={handleWorkflowClick}
             handleDeleteWorkflow={handleDeleteWorkflow}
+            handleCopyWorkflows={handleCopyWorkflows}
           />
         );
       case 'deployment':

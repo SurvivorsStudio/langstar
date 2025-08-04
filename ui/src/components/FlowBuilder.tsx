@@ -9,12 +9,14 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowInstance,
   Node,
+  Edge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { useFlowStore } from '../store/flowStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
+import EdgeInspector from './EdgeInspector';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle } from 'lucide-react';
@@ -25,7 +27,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, copyNodes, pasteNodes } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
@@ -33,23 +35,7 @@ const FlowBuilder: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [synced, setSynced] = useState(false);
 
-  // Ctrl+C / Ctrl+V 로 복사·붙여넣기
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        const selectedIds = rfInstance
-            ?.getNodes()
-            .filter(n => n.selected)
-            .map(n => n.id) || [];
-        copyNodes(selectedIds);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        pasteNodes();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [rfInstance, copyNodes, pasteNodes]);
+
 
   // id와 projectName이 다를 때만 setProjectName (동기화 플래그 사용)
   useEffect(() => {
@@ -106,9 +92,19 @@ const FlowBuilder: React.FC = () => {
     setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)
   }, [setFocusedElement, setSelectedNode]);
 
+  const onNodeDragStart = useCallback((_: unknown, node: Node) => {
+    setSelectedNode(node.id);
+    setShowInspector(true);
+    setFocusedElement('node', node.id);
+  }, [setFocusedElement, setSelectedNode]);
+
+  const onEdgeClick = useCallback((_: unknown, edge: Edge) => {
+    setFocusedElement('edge', edge.id);
+    setShowInspector(true);
+  }, [setFocusedElement]);
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-    setShowInspector(false);
     setFocusedElement(null, null); // 패널 클릭 시 모든 포커스 해제
   }, [setFocusedElement, setSelectedNode]);
 
@@ -155,6 +151,13 @@ const FlowBuilder: React.FC = () => {
     if (!data || !reactFlowBounds) return;
 
     const { type, label } = JSON.parse(data);
+    
+    // tool 노드가 이미 존재하고 추가하려는 노드가 tool 노드인 경우 방지
+    if (type === 'toolsMemoryNode' && nodes.some(node => node.type === 'toolsMemoryNode')) {
+      alert('Only one Tools node is allowed per workflow');
+      return;
+    }
+    
     const position = reactFlowInstance.project({
       x: event.clientX - reactFlowBounds.left,
       y: event.clientY - reactFlowBounds.top,
@@ -164,7 +167,7 @@ const FlowBuilder: React.FC = () => {
       position,
       data: { label, code: '', config: {} }
     });
-  }, [addNode, reactFlowInstance]);
+  }, [addNode, reactFlowInstance, nodes]);
 
   if (isLoading) {
     return (
@@ -188,6 +191,8 @@ const FlowBuilder: React.FC = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onNodeDragStart={onNodeDragStart}
+            onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -224,6 +229,14 @@ const FlowBuilder: React.FC = () => {
             setShowInspector(false);
             setFocusedElement(null, null); // NodeInspector 닫힐 때 포커스 해제
             setSelectedNode(null);
+          }}
+        />
+      )}
+      {focusedElement.type === 'edge' && focusedElement.id && (
+        <EdgeInspector
+          edgeId={focusedElement.id}
+          onClose={() => {
+            setFocusedElement(null, null); // EdgeInspector 닫힐 때 포커스 해제
           }}
         />
       )}

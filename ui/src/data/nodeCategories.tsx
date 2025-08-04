@@ -48,7 +48,7 @@ export const nodeCategories: NodeCategory[] = [
       },
       {
         type: 'functionNode',
-        label: 'Custom Python Function',
+        label: 'PythonFunction',
         description: 'Execute custom Python function',
         icon: (className = '') => <FileCode size={20} className={className} />
       },

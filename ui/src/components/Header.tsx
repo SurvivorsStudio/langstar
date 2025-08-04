@@ -48,7 +48,7 @@ const Header: React.FC = () => {
         if (isEditingName) {
           handleCancelEditName();
         }
-      }, 100);
+      }, 200);
     }
   };
   
@@ -71,12 +71,14 @@ const Header: React.FC = () => {
       return;
     }
 
-    if (!editingName.trim()) {
+    const trimmedName = editingName.trim();
+    
+    if (!trimmedName) {
       alert('워크플로우 이름은 비워둘 수 없습니다.');
       return;
     }
 
-    if (editingName.trim() === projectName) {
+    if (trimmedName === projectName) {
       setIsEditingName(false);
       return;
     }
@@ -90,14 +92,16 @@ const Header: React.FC = () => {
         await saveWorkflow();
       }
       
-      await renameWorkflow(projectName, editingName.trim());
+      // 이름 변경 전에 잠시 대기
+      await new Promise(resolve => setTimeout(resolve, 50));
       
-      const newName = editingName.trim();
-      setProjectName(newName);
+      await renameWorkflow(projectName, trimmedName);
+      
+      setProjectName(trimmedName);
       setIsEditingName(false);
       
       // URL 업데이트
-      navigate(`/flow/${encodeURIComponent(newName)}`, { replace: true });
+      navigate(`/flow/${encodeURIComponent(trimmedName)}`, { replace: true });
       
       alert('워크플로우 이름이 변경되었습니다.');
     } catch (error) {
@@ -154,7 +158,14 @@ const Header: React.FC = () => {
                   type="text"
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={handleBlur}
+                  onBlur={(e) => {
+                    // 버튼 클릭인지 확인
+                    const relatedTarget = e.relatedTarget as HTMLElement;
+                    if (relatedTarget && (relatedTarget.closest('.workflow-name-edit-area') || relatedTarget.tagName === 'BUTTON')) {
+                      return; // 버튼 클릭이면 blur 처리하지 않음
+                    }
+                    handleBlur();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -175,6 +186,7 @@ const Header: React.FC = () => {
                   disabled={isRenaming}
                   className="text-green-600 hover:text-green-700 disabled:opacity-50"
                   title="저장"
+                  tabIndex={0}
                 >
                   {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓'}
                 </button>
@@ -183,6 +195,7 @@ const Header: React.FC = () => {
                   disabled={isRenaming}
                   className="text-red-600 hover:text-red-700 disabled:opacity-50"
                   title="취소"
+                  tabIndex={0}
                 >
                   ✕
                 </button>

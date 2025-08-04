@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import CustomSelect from '../Common/CustomSelect';
+import CustomSelect, { EnhancedSelect } from '../Common/CustomSelect';
 
 interface MergeMapping {
   id: string;
@@ -21,6 +21,16 @@ interface SourceOption {
   label: string; // Format: "Node Label: key"
   nodeId: string;
   nodeKey: string;
+  nodeLabel: string;
+  preview?: string;
+  type?: string;
+}
+
+interface GroupedSourceOptions {
+  [nodeId: string]: {
+    nodeLabel: string;
+    options: SourceOption[];
+  };
 }
 
 const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
@@ -40,18 +50,100 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
     incomingEdges.forEach(edge => {
       const sourceNode = nodes.find(n => n.id === edge.source);
       if (sourceNode && sourceNode.data.output && typeof sourceNode.data.output === 'object') {
-        Object.keys(sourceNode.data.output).forEach(key => {
+        Object.entries(sourceNode.data.output).forEach(([key, value]) => {
+          // 값의 타입과 미리보기 생성
+          const getValueType = (val: any): string => {
+            if (typeof val === 'string') return 'string';
+            if (typeof val === 'number') return 'number';
+            if (typeof val === 'boolean') return 'boolean';
+            if (Array.isArray(val)) return 'array';
+            if (typeof val === 'object' && val !== null) return 'object';
+            return typeof val;
+          };
+
+          const getValuePreview = (val: any): string => {
+            if (typeof val === 'string') {
+              return val.length > 50 ? val.substring(0, 50) + '...' : val;
+            } else if (typeof val === 'object') {
+              const jsonStr = JSON.stringify(val);
+              return jsonStr.length > 50 ? jsonStr.substring(0, 50) + '...' : jsonStr;
+            }
+            return String(val);
+          };
+
           options.push({
             value: `${sourceNode.id}.${key}`,
             label: `${sourceNode.data.label}: ${key}`,
             nodeId: sourceNode.id,
             nodeKey: key,
+            nodeLabel: sourceNode.data.label,
+            preview: getValuePreview(value),
+            type: getValueType(value),
           });
         });
       }
     });
     return options;
   }, [nodeId, nodes, edges]);
+
+  const groupedSourceOptions = useMemo<GroupedSourceOptions>(() => {
+    const grouped: GroupedSourceOptions = {};
+    
+    availableSourceOptions.forEach(option => {
+      if (!grouped[option.nodeId]) {
+        grouped[option.nodeId] = {
+          nodeLabel: option.nodeLabel,
+          options: []
+        };
+      }
+      grouped[option.nodeId].options.push(option);
+    });
+    
+    return grouped;
+  }, [availableSourceOptions]);
+
+  const flattenedOptionsWithGroups = useMemo(() => {
+    const options: Array<{ value: string; label: string; isGroup?: boolean; groupLabel?: string; preview?: string; type?: string; nodeColor?: string }> = [];
+    
+    // 노드별 색상 배열 (다양한 색상으로 노드 구분)
+    const nodeColors = [
+      'bg-blue-500 text-white',
+      'bg-green-500 text-white', 
+      'bg-purple-500 text-white',
+      'bg-orange-500 text-white',
+      'bg-pink-500 text-white',
+      'bg-indigo-500 text-white',
+      'bg-teal-500 text-white',
+      'bg-red-500 text-white'
+    ];
+    
+    Object.entries(groupedSourceOptions).forEach(([nodeId, group], index) => {
+      const nodeColor = nodeColors[index % nodeColors.length];
+      
+      // 그룹 헤더 추가 (노드 이름에 색상 강조)
+      options.push({
+        value: `group-${nodeId}`,
+        label: `📋 ${group.nodeLabel}`,
+        isGroup: true,
+        groupLabel: group.nodeLabel,
+        nodeColor: nodeColor
+      });
+      
+      // 그룹 내 옵션들 추가 (들여쓰기)
+      group.options.forEach(option => {
+        options.push({
+          value: option.value,
+          label: `    ${option.label}`,
+          isGroup: false,
+          preview: option.preview,
+          type: option.type,
+          nodeColor: nodeColor
+        });
+      });
+    });
+    
+    return options;
+  }, [groupedSourceOptions]);
 
   const handleAddMapping = () => {
     const newMapping: MergeMapping = {
@@ -120,10 +212,10 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
           {/* Source Value 선택 드롭다운 */}
           <div>
             <label htmlFor={`source-value-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Source Value</label>
-            <CustomSelect
+            <EnhancedSelect
               value={mapping.sourceNodeId ? `${mapping.sourceNodeId}.${mapping.sourceNodeKey}` : ''}
               onChange={value => handleMappingChange(index, 'sourceNodeId', value)}
-              options={availableSourceOptions}
+              options={flattenedOptionsWithGroups}
               placeholder="Select Source Value"
             />
           </div>

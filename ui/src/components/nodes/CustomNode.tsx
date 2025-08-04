@@ -26,9 +26,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const isConditionNode = type === 'conditionNode';
   const isToolsMemoryNode = type === 'toolsMemoryNode';
 
-  // ToolsMemoryNode일 경우, 설정에서 그룹 목록 가져오기
-  const groups: any[] = data.config?.groups || [];
-  const toolsGroups = groups.filter((g: any) => g.type === 'tools');
+
 
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
   const hasConnection = edges.some(edge => edge.source === id);
@@ -159,7 +157,22 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    * @param {React.ChangeEvent<HTMLInputElement>} event - 변경 이벤트 객체.
    */
   const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setNodeName(event.target.value);
+    const input = event.target;
+    const cursorPosition = input.selectionStart || 0;
+    const originalValue = input.value;
+    const newName = originalValue.replace(/\s+/g, ''); // 띄어쓰기 제거
+    
+    // 띄어쓰기가 제거된 경우 커서 위치 조정
+    const removedSpaces = originalValue.length - newName.length;
+    const adjustedPosition = cursorPosition - removedSpaces;
+    
+    setNodeName(newName);
+    
+    // 다음 렌더링 후 커서 위치 복원
+    setTimeout(() => {
+      const newPosition = Math.max(0, Math.min(adjustedPosition, newName.length));
+      input.setSelectionRange(newPosition, newPosition);
+    }, 0);
   };
 
   /**
@@ -167,11 +180,17 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    */
   const handleNameSubmit = () => {
     const trimmedName = nodeName.trim();
-    // 이름이 유효하고 변경된 경우에만 업데이트
-    if (trimmedName && trimmedName !== data.label) {
+    
+    // 중복 체크: 현재 노드를 제외한 다른 노드들과 이름 비교
+    const isDuplicate = nodes.some(node => 
+      node.id !== id && node.data.label === trimmedName
+    );
+    
+    // 이름이 유효하고 변경되었으며 중복이 아닌 경우에만 업데이트
+    if (trimmedName && trimmedName !== data.label && !isDuplicate) {
       updateNodeData(id, { ...data, label: trimmedName });
     } else {
-      // 유효하지 않거나 변경되지 않은 경우 원래 이름으로 복원
+      // 유효하지 않거나 변경되지 않았거나 중복인 경우 원래 이름으로 복원
       setNodeName(data.label);
     }
     setIsEditing(false);
@@ -190,110 +209,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     }
   };
 
-  /**
-   * 지정된 타입의 그룹 중에서 동일한 이름이 이미 존재하는지 확인합니다.
-   * @param {string} name - 확인할 그룹 이름.
-   * @param {'memory' | 'tools'} type - 그룹 타입 ('memory' 또는 'tools').
-   * @returns {boolean} 이름이 존재하면 true, 그렇지 않으면 false.
-   */
-  const checkNameExists = (name: string): boolean => {
-    const existingGroups = groups.filter((g: any) => g.type === 'tools');
-    return existingGroups.some((g: any) => g.name.toLowerCase() === name.toLowerCase());
-  };
 
-  /**
-   * 새로운 그룹을 추가합니다.
-   * 그룹 이름이 중복되지 않도록 기본 이름에 숫자를 붙여 생성합니다.
-   */
-  const handleAddGroup = () => {
-    const defaultName = 'New Tools Group';
-    let newName = defaultName;
-    let counter = 1;
-    // 중복되지 않는 이름 찾기
-    while (checkNameExists(newName)) {
-      newName = `${defaultName} ${counter}`;
-      counter++;
-    }
-
-    const newGroup = {
-      id: `group-${Date.now()}`,
-      name: newName,
-      description: '',
-      nodes: [],
-      type: 'tools'
-    };
-    // 노드 데이터 업데이트 (새 그룹 추가)
-    updateNodeData(id, {
-      ...data,
-      config: {
-        ...data.config,
-        groups: [...groups, newGroup]
-      }
-    });
-  };
-
-  /**
-   * 특정 그룹을 삭제합니다.
-   * @param {React.MouseEvent} event - 마우스 이벤트 객체.
-   * @param {string} groupId - 삭제할 그룹의 ID.
-   */
-  const handleDeleteGroup = (event: React.MouseEvent, groupId: string) => {
-    event.stopPropagation(); // 이벤트 버블링 방지
-    if (window.confirm('Are you sure you want to delete this group?')) {
-      updateNodeData(id, { // 노드 데이터 업데이트 (해당 그룹 제거)
-        ...data,
-        config: {
-          ...data.config,
-          groups: groups.filter(g => g.id !== groupId)
-        }
-      });
-    }
-  };
-
-  /**
-   * 도구 그룹 목록을 렌더링합니다.
-   * @param {any[]} groups - 렌더링할 그룹 객체 배열.
-   * @returns {JSX.Element} 그룹 목록을 나타내는 JSX.
-   */
-  const renderGroups = (groups: any[]) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-gray-700 dark:text-gray-300">Tools</span>
-      </div>
-      {groups.map((group) => (
-        <div 
-          key={group.id} 
-          className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors relative group"
-          // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
-          onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-800 dark:text-gray-200">{group.name}</span>
-            <div className="flex items-center">
-              <button
-                onClick={(e) => handleDeleteGroup(e, group.id)}
-                // 마우스 호버 시에만 삭제 버튼 표시
-                className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
-              >
-                <Trash2 size={14} />
-              </button>
-              <ChevronRight size={14} className="text-gray-400 dark:text-gray-500" />
-            </div>
-          </div>
-          {group.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{group.description}</p>
-          )}
-        </div>
-      ))}
-      <button
-        onClick={() => handleAddGroup()}
-        className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
-      >
-        <Plus size={14} className="mr-1" />
-        Add Tools Group
-      </button>
-    </div>
-  );
 
   // 노드가 포커스되었는지 확인
   const isNodeFocused = focusedElement.type === 'node' && focusedElement.id === id;
@@ -401,12 +317,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{data.description}</div>
       )}
 
-      {/* ToolsMemoryNode일 경우 도구 그룹 렌더링 */}
-      {isToolsMemoryNode && (
-        <div className="mt-4 space-y-4">
-          {renderGroups(toolsGroups)}
-        </div>
-      )}
+
 
       {/* 조건 노드이고 유효성 에러가 있는 경우 에러 메시지 표시 */}
       {isConditionNode && hasValidationError && (
