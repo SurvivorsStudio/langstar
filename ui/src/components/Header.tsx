@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import homeLogo from '../assets/common/home_logo.png';
 import { apiService } from '../services/apiService';
 import { DeploymentFormData, Deployment } from '../types/deployment';
-import DeploymentModal from './DeploymentModal';
-import DeploymentSuccessModal from './DeploymentSuccessModal';
+import DeploymentModal from './deployment/DeploymentModal';
+import DeploymentSuccessModal from './deployment/DeploymentSuccessModal';
 
 import CodeEditor from './CodeEditor';
 

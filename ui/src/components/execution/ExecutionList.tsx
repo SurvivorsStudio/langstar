@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Square, RefreshCw, Eye, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Play, Square, RefreshCw, Eye, Clock, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 
 interface Execution {
   id: string;
@@ -31,6 +31,8 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
     search: '',
     timeRange: 'last-15-months'
   });
+  const [selectedExecutions, setSelectedExecutions] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchExecutions();
@@ -100,6 +102,106 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
     }
   };
 
+  const deleteExecution = async (executionId: string) => {
+    if (!window.confirm('Are you sure you want to delete this execution? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/executions/${executionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Execution deleted successfully:', executionId);
+        fetchExecutions(); // 목록 새로고침
+      } else {
+        console.error('Failed to delete execution:', data.message);
+        alert('Failed to delete execution: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting execution:', error);
+      alert('Error deleting execution: ' + error);
+    }
+  };
+
+  const deleteSelectedExecutions = async () => {
+    if (selectedExecutions.size === 0) {
+      alert('Please select executions to delete.');
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to delete ${selectedExecutions.size} execution(s)? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    const executionIds = Array.from(selectedExecutions);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const executionId of executionIds) {
+        try {
+          const response = await fetch(`/api/executions/${executionId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            successCount++;
+            console.log('Execution deleted successfully:', executionId);
+          } else {
+            errorCount++;
+            console.error('Failed to delete execution:', executionId, data.message);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error('Error deleting execution:', executionId, error);
+        }
+      }
+
+      // 결과 알림
+      if (successCount > 0) {
+        alert(`Successfully deleted ${successCount} execution(s).${errorCount > 0 ? ` Failed to delete ${errorCount} execution(s).` : ''}`);
+        setSelectedExecutions(new Set()); // 선택 초기화
+        fetchExecutions(); // 목록 새로고침
+      } else {
+        alert('Failed to delete any executions.');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedExecutions.size === executions.length) {
+      setSelectedExecutions(new Set());
+    } else {
+      setSelectedExecutions(new Set(executions.map(execution => execution.id)));
+    }
+  };
+
+  const handleSelectExecution = (executionId: string) => {
+    const newSelected = new Set(selectedExecutions);
+    if (newSelected.has(executionId)) {
+      newSelected.delete(executionId);
+    } else {
+      newSelected.add(executionId);
+    }
+    setSelectedExecutions(newSelected);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running':
@@ -133,11 +235,12 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
   };
 
   const formatDuration = (durationMs?: number) => {
-    if (!durationMs) return '-';
-    const seconds = Math.floor(durationMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    if (!durationMs) {
+      return '-';
+    }
+    
+    // ms 단위로 그대로 표시
+    return `${durationMs}ms`;
   };
 
   const formatDateTime = (dateString: string) => {
@@ -158,6 +261,17 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            {selectedExecutions.size > 0 && (
+              <button
+                onClick={deleteSelectedExecutions}
+                disabled={isDeleting}
+                className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 disabled:opacity-50 flex items-center space-x-1"
+                title={`Delete ${selectedExecutions.size} selected execution(s)`}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeleting ? 'Deleting...' : `Delete (${selectedExecutions.size})`}</span>
+              </button>
+            )}
             <button
               onClick={fetchExecutions}
               className="p-2 text-gray-500 hover:text-gray-700"
@@ -209,6 +323,15 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <input
+                  type="checkbox"
+                  checked={selectedExecutions.size === executions.length && executions.length > 0}
+                  onChange={handleSelectAll}
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -228,13 +351,13 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                   Loading executions...
                 </td>
               </tr>
             ) : executions.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                   No executions found
                 </td>
               </tr>
@@ -245,6 +368,18 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => onExecutionSelect(execution)}
                 >
+                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedExecutions.has(execution.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleSelectExecution(execution.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-800">
                     {execution.name}
                   </td>
@@ -286,6 +421,16 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
                           <Square className="w-4 h-4" />
                         </button>
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteExecution(execution.id);
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete execution"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -3,24 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Play, 
-  Edit, 
-  MoreHorizontal, 
   Clock, 
   CheckCircle, 
   XCircle, 
   AlertCircle,
   Activity,
-  BarChart3,
-  FileText,
-  Tag,
-  GitBranch,
-  Settings,
-  RefreshCw
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Deployment, DeploymentStatus } from '../../types/deployment';
 import ExecutionList from '../execution/ExecutionList';
-import DeploymentFlowGraph from './DeploymentFlowGraph.tsx';
 import ExecutionDetail from '../execution/ExecutionDetail.tsx';
 
 interface Execution {
@@ -40,7 +31,7 @@ const DeploymentDetail: React.FC = () => {
   const navigate = useNavigate();
   
   const [deployment, setDeployment] = useState<Deployment | null>(null);
-  const [activeTab, setActiveTab] = useState<'executions' | 'monitoring' | 'logging' | 'definition' | 'aliases' | 'versions' | 'tags'>('executions');
+  const [activeTab, setActiveTab] = useState<'executions'>('executions');
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +72,7 @@ const DeploymentDetail: React.FC = () => {
   const [executionResult, setExecutionResult] = useState<any>(null);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [isLoadingExecutionDetail, setIsLoadingExecutionDetail] = useState(false);
 
   const generateDefaultInput = () => {
     try {
@@ -143,8 +135,12 @@ const DeploymentDetail: React.FC = () => {
   const handleExecuteDeployment = async () => {
     try {
       setIsExecuting(true);
+      setIsLoadingExecutionDetail(true); // Execute 버튼 클릭 시 로딩 시작
       setInputError(null);
       setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Starting execution...`]);
+      
+      // 설정 팝업 닫기
+      setIsExecutionModalOpen(false);
 
       // Input 데이터 파싱
       let inputData = {};
@@ -176,6 +172,8 @@ const DeploymentDetail: React.FC = () => {
       });
 
       const data = await response.json();
+      
+      console.log('🔍 Execution response data:', data);
 
       if (data.success) {
         setExecutionResult(data);
@@ -185,22 +183,55 @@ const DeploymentDetail: React.FC = () => {
         // Execution History 새로고침을 위해 이벤트 발생
         console.log('Dispatching executionCompleted event');
         window.dispatchEvent(new CustomEvent('executionCompleted'));
+        
+        // 새로 생성된 실행의 ID를 가져와서 ExecutionDetail을 최신화
+        const executionId = data.execution_id || data.result?.execution_id;
+        if (executionId) {
+          console.log('New execution created with ID:', executionId);
+          
+          // 즉시 로딩 시작
+          setIsLoadingExecutionDetail(true);
+          console.log('🔄 Loading new execution detail...');
+          
+          // 새 실행 정보를 가져와서 ExecutionDetail을 업데이트
+          setTimeout(async () => {
+            try {
+              const executionResponse = await fetch(`/api/executions/${executionId}`);
+              const executionData = await executionResponse.json();
+              
+              if (executionData.success && executionData.execution) {
+                console.log('✅ Fetched new execution data:', executionData.execution);
+                setSelectedExecution(executionData.execution);
+              } else {
+                console.log('⚠️ Execution data not found, trying alternative approach...');
+                // 대안: 가장 최근 실행을 가져오기
+                const executionsResponse = await fetch(`/api/workflows/${deployment?.workflowId}/executions?max_results=1`);
+                const executionsData = await executionsResponse.json();
+                
+                if (executionsData.success && executionsData.executions && executionsData.executions.length > 0) {
+                  console.log('✅ Using most recent execution:', executionsData.executions[0]);
+                  setSelectedExecution(executionsData.executions[0]);
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error fetching new execution data:', error);
+            } finally {
+              setIsLoadingExecutionDetail(false);
+            }
+          }, 2000); // 2초 후에 실행 정보를 가져옴 (더 긴 지연)
+        }
       } else {
         setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${data.message || 'Execution failed'}`]);
       }
     } catch (error) {
       console.error('Error executing deployment:', error);
       setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${error}`]);
+      setIsLoadingExecutionDetail(false); // 에러 발생 시 로딩 상태 해제
     } finally {
       setIsExecuting(false);
     }
   };
 
-
-
-  const handleEditDeployment = () => {
-    navigate(`/flow-builder?deploymentId=${deploymentId}`);
-  };
 
   const getStatusIcon = (status: DeploymentStatus) => {
     switch (status) {
@@ -276,18 +307,7 @@ const DeploymentDetail: React.FC = () => {
                 <p className="text-sm text-gray-500">Deployment Details</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleEditDeployment}
-                className="px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-2"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Edit</span>
-              </button>
-              <button className="px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-            </div>
+
           </div>
         </div>
 
@@ -295,14 +315,14 @@ const DeploymentDetail: React.FC = () => {
         <div className="px-6 py-4 bg-gray-50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-gray-500">Arn:</span>
+              <span className="text-gray-500">Name:</span>
               <p className="font-mono text-xs text-gray-700 mt-1">
-                langstar:ap-northeast-2:123456789012:workflow:{deployment.name}
+                {deployment.workflowName || 'Unknown Workflow'}:{deployment.name}
               </p>
             </div>
             <div>
-              <span className="text-gray-500">Type:</span>
-              <p className="mt-1">Standard</p>
+              <span className="text-gray-500">ID:</span>
+              <p className="mt-1">{deployment.id}</p>
             </div>
             <div>
               <span className="text-gray-500">Status:</span>
@@ -321,31 +341,10 @@ const DeploymentDetail: React.FC = () => {
         {/* Tabs */}
         <div className="px-6">
           <nav className="flex space-x-8">
-            {[
-              { id: 'executions', label: 'Executions', icon: Activity },
-              { id: 'monitoring', label: 'Monitoring', icon: BarChart3 },
-              { id: 'logging', label: 'Logging', icon: FileText },
-              { id: 'definition', label: 'Definition', icon: GitBranch },
-              { id: 'aliases', label: 'Aliases', icon: Tag },
-              { id: 'versions', label: 'Versions', icon: GitBranch },
-              { id: 'tags', label: 'Tags', icon: Settings }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+            <button className="flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600">
+              <Activity className="w-4 h-4" />
+              <span>Executions</span>
+            </button>
           </nav>
         </div>
       </div>
@@ -354,86 +353,38 @@ const DeploymentDetail: React.FC = () => {
       <div className="px-6 py-6">
         {activeTab === 'executions' && (
           <div className="space-y-6">
-            {/* Execution Management Section */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Execution Management</h3>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setExecutionLogs([]);
-                      setExecutionResult(null);
-                    }}
-                    className="p-2 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100"
-                    title="Clear logs"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
+
+
+            {/* Execution History */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Execution History</h3>
                   <button
                     onClick={handleStartExecution}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 flex items-center space-x-2"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center space-x-2"
                   >
                     <Play className="w-4 h-4" />
                     <span>Start execution</span>
                   </button>
                 </div>
               </div>
-
-              {/* Execution Status */}
-              {isExecuting && (
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    <span className="text-blue-700 font-medium">Execution in progress...</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Execution Logs */}
-              {executionLogs.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Execution Logs</h4>
-                  <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-60 overflow-y-auto">
-                    {executionLogs.map((log, index) => (
-                      <div key={index} className="mb-1">{log}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Execution Result */}
-              {executionResult && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Execution Result</h4>
-                  <Editor
-                    height="200px"
-                    language="json"
-                    value={JSON.stringify(executionResult, null, 2)}
-                    options={{
-                      readOnly: true,
-                      minimap: { enabled: false },
-                      fontSize: 12,
-                      theme: 'vs-dark'
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Execution History */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Execution History</h3>
-              </div>
               <div className="p-4">
-                {selectedExecution ? (
+                {isLoadingExecutionDetail ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading execution details...</p>
+                    </div>
+                  </div>
+                ) : selectedExecution ? (
                   <ExecutionDetail 
                     execution={selectedExecution}
                     onBack={() => setSelectedExecution(null)}
                   />
                 ) : (
                   <ExecutionList
-                    workflowId={deployment.workflowId}
+                    workflowId={deployment.id}
                     workflowName={deployment.name}
                     onExecutionSelect={setSelectedExecution}
                   />
@@ -446,7 +397,7 @@ const DeploymentDetail: React.FC = () => {
         {/* Execution Modal */}
         {isExecutionModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900">
@@ -464,167 +415,74 @@ const DeploymentDetail: React.FC = () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Input Configuration */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Input Data (JSON) <span className="text-red-500">*</span>
-                    </label>
-                    <Editor
-                      height="300px"
-                      language="json"
-                      value={executionInput}
-                      onChange={(value) => {
-                        setExecutionInput(value || '{}');
-                        setInputError(null);
-                      }}
-                      options={{
-                        minimap: { enabled: false },
-                        fontSize: 12,
-                        theme: 'vs-light',
-                        lineNumbers: 'on',
-                        folding: true,
-                        wordWrap: 'on'
-                      }}
-                    />
-                    {inputError && (
-                      <div className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
-                        <div className="flex items-center space-x-2">
-                          <XCircle className="w-4 h-4" />
-                          <span>{inputError}</span>
-                        </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Input Data (JSON) <span className="text-red-500">*</span>
+                  </label>
+                  <Editor
+                    height="300px"
+                    language="json"
+                    value={executionInput}
+                    onChange={(value) => {
+                      setExecutionInput(value || '{}');
+                      setInputError(null);
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      theme: 'vs-light',
+                      lineNumbers: 'on',
+                      folding: true,
+                      wordWrap: 'on'
+                    }}
+                  />
+                  {inputError && (
+                    <div className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
+                      <div className="flex items-center space-x-2">
+                        <XCircle className="w-4 h-4" />
+                        <span>{inputError}</span>
                       </div>
-                    )}
-                    <div className="mt-2 text-xs text-gray-500">
-                      * Required variables are automatically populated based on the workflow's Start node configuration.
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      onClick={() => setIsExecutionModalOpen(false)}
-                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                      disabled={isExecuting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleExecuteDeployment}
-                      disabled={isExecuting}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50 flex items-center space-x-2"
-                    >
-                      {isExecuting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Executing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4" />
-                          <span>Execute</span>
-                        </>
-                      )}
-                    </button>
+                  )}
+                  <div className="mt-2 text-xs text-gray-500">
+                    * Required variables are automatically populated based on the workflow's Start node configuration.
                   </div>
                 </div>
 
-                {/* Right Column - Execution Status & Results */}
-                <div className="space-y-4">
-                  {/* Execution Status */}
-                  {isExecuting && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                        <span className="text-blue-700 font-medium">Execution in progress...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Execution Logs */}
-                  {executionLogs.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Execution Logs
-                      </label>
-                      <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-40 overflow-y-auto border">
-                        {executionLogs.map((log, index) => (
-                          <div key={index} className="mb-1">{log}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Execution Result */}
-                  {executionResult && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Execution Result
-                      </label>
-                      <Editor
-                        height="200px"
-                        language="json"
-                        value={JSON.stringify(executionResult, null, 2)}
-                        options={{
-                          readOnly: true,
-                          minimap: { enabled: false },
-                          fontSize: 12,
-                          theme: 'vs-dark',
-                          lineNumbers: 'on',
-                          folding: true,
-                          wordWrap: 'on'
-                        }}
-                      />
-                    </div>
-                  )}
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={() => setIsExecutionModalOpen(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    disabled={isExecuting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleExecuteDeployment}
+                    disabled={isExecuting}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {isExecuting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Executing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4" />
+                        <span>Execute</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
         
-        {activeTab === 'definition' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Workflow Definition</h3>
-            <DeploymentFlowGraph deployment={deployment} />
-          </div>
-        )}
-        
-        {activeTab === 'monitoring' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoring</h3>
-            <p className="text-gray-600">Monitoring dashboard will be implemented here.</p>
-          </div>
-        )}
-        
-        {activeTab === 'logging' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Logging</h3>
-            <p className="text-gray-600">Logging configuration will be implemented here.</p>
-          </div>
-        )}
-        
-        {activeTab === 'aliases' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Aliases</h3>
-            <p className="text-gray-600">Alias management will be implemented here.</p>
-          </div>
-        )}
-        
-        {activeTab === 'versions' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Versions</h3>
-            <p className="text-gray-600">Version management will be implemented here.</p>
-          </div>
-        )}
-        
-        {activeTab === 'tags' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
-            <p className="text-gray-600">Tag management will be implemented here.</p>
-          </div>
-        )}
+
       </div>
     </div>
   );
