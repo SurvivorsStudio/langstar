@@ -34,6 +34,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [availableVariables, setAvailableVariables] = useState<string[]>([]);
   const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
   const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
+  const [isEditingInputData, setIsEditingInputData] = useState<boolean>(false);
+  const [editedInputData, setEditedInputData] = useState<string>('');
 
   useEffect(() => {
     const node = nodes.find((n: any) => n.id === nodeId);
@@ -49,40 +51,58 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       const storeSelectedEdgeId = manuallySelectedEdges[nodeId];
       setManuallySelectedEdgeId(storeSelectedEdgeId || null);
 
-      // input data 선택 로직
-      let currentMergedInputData: Record<string, VariableValue> = {};
-      let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
-      
-      if (currentIncomingEdges.length > 0) {
-        // 수동으로 선택된 edge가 있으면 그것을 사용, 없으면 가장 최근 것 사용
-        const edgesWithTimestamps = currentIncomingEdges
-          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-          .map(edge => ({
-            edge,
-            timestamp: edge.data?.timestamp || 0,
-            output: edge.data.output
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+      // 편집 모드가 아닐 때만 input data 업데이트
+      if (!isEditingInputData) {
+        // input data 선택 로직
+        let currentMergedInputData: Record<string, VariableValue> = {};
+        let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
+        
+        if (currentIncomingEdges.length > 0) {
+          // 수동으로 선택된 edge가 있으면 그것을 사용, 없으면 가장 최근 것 사용
+          const edgesWithTimestamps = currentIncomingEdges
+            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+            .map(edge => ({
+              edge,
+              timestamp: edge.data?.timestamp || 0,
+              output: edge.data.output
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
 
-        if (edgesWithTimestamps.length > 0) {
-          const targetEdge = storeSelectedEdgeId 
-            ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
-            : edgesWithTimestamps[0];
-          
-          currentMergedInputData = targetEdge.output;
-          selectedEdge = {
-            edgeId: targetEdge.edge.id,
-            sourceNodeId: targetEdge.edge.source,
-            timestamp: targetEdge.timestamp
-          };
+          console.log(`[NodeInspector] Available edges for node ${nodeId}:`, edgesWithTimestamps.map(e => ({
+            edgeId: e.edge.id,
+            source: e.edge.source,
+            timestamp: e.timestamp,
+            timestampDate: new Date(e.timestamp).toLocaleString()
+          })));
+
+          if (edgesWithTimestamps.length > 0) {
+            const targetEdge = storeSelectedEdgeId 
+              ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
+              : edgesWithTimestamps[0];
+            
+            console.log(`[NodeInspector] Selected edge for node ${nodeId}:`, {
+              edgeId: targetEdge.edge.id,
+              source: targetEdge.edge.source,
+              timestamp: targetEdge.timestamp,
+              timestampDate: new Date(targetEdge.timestamp).toLocaleString(),
+              isManuallySelected: !!storeSelectedEdgeId
+            });
+            
+            currentMergedInputData = targetEdge.output;
+            selectedEdge = {
+              edgeId: targetEdge.edge.id,
+              sourceNodeId: targetEdge.edge.source,
+              timestamp: targetEdge.timestamp
+            };
+          }
         }
-      }
-      setMergedInputData(currentMergedInputData);
-      setSelectedEdgeInfo(selectedEdge);
+        setMergedInputData(currentMergedInputData);
+        setSelectedEdgeInfo(selectedEdge);
 
-      const currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
-      setHasValidInputData(currentHasValidInputData);
-      setAvailableVariables(currentHasValidInputData ? Object.keys(currentMergedInputData) : []);
+        const currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
+        setHasValidInputData(currentHasValidInputData);
+        setAvailableVariables(currentHasValidInputData ? Object.keys(currentMergedInputData) : []);
+      }
 
       // Adjust active tab based on node type and current active tab validity
       const nodeType = node.type;
@@ -112,7 +132,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         setActiveTab(newDefaultTab);
       }
     }
-  }, [nodeId, nodes, edges, activeTab, manuallySelectedEdgeId]);
+  }, [nodeId, nodes, edges, activeTab, manuallySelectedEdges, isEditingInputData]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
@@ -205,6 +225,57 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       setSelectedEdgeInfo(null);
       
       console.log(`Cleared all input data for node ${nodeId}`);
+    }
+  };
+
+  // input data 편집 시작 핸들러
+  const handleStartEditInputData = () => {
+    setEditedInputData(JSON.stringify(mergedInputData, null, 2));
+    setIsEditingInputData(true);
+  };
+
+  // input data 편집 취소 핸들러
+  const handleCancelEditInputData = () => {
+    setIsEditingInputData(false);
+    setEditedInputData('');
+  };
+
+  // input data 편집 저장 핸들러
+  const handleSaveEditInputData = () => {
+    try {
+      const parsedData = JSON.parse(editedInputData);
+      
+      // 수정된 데이터를 노드에 설정
+      if (currentNode) {
+        updateNodeData(nodeId, {
+          ...currentNode.data,
+          inputData: parsedData
+        });
+      }
+      
+      // 수정된 데이터를 edge에 반영
+      if (selectedEdgeInfo) {
+        updateEdgeData(selectedEdgeInfo.edgeId, {
+          output: parsedData,
+          timestamp: Date.now()
+        });
+      }
+      
+      // 로컬 상태 업데이트
+      setMergedInputData(parsedData);
+      setIsEditingInputData(false);
+      setEditedInputData('');
+      
+      // 수동 선택 정보 업데이트 (편집된 데이터를 선택된 것으로 표시)
+      if (selectedEdgeInfo) {
+        setManuallySelectedEdge(nodeId, selectedEdgeInfo.edgeId);
+        setManuallySelectedEdgeId(selectedEdgeInfo.edgeId);
+      }
+      
+      console.log(`Updated input data for node ${nodeId}:`, parsedData);
+    } catch (error) {
+      console.error('Invalid JSON format:', error);
+      alert('Invalid JSON format. Please check your input.');
     }
   };
 
@@ -302,15 +373,59 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Incoming Data</h3>
-              {incomingEdges.length > 0 && hasValidInputData && (
+              <div className="flex items-center space-x-2">
+                {incomingEdges.length > 0 && hasValidInputData && (
+                  <button
+                    onClick={handleClearInputData}
+                    className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                    title="Clear all input data"
+                  >
+                    Clear All
+                  </button>
+                )}
                 <button
-                  onClick={handleClearInputData}
-                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
-                  title="Clear all input data"
+                  onClick={() => {
+                    // 강제로 input data 새로고침
+                    const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
+                    setIncomingEdges(currentIncomingEdges);
+                    
+                    const storeSelectedEdgeId = manuallySelectedEdges[nodeId];
+                    setManuallySelectedEdgeId(storeSelectedEdgeId || null);
+                    
+                    if (currentIncomingEdges.length > 0) {
+                      const edgesWithTimestamps = currentIncomingEdges
+                        .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+                        .map(edge => ({
+                          edge,
+                          timestamp: edge.data?.timestamp || 0,
+                          output: edge.data.output
+                        }))
+                        .sort((a, b) => b.timestamp - a.timestamp);
+
+                      if (edgesWithTimestamps.length > 0) {
+                        const targetEdge = storeSelectedEdgeId 
+                          ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
+                          : edgesWithTimestamps[0];
+                        
+                        setMergedInputData(targetEdge.output);
+                        setSelectedEdgeInfo({
+                          edgeId: targetEdge.edge.id,
+                          sourceNodeId: targetEdge.edge.source,
+                          timestamp: targetEdge.timestamp
+                        });
+                        
+                        const currentHasValidInputData = targetEdge.output && Object.keys(targetEdge.output).length > 0;
+                        setHasValidInputData(currentHasValidInputData);
+                        setAvailableVariables(currentHasValidInputData ? Object.keys(targetEdge.output) : []);
+                      }
+                    }
+                  }}
+                  className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                  title="Refresh input data"
                 >
-                  Clear All
+                  Refresh
                 </button>
-              )}
+              </div>
             </div>
             {incomingEdges.length === 0 ? (
               <div className="flex items-center mt-1 text-amber-500 text-xs">
@@ -344,11 +459,45 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                         <Play className="w-3 h-3 text-green-600 dark:text-green-400" />
                       </div>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
-                      <pre className="whitespace-pre-wrap break-words">
-                        {JSON.stringify(mergedInputData, null, 2)}
-                      </pre>
-                    </div>
+                    
+                    {isEditingInputData ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editedInputData}
+                          onChange={(e) => setEditedInputData(e.target.value)}
+                          className="w-full h-32 p-2 text-xs font-mono bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Edit JSON data here..."
+                        />
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={handleSaveEditInputData}
+                            className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEditInputData}
+                            className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
+                          <pre className="whitespace-pre-wrap break-words">
+                            {JSON.stringify(mergedInputData, null, 2)}
+                          </pre>
+                        </div>
+                        <button
+                          onClick={handleStartEditInputData}
+                          className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                        >
+                          Edit Data
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
