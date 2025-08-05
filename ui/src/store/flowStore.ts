@@ -1186,6 +1186,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         case 'mergeNode': {
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
           const allInputsFromEdges: Record<string, any> = {};
+          
+          // 모든 source node가 완료되었는지 확인
+          const sourceNodeIds = [...new Set(incomingEdges.map(edge => edge.source))];
+          const completedSourceNodes = sourceNodeIds.filter(sourceId => {
+            const sourceNode = get().nodes.find(n => n.id === sourceId);
+            return sourceNode && sourceNode.data.output && !sourceNode.data.isExecuting;
+          });
+          
+          // 모든 source node가 완료되지 않았다면 대기
+          if (completedSourceNodes.length < sourceNodeIds.length) {
+            console.log(`[MergeNode ${nodeId}] Waiting for all source nodes to complete. Completed: ${completedSourceNodes.length}/${sourceNodeIds.length}`);
+            output = { 
+              status: 'waiting',
+              message: `Waiting for all source nodes to complete (${completedSourceNodes.length}/${sourceNodeIds.length})`,
+              completedNodes: completedSourceNodes,
+              totalNodes: sourceNodeIds.length
+            };
+            break;
+          }
+          
+          // 모든 source node가 완료되었으므로 merge 처리
+          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge.`);
+          
           incomingEdges.forEach(edge => {
             if (edge.data?.output && typeof edge.data.output === 'object') {
               // Store all outputs keyed by their source node ID for easy lookup
@@ -1216,6 +1239,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             // Fallback or error if no mappings? For now, empty if no valid mappings.
             console.warn(`MergeNode (${nodeId}): No merge mappings defined or mappings are empty. Output will be empty.`);
           }
+          
+          console.log(`[MergeNode ${nodeId}] Merge completed successfully:`, mergedOutput);
           output = mergedOutput;
           break;
         }
@@ -1279,6 +1304,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         } else {
           console.log(`    ➖ 엣지 ${edge.id} (타겟: ${edge.target})로 데이터가 전달되지 않았습니다. (조건: ${edge.data?.label || 'N/A'}, 출력: ${edge.data?.output})`);
         }
+      }
+      
+      // Merge node가 대기 상태인지 확인하고 재실행
+      const currentExecutedNode = getNodeById(currentNodeId);
+      if (currentExecutedNode?.type === 'mergeNode' && currentExecutedNode.data.output?.status === 'waiting') {
+        console.log(`🔄 Merge node ${currentNodeId} is waiting. Re-adding to queue for retry.`);
+        executionQueue.push(currentNodeId);
       }
     }
     console.log("\n=========================================");
