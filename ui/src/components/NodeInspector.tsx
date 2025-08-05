@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Settings, Code, AlertCircle, LogIn } from 'lucide-react';
+import { X, Settings, Code, AlertCircle, LogIn, Play } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import ConditionSettings from './nodes/ConditionSettings';
@@ -21,7 +21,7 @@ interface NodeInspectorProps {
 }
 
 const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
-  const { nodes, edges, updateNodeData } = useFlowStore();
+  const { nodes, edges, updateNodeData, executeNode, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
   const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings'>('input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
@@ -32,6 +32,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [mergedInputData, setMergedInputData] = useState<Record<string, VariableValue>>({});
   const [hasValidInputData, setHasValidInputData] = useState<boolean>(false);
   const [availableVariables, setAvailableVariables] = useState<string[]>([]);
+  const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
+  const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
 
   useEffect(() => {
     const node = nodes.find((n: any) => n.id === nodeId);
@@ -43,13 +45,40 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
       setIncomingEdges(currentIncomingEdges);
 
-      const currentMergedInputData = currentIncomingEdges.reduce((acc: Record<string, VariableValue>, edge: Edge) => {
-        if (edge.data?.output && typeof edge.data.output === 'object') {
-          return { ...acc, ...edge.data.output };
+      // store에서 수동 선택된 edge 정보 가져오기
+      const storeSelectedEdgeId = manuallySelectedEdges[nodeId];
+      setManuallySelectedEdgeId(storeSelectedEdgeId || null);
+
+      // input data 선택 로직
+      let currentMergedInputData: Record<string, VariableValue> = {};
+      let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
+      
+      if (currentIncomingEdges.length > 0) {
+        // 수동으로 선택된 edge가 있으면 그것을 사용, 없으면 가장 최근 것 사용
+        const edgesWithTimestamps = currentIncomingEdges
+          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+          .map(edge => ({
+            edge,
+            timestamp: edge.data?.timestamp || 0,
+            output: edge.data.output
+          }))
+          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+
+        if (edgesWithTimestamps.length > 0) {
+          const targetEdge = storeSelectedEdgeId 
+            ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
+            : edgesWithTimestamps[0];
+          
+          currentMergedInputData = targetEdge.output;
+          selectedEdge = {
+            edgeId: targetEdge.edge.id,
+            sourceNodeId: targetEdge.edge.source,
+            timestamp: targetEdge.timestamp
+          };
         }
-        return acc;
-      }, {} as Record<string, VariableValue>);
+      }
       setMergedInputData(currentMergedInputData);
+      setSelectedEdgeInfo(selectedEdge);
 
       const currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
       setHasValidInputData(currentHasValidInputData);
@@ -83,7 +112,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         setActiveTab(newDefaultTab);
       }
     }
-  }, [nodeId, nodes, edges, activeTab]);
+  }, [nodeId, nodes, edges, activeTab, manuallySelectedEdgeId]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
@@ -103,6 +132,79 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         ...currentNode.data,
         code: newCode
       });
+    }
+  };
+
+  // input data 클릭 핸들러
+  const handleInputDataClick = async (edgeId: string, sourceNodeId: string, inputData: Record<string, VariableValue>) => {
+    setManuallySelectedEdgeId(edgeId);
+    
+    // store에 수동 선택 정보 저장
+    setManuallySelectedEdge(nodeId, edgeId);
+    
+    // 선택된 input data로 노드 실행
+    if (currentNode) {
+      try {
+        // input data를 노드에 설정
+        updateNodeData(nodeId, {
+          ...currentNode.data,
+          inputData: inputData
+        });
+        
+        // 노드 실행을 위해 임시로 edge 데이터 수정
+        const originalEdgeData = edges.find(e => e.id === edgeId)?.data;
+        
+        // 선택된 input data로 edge 업데이트
+        updateEdgeData(edgeId, {
+          output: inputData,
+          timestamp: Date.now()
+        });
+        
+        // 노드 실행
+        await executeNode(nodeId);
+        
+        // 원래 edge 데이터 복원 (선택적)
+        if (originalEdgeData) {
+          setTimeout(() => {
+            updateEdgeData(edgeId, originalEdgeData);
+          }, 100);
+        }
+        
+        console.log(`Node ${nodeId} executed with manually selected input from node ${sourceNodeId}`);
+      } catch (error) {
+        console.error('Error executing node with selected input:', error);
+      }
+    }
+  };
+
+  // input data 전체 삭제 핸들러
+  const handleClearInputData = () => {
+    if (currentNode) {
+      // 노드의 inputData 초기화
+      updateNodeData(nodeId, {
+        ...currentNode.data,
+        inputData: null
+      });
+      
+      // 수동 선택 정보 초기화
+      setManuallySelectedEdge(nodeId, null);
+      setManuallySelectedEdgeId(null);
+      
+      // 모든 incoming edge의 output 초기화
+      incomingEdges.forEach(edge => {
+        updateEdgeData(edge.id, {
+          output: null,
+          timestamp: 0
+        });
+      });
+      
+      // 로컬 상태 초기화
+      setMergedInputData({});
+      setHasValidInputData(false);
+      setAvailableVariables([]);
+      setSelectedEdgeInfo(null);
+      
+      console.log(`Cleared all input data for node ${nodeId}`);
     }
   };
 
@@ -198,7 +300,18 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'input_data' && !isStartNode && (
           <div className="p-4">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Incoming Data</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Incoming Data</h3>
+              {incomingEdges.length > 0 && hasValidInputData && (
+                <button
+                  onClick={handleClearInputData}
+                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                  title="Clear all input data"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
             {incomingEdges.length === 0 ? (
               <div className="flex items-center mt-1 text-amber-500 text-xs">
                 <AlertCircle size={12} className="mr-1" />
@@ -210,10 +323,77 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                 Connected node(s) have not produced output or output is empty. Execute preceding nodes.
               </div>
             ) : (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 font-mono text-xs text-gray-900 dark:text-gray-100">
-                <pre className="whitespace-pre-wrap break-words">
-                  {JSON.stringify(mergedInputData, null, 2)}
-                </pre>
+              <div className="space-y-3">
+                {/* 선택된 데이터 표시 */}
+                {selectedEdgeInfo && (
+                  <div 
+                    className={`bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors ${
+                      manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''
+                    }`}
+                    onClick={() => handleInputDataClick(selectedEdgeInfo.edgeId, selectedEdgeInfo.sourceNodeId, mergedInputData)}
+                    title="Click to execute with this input"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                        ✅ Selected Input (Latest)
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          {new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()}
+                        </span>
+                        <Play className="w-3 h-3 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
+                      <pre className="whitespace-pre-wrap break-words">
+                        {JSON.stringify(mergedInputData, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 다른 input data들 표시 */}
+                {incomingEdges.length > 1 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400">Other Available Inputs:</h4>
+                    {incomingEdges
+                      .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+                      .filter(edge => !selectedEdgeInfo || edge.id !== selectedEdgeInfo.edgeId)
+                      .map((edge) => {
+                        const sourceNode = nodes.find(n => n.id === edge.source);
+                        const isSelected = manuallySelectedEdgeId === edge.id;
+                        return (
+                          <div 
+                            key={edge.id}
+                            className={`border rounded-lg p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                              isSelected 
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 border-2' 
+                                : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+                            }`}
+                            onClick={() => handleInputDataClick(edge.id, edge.source, edge.data.output)}
+                            title="Click to execute with this input"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                From: {sourceNode?.data.label || edge.source}
+                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-500">
+                                  {edge.data.timestamp ? new Date(edge.data.timestamp).toLocaleTimeString() : 'No timestamp'}
+                                </span>
+                                <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
+                              </div>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800 rounded p-1 font-mono text-xs text-gray-700 dark:text-gray-300 opacity-60">
+                              <pre className="whitespace-pre-wrap break-words">
+                                {JSON.stringify(edge.data.output, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             )}
           </div>
