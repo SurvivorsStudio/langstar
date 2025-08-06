@@ -60,6 +60,27 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
   const { status, nodeLog, getNodeColorClass } = data;
   const [expandedInput, setExpandedInput] = useState(false);
   const [expandedOutput, setExpandedOutput] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // 노드 높이를 동적으로 계산 (드래그 중에는 고정 높이 사용)
+  const getNodeHeight = () => {
+    // 드래그 중일 때는 고정 높이를 사용하여 성능 최적화
+    if (isDragging) {
+      return 160;
+    }
+    
+    let height = 160; // 기본 높이
+    
+    if (expandedInput) {
+      height += 80; // Input 펼침 시 추가 높이
+    }
+    
+    if (expandedOutput) {
+      height += 80; // Output 펼침 시 추가 높이
+    }
+    
+    return height;
+  };
   
   const getNodeStatusIcon = (status: string) => {
     switch (status) {
@@ -94,7 +115,16 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
   return (
     <div 
       className={`bg-white dark:bg-gray-800 rounded-lg border-2 shadow-lg transition-all duration-300 hover:shadow-xl ${getNodeColorClass(data.nodeType, status)} ${data.selected ? 'ring-4 ring-blue-400 ring-opacity-50 shadow-2xl scale-105' : ''}`} 
-      style={{ width: '100%', height: '100%', boxSizing: 'border-box' }}
+      style={{ 
+        width: '100%', 
+        height: `${getNodeHeight()}px`, 
+        boxSizing: 'border-box',
+        // 드래그 중일 때는 transition 비활성화
+        transition: isDragging ? 'none' : 'all 0.3s ease'
+      }}
+      onMouseDown={() => setIsDragging(true)}
+      onMouseUp={() => setIsDragging(false)}
+      onMouseLeave={() => setIsDragging(false)}
     >
       {/* Input Handle (Top Center) */}
       <Handle
@@ -120,47 +150,53 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
         
 
         
-        {/* Show input/output data if available */}
-        {nodeLog && (
-          <div className="space-y-2 flex-1">
-            {/* Input Data - Started 상태에서는 표시하지 않음 */}
-            {nodeLog.input_data && Object.keys(nodeLog.input_data).length > 0 && status !== 'started' && (
-              <div className="text-xs">
-                <button 
-                  onClick={() => setExpandedInput(!expandedInput)}
-                  className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                >
-                  {expandedInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  <span className="font-medium">Input:</span>
-                  <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.input_data).length} fields)</span>
-                </button>
-                {expandedInput && (
-                  <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-600">
-                    <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.input_data, null, 2)}</pre>
+                    {/* Show input/output data if available */}
+            {nodeLog && !isDragging && (
+              <div className="space-y-2 flex-1">
+                {/* Input Data - Started 상태에서는 표시하지 않음 */}
+                {nodeLog.input_data && Object.keys(nodeLog.input_data).length > 0 && status !== 'started' && (
+                  <div className="text-xs">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedInput(!expandedInput);
+                      }}
+                      className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                    >
+                      {expandedInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      <span className="font-medium">Input:</span>
+                      <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.input_data).length} fields)</span>
+                    </button>
+                    {expandedInput && (
+                      <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-20 overflow-y-auto border border-gray-200 dark:border-gray-600">
+                        <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.input_data, null, 2)}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Output Data - Started 상태에서는 표시하지 않음 */}
+                {nodeLog.output_data && Object.keys(nodeLog.output_data).length > 0 && status !== 'started' && (
+                  <div className="text-xs">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedOutput(!expandedOutput);
+                      }}
+                      className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                    >
+                      {expandedOutput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      <span className="font-medium">Output:</span>
+                      <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.output_data).length} fields)</span>
+                    </button>
+                    {expandedOutput && (
+                      <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-20 overflow-y-auto border border-gray-200 dark:border-gray-600">
+                        <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.output_data, null, 2)}</pre>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-            {/* Output Data - Started 상태에서는 표시하지 않음 */}
-            {nodeLog.output_data && Object.keys(nodeLog.output_data).length > 0 && status !== 'started' && (
-              <div className="text-xs">
-                <button 
-                  onClick={() => setExpandedOutput(!expandedOutput)}
-                  className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                >
-                  {expandedOutput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  <span className="font-medium">Output:</span>
-                  <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.output_data).length} fields)</span>
-                </button>
-                {expandedOutput && (
-                  <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-600">
-                    <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.output_data, null, 2)}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Status indicator */}
@@ -804,26 +840,60 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                     margin-left: 0 !important;
                   }
                   
-                  /* 노드 크기 정확히 제어 */
+                  /* 노드 크기 제어 (드래그 최적화) */
                   .react-flow__node {
-                    width: 256px !important;
-                    height: 160px !important;
-                    min-width: 256px !important;
-                    min-height: 160px !important;
-                    max-width: 256px !important;
-                    max-height: 160px !important;
+                    width: 256px;
+                    min-width: 256px;
+                    max-width: 256px;
+                    min-height: 160px;
+                    /* 드래그 성능 최적화 */
+                    will-change: transform;
+                    transform: translate3d(0, 0, 0);
                   }
                   
                   /* 노드 내부 컨테이너 크기 제어 */
                   .react-flow__node-default {
-                    width: 100% !important;
-                    height: 100% !important;
-                    box-sizing: border-box !important;
+                    width: 100%;
+                    height: 100%;
+                    box-sizing: border-box;
+                  }
+                  
+                  /* 드래그 중 노드 스타일 */
+                  .react-flow__node.dragging {
+                    z-index: 1000;
+                    pointer-events: none;
+                  }
+                  
+                  /* 드래그 중 노드 내부 요소들 비활성화 */
+                  .react-flow__node.dragging * {
+                    pointer-events: none;
                   }
                   
                   /* 선택된 노드 스타일 */
                   .react-flow__node.selected {
-                    z-index: 10 !important;
+                    z-index: 10;
+                  }
+                  
+                  /* React Flow 드래그 성능 최적화 */
+                  .react-flow__pane {
+                    cursor: grab;
+                  }
+                  
+                  .react-flow__pane:active {
+                    cursor: grabbing;
+                  }
+                  
+                  /* 노드 드래그 중 스타일 */
+                  .react-flow__node.dragging {
+                    cursor: grabbing !important;
+                    user-select: none;
+                  }
+                  
+                  /* 드래그 중 노드 내부 상호작용 비활성화 */
+                  .react-flow__node.dragging button,
+                  .react-flow__node.dragging input,
+                  .react-flow__node.dragging select {
+                    pointer-events: none;
                   }
                   
                   /* 하이라이트된 로그 영역 스타일 */
@@ -878,6 +948,32 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
                     fitViewOptions={{ padding: 0.2 }}
                     attributionPosition="bottom-left"
                     onInit={setRfInstance}
+                    // 드래그 성능 최적화 설정
+                    nodesDraggable={true}
+                    nodesConnectable={false}
+                    elementsSelectable={true}
+                    selectNodesOnDrag={false}
+                    panOnDrag={true}
+                    panOnScroll={false}
+                    zoomOnScroll={true}
+                    zoomOnPinch={true}
+                    zoomOnDoubleClick={false}
+                    preventScrolling={true}
+                    // 드래그 중 성능 최적화
+                    onNodeDragStart={(event, node) => {
+                      // 드래그 시작 시 노드에 dragging 클래스 추가
+                      const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
+                      if (nodeElement) {
+                        nodeElement.classList.add('dragging');
+                      }
+                    }}
+                    onNodeDragStop={(event, node) => {
+                      // 드래그 종료 시 노드에서 dragging 클래스 제거
+                      const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
+                      if (nodeElement) {
+                        nodeElement.classList.remove('dragging');
+                      }
+                    }}
                     onNodeClick={(event, node) => {
                       setSelectedNodeId(node.id);
                       setHighlightedNodeId(node.id);
