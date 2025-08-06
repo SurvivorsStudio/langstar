@@ -12,7 +12,6 @@ export enum DeploymentStatus {
 // 배포 환경 enum
 export enum DeploymentEnvironment {
   DEV = 'dev',
-  STAGING = 'staging',
   PROD = 'prod'
 }
 

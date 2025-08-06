@@ -313,11 +313,8 @@ def run_deployment(deployment_id: str, msg: dict = Body(...), request: Request =
         
         logger.info(f"Successfully executed deployment {deployment_id}")
         
-        return {
-            "success": True,
-            "deployment_id": deployment_id,
-            "result": result
-        }
+        # deployment_service에서 이미 완전한 응답 구조를 반환하므로 그대로 전달
+        return result
         
     except ValueError as e:
         logger.error(f"Deployment not found or not active: {str(e)}")

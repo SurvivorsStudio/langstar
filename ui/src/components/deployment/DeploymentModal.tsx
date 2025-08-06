@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
-import { DeploymentFormData, DeploymentEnvironment } from '../types/deployment';
+import { DeploymentFormData, DeploymentEnvironment } from '../../types/deployment';
 
 interface DeploymentModalProps {
   isOpen: boolean;
@@ -44,9 +44,9 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = '배포 이름은 필수입니다.';
+      newErrors.name = 'Deployment name is required.';
     } else if (formData.name.length > 100) {
-      newErrors.name = '배포 이름은 100자 이하여야 합니다.';
+      newErrors.name = 'Deployment name must be 100 characters or less.';
     }
 
     if (!formData.version.trim()) {
@@ -148,7 +148,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
                   ? 'border-red-500 focus:ring-red-500' 
                   : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white'
               }`}
-              placeholder="예: 1.0.0"
+              placeholder="e.g., 1.0.0"
               disabled={isLoading}
             />
             {errors.version && (
@@ -159,7 +159,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
           {/* 환경 */}
           <div>
             <label htmlFor="environment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              환경
+              Environment
             </label>
             <select
               id="environment"
@@ -168,16 +168,15 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               disabled={isLoading}
             >
-              <option value={DeploymentEnvironment.DEV}>개발 (DEV)</option>
-              <option value={DeploymentEnvironment.STAGING}>스테이징 (STAGING)</option>
-              <option value={DeploymentEnvironment.PROD}>운영 (PROD)</option>
+              <option value={DeploymentEnvironment.DEV}>Development (DEV)</option>
+              <option value={DeploymentEnvironment.PROD}>Production (PROD)</option>
             </select>
           </div>
 
           {/* 설명 */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              설명
+              Description
             </label>
             <textarea
               id="description"
@@ -189,7 +188,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
                   ? 'border-red-500 focus:ring-red-500' 
                   : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white'
               }`}
-              placeholder="배포에 대한 설명을 입력하세요..."
+              placeholder="Enter description for the deployment..."
               disabled={isLoading}
             />
             {errors.description && (
@@ -205,7 +204,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
               disabled={isLoading}
             >
-              취소
+              Cancel
             </button>
             <button
               type="submit"
@@ -215,12 +214,12 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  배포 중...
+                  Deploying...
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  배포 생성
+                  Create Deployment
                 </>
               )}
             </button>

@@ -93,7 +93,8 @@ memory = ConversationBufferMemory(return_messages=True)
 def memory_base_agent_code(node) : 
     code = ""
     node_name = node['data']['label']
-
+    node_id = node['id']
+    node_type = node['type']
     if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
         code += f"""
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -101,6 +102,7 @@ from langchain_aws import ChatBedrockConverse
 from langchain.memory import ConversationBufferMemory
 
 
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
     my_name = "{node_name}" 
@@ -203,9 +205,12 @@ def get_tool_list(node) :
 
 def base_tool_agent_code(node) :
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     tool_list = get_tool_list(node)
 
     code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
     from langchain_aws import ChatBedrockConverse
@@ -338,6 +343,8 @@ def return_update_config( node_config, user_message_content, ai_message_content 
 def memory_tool_agent_code(node) : 
     code = ""
     node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
     tool_list = get_tool_list(node)
 
     # code = memory_select_code() 
@@ -345,7 +352,7 @@ def memory_tool_agent_code(node) :
 
     code += common_memory_code() 
     code += f"""
-
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
     from langchain_aws import ChatBedrockConverse
