@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Bot, Split, FileCode, Play, Square, MessageSquare, Settings, Group, GitMerge,
-  Database, Cpu
+  Database, Cpu, Code
 } from 'lucide-react';
 import { CustomNode } from './CustomNode';
 const AgentNode = (props: any) => (
@@ -136,6 +136,18 @@ const MergeNode = (props: any) => (
   />
 );
 
+const UserNode = (props: any) => (
+  <CustomNode
+    {...props}
+    data={{
+      ...props.data,
+      icon: <Code size={16} />,
+      nodeType: 'userNode',
+      description: 'User-defined custom node'
+    }}
+  />
+);
+
 export const nodeTypes = {
   agentNode: AgentNode,
   conditionNode: ConditionNode,
@@ -148,4 +160,5 @@ export const nodeTypes = {
   embeddingNode: EmbeddingNode,
   ragNode: RAGNode,
   mergeNode: MergeNode, // MergeNode 추가
+  userNode: UserNode, // UserNode 추가
 };

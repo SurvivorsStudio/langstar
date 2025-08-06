@@ -9,6 +9,8 @@ import RagConfigForm from '../components/workspace/RagConfigForm';
 import DeploymentList from '../components/workspace/DeploymentList';
 import AIConnectionList from '../components/workspace/AIConnectionList';
 import AIConnectionWizard from '../components/workspace/AIConnectionWizard';
+import NodeCreation from '../components/workspace/NodeCreation';
+import NodeManagement from '../components/workspace/NodeManagement';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
 import { Deployment } from '../types/deployment';
 
@@ -347,6 +349,8 @@ const WorkspacePage: React.FC = () => {
             activeMenu={activeMenu}
           />
         );
+      case 'node-creation':
+        return <NodeManagement onBack={() => setActiveMenu('chatflows')} />;
       default:
         return null;
     }

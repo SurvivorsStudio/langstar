@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, X, Search, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, X, Search, Sun, Moon, Code } from 'lucide-react';
 import { nodeCategories } from '../data/nodeCategories';
 import { useThemeStore } from '../store/themeStore';
+import { useFlowStore } from '../store/flowStore';
 
 interface NodeSidebarProps {
   onClose: () => void;
@@ -9,10 +10,17 @@ interface NodeSidebarProps {
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+  const { userNodes, fetchUserNodes } = useFlowStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    'Sequential Agents': true
+    'Sequential Agents': true,
+    'User Nodes': false
   });
+
+  // UserNode 목록 로드
+  useEffect(() => {
+    fetchUserNodes();
+  }, [fetchUserNodes]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
@@ -105,6 +113,47 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
             )}
           </div>
         ))}
+
+        {/* UserNode 섹션 */}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => toggleCategory('User Nodes')}
+            className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <span className="font-medium text-gray-700 dark:text-gray-300">User Nodes</span>
+            {expandedCategories['User Nodes'] ? (
+              <ChevronUp size={18} className="text-gray-500 dark:text-gray-400" />
+            ) : (
+              <ChevronDown size={18} className="text-gray-500 dark:text-gray-400" />
+            )}
+          </button>
+          {expandedCategories['User Nodes'] && (
+            <div className="px-4 pb-3">
+              {userNodes.length === 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+                  사용자 정의 노드가 없습니다.
+                </div>
+              ) : (
+                userNodes.map((userNode) => (
+                  <div
+                    key={userNode.id}
+                    className="flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
+                    draggable
+                    onDragStart={(event) => handleNodeDragStart(event, 'userNode', userNode.name)}
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
+                      <Code className={`h-6 w-6 ${isDarkMode ? 'text-white' : 'text-gray-700'}`} />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{userNode.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 text-left">{userNode.functionDescription}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div 

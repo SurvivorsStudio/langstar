@@ -12,6 +12,7 @@ import RAGSettings from './nodes/RAGSettings';
 import MergeSettings from './nodes/MergeSettings';
 import EndNodeSettings from './nodes/EndNodeSettings';
 import ToolsMemorySettings from './nodes/ToolsMemorySettings';
+import UserNodeSettings from './nodes/UserNodeSettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
 
@@ -240,6 +241,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const isRAGNode = currentNode.type === 'ragNode';
   const isEndNode = currentNode.type === 'endNode';
   const isMergeNode = currentNode.type === 'mergeNode';
+  const isUserNode = currentNode.type === 'userNode';
 
   return (
     <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10">
@@ -305,7 +307,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
           return null;
         })()}
 
-        {!(isPromptNode || isSystemPromptNode) && (
+        {!(isPromptNode || isSystemPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode) && (
           <button
             className={`flex-1 py-2 flex justify-center items-center ${
               activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
@@ -538,6 +540,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
               {isRAGNode && <RAGSettings nodeId={nodeId} />}
               {isMergeNode && <MergeSettings nodeId={nodeId} />}
               {isEndNode && <EndNodeSettings nodeId={nodeId} />}
+              {isUserNode && <UserNodeSettings nodeId={nodeId} />}
             </div>
           </div>
         )}
