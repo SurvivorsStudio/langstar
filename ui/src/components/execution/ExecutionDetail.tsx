@@ -58,29 +58,9 @@ interface ExecutionDetailProps {
 // Execution용 커스텀 노드 컴포넌트
 const ExecutionNode = ({ data, isConnectable }: any) => {
   const { status, nodeLog, getNodeColorClass } = data;
-  const [expandedInput, setExpandedInput] = useState(false);
-  const [expandedOutput, setExpandedOutput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   
-  // 노드 높이를 동적으로 계산 (드래그 중에는 고정 높이 사용)
-  const getNodeHeight = () => {
-    // 드래그 중일 때는 고정 높이를 사용하여 성능 최적화
-    if (isDragging) {
-      return 160;
-    }
-    
-    let height = 160; // 기본 높이
-    
-    if (expandedInput) {
-      height += 80; // Input 펼침 시 추가 높이
-    }
-    
-    if (expandedOutput) {
-      height += 80; // Output 펼침 시 추가 높이
-    }
-    
-    return height;
-  };
+
   
   const getNodeStatusIcon = (status: string) => {
     switch (status) {
@@ -117,7 +97,7 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
       className={`bg-white dark:bg-gray-800 rounded-lg border-2 shadow-lg transition-all duration-300 hover:shadow-xl ${getNodeColorClass(data.nodeType, status)} ${data.selected ? 'ring-4 ring-blue-400 ring-opacity-50 shadow-2xl scale-105' : ''}`} 
       style={{ 
         width: '100%', 
-        height: `${getNodeHeight()}px`, 
+        height: '160px', 
         boxSizing: 'border-box',
         // 드래그 중일 때는 transition 비활성화
         transition: isDragging ? 'none' : 'all 0.3s ease'
@@ -150,50 +130,12 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
         
 
         
-                    {/* Show input/output data if available */}
-            {nodeLog && !isDragging && (
-              <div className="space-y-2 flex-1">
-                {/* Input Data - Started 상태에서는 표시하지 않음 */}
-                {nodeLog.input_data && Object.keys(nodeLog.input_data).length > 0 && status !== 'started' && (
-                  <div className="text-xs">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedInput(!expandedInput);
-                      }}
-                      className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                    >
-                      {expandedInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                      <span className="font-medium">Input:</span>
-                      <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.input_data).length} fields)</span>
-                    </button>
-                    {expandedInput && (
-                      <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-20 overflow-y-auto border border-gray-200 dark:border-gray-600">
-                        <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.input_data, null, 2)}</pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* Output Data - Started 상태에서는 표시하지 않음 */}
-                {nodeLog.output_data && Object.keys(nodeLog.output_data).length > 0 && status !== 'started' && (
-                  <div className="text-xs">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedOutput(!expandedOutput);
-                      }}
-                      className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                    >
-                      {expandedOutput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                      <span className="font-medium">Output:</span>
-                      <span className="text-gray-500 dark:text-gray-400">({Object.keys(nodeLog.output_data).length} fields)</span>
-                    </button>
-                    {expandedOutput && (
-                      <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded mt-1 max-h-20 overflow-y-auto border border-gray-200 dark:border-gray-600">
-                        <pre className="text-xs text-gray-900 dark:text-gray-100">{JSON.stringify(nodeLog.output_data, null, 2)}</pre>
-                      </div>
-                    )}
-                  </div>
+                    {/* Node status and basic info */}
+            {nodeLog && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Status: {status}
+                {nodeLog.duration_ms && (
+                  <span className="ml-2">Duration: {nodeLog.duration_ms}ms</span>
                 )}
               </div>
             )}
