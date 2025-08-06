@@ -9,6 +9,7 @@ from server.services.execution_service import execution_service
 from server.services.deployment_service import deployment_service
 from server.utils.execution_logger import execution_logger
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,82 @@ def stop_execution(execution_id: str, request: StopExecutionRequest):
         logger.error(f"Error stopping execution: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete('/executions/{execution_id}')
+def delete_execution(execution_id: str):
+    """실행을 삭제합니다."""
+    try:
+        logger.info(f"Deleting execution: {execution_id}")
+        
+        success = execution_service.delete_execution(execution_id)
+        
+        if success:
+            logger.info(f"Successfully deleted execution: {execution_id}")
+            return {
+                "success": True,
+                "message": f"Execution {execution_id} deleted successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+        
+    except Exception as e:
+        logger.error(f"Error deleting execution: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get('/executions/{execution_id}/download-logs')
+def download_execution_logs(execution_id: str):
+    """실행 로그 파일을 다운로드합니다."""
+    try:
+        logger.info(f"Downloading logs for execution: {execution_id}")
+        
+        # 1. 실행 정보 조회
+        execution = execution_service.describe_execution(execution_id)
+        if not execution:
+            raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+        
+        # 2. 로그 파일 경로 찾기
+        log_file_path = execution_service.get_execution_log_file_path(execution_id)
+        if not log_file_path or not os.path.exists(log_file_path):
+            raise HTTPException(status_code=404, detail=f"Log file not found for execution {execution_id}")
+        
+        # 3. 파일 다운로드
+        from fastapi.responses import FileResponse
+        import zipfile
+        import tempfile
+        
+        # 로그 디렉토리를 ZIP으로 압축
+        log_dir = os.path.dirname(log_file_path)
+        temp_zip_path = tempfile.mktemp(suffix='.zip')
+        
+        with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(log_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, log_dir)
+                    zipf.write(file_path, arcname)
+        
+        # ZIP 파일을 응답으로 반환 (UUID 기반)
+        import uuid
+        unique_filename = f"logs_{uuid.uuid4().hex[:8]}.zip"
+        
+        def cleanup_temp_file():
+            try:
+                os.remove(temp_zip_path)
+            except:
+                pass
+        
+        return FileResponse(
+            path=temp_zip_path,
+            filename=unique_filename,
+            media_type='application/zip',
+            background=cleanup_temp_file
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading execution logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get('/executions/{execution_id}/history')
 def get_execution_history(execution_id: str):
     """실행 히스토리를 반환합니다."""
@@ -171,18 +248,29 @@ def get_detailed_execution_logs(deployment_id: str, execution_id: str):
     try:
         logger.info(f"Getting detailed logs for execution: {execution_id}")
         
-        # 배포 버전 정보 조회
-        deployment = deployment_service.get_deployment_by_id(deployment_id)
-        if not deployment:
-            raise HTTPException(status_code=404, detail=f"Deployment {deployment_id} not found")
+        # 1. 먼저 execution 정보를 조회해서 실제 사용된 version_id를 가져옴
+        execution = execution_service.describe_execution(execution_id)
+        if not execution:
+            raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
             
-        versions = deployment_service.get_deployment_versions(deployment_id)
-        if not versions:
-            raise HTTPException(status_code=404, detail=f"No versions found for deployment {deployment_id}")
-            
-        version_id = versions[0].id  # 최신 버전 사용
+        # 2. execution에서 version_id 추출 (실제 실행에 사용된 버전)
+        version_id = getattr(execution, 'version_id', None)
+        if not version_id:
+            # version_id가 없는 경우, 배포의 최신 버전 사용 (fallback)
+            deployment = deployment_service.get_deployment_by_id(deployment_id)
+            if not deployment:
+                raise HTTPException(status_code=404, detail=f"Deployment {deployment_id} not found")
+                
+            versions = deployment_service.get_deployment_versions(deployment_id)
+            if not versions:
+                raise HTTPException(status_code=404, detail=f"No versions found for deployment {deployment_id}")
+                
+            version_id = versions[0].id  # 최신 버전 사용
+            logger.info(f"Using latest version {version_id} as fallback for execution {execution_id}")
+        else:
+            logger.info(f"Using execution's version {version_id} for execution {execution_id}")
         
-        # 상세 로그 조회
+        # 3. 상세 로그 조회 (실제 사용된 version_id로)
         detailed_logs = execution_logger.get_execution_logs(deployment_id, version_id, execution_id)
         
         # 로그를 딕셔너리로 변환

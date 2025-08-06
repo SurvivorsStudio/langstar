@@ -35,6 +35,8 @@ class Execution(BaseModel):
     workflow_snapshot: Optional[Dict[str, Any]] = None
     node_execution_history: Optional[List[Dict[str, Any]]] = None
     state_transitions_list: Optional[List[Dict[str, Any]]] = None
+    # 배포 정보
+    deployment_id: Optional[str] = None  # 실행에 사용된 배포 ID
     # 외부 API 호출 정보
     api_call_info: Optional[Dict[str, Any]] = None  # API 호출 관련 정보 (IP, User-Agent, 요청 헤더 등)
     execution_source: str = "internal"  # "internal" (프론트엔드), "external" (외부 API), "scheduled" (스케줄러)
