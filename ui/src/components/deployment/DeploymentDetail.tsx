@@ -281,7 +281,7 @@ const DeploymentDetail: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Error</h3>
           <p className="text-gray-600 dark:text-gray-400">{error || 'Deployment not found'}</p>
           <button
-            onClick={() => navigate('/workspace')}
+            onClick={() => navigate('/workspace?tab=deployment')}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Back to Workspace
@@ -299,7 +299,7 @@ const DeploymentDetail: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => navigate('/workspace')}
+                onClick={() => navigate('/workspace?tab=deployment')}
                 className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <ArrowLeft className="w-5 h-5" />
