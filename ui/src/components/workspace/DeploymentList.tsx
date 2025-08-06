@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Deployment, DeploymentStatus, DeploymentEnvironment } from '../../types/deployment';
-import { PlusCircle, Code, ArrowRightCircle, ListChecks, X, Play, Pause, Trash2, Rocket, Grid, List, AlertCircle, ChevronRight, ChevronDown, Folder, FileText, ExternalLink, Zap, Activity } from 'lucide-react';
-import { apiService } from '../../services/apiService';
-import DeploymentPlayground from '../DeploymentPlayground';
+import { Code, X, Play, Pause, Trash2, Rocket, AlertCircle, ChevronRight, ChevronDown, Folder, FileText, ExternalLink } from 'lucide-react';
+import DeploymentPlayground from '../deployment/DeploymentPlayground';
 import Editor from '@monaco-editor/react';
+import { apiService } from '../../services/apiService';
 
 interface DeploymentListProps {
   deployments: Deployment[];
@@ -20,7 +20,16 @@ interface WorkflowGroup {
   workflowName: string;
   deployments: Deployment[];
   isExpanded: boolean;
-  activeDeployment: Deployment | null;
+  environments: {
+    dev: {
+      isExpanded: boolean;
+      deployments: Deployment[];
+    };
+    prod: {
+      isExpanded: boolean;
+      deployments: Deployment[];
+    };
+  };
 }
 
 const DeploymentList: React.FC<DeploymentListProps> = ({
@@ -31,20 +40,12 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
   handleActivateDeployment,
   handleDeactivateDeployment,
 }) => {
+  const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(false);
+  const [workflowGroups, setWorkflowGroups] = useState<WorkflowGroup[]>([]);
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
   const [apiModalTab, setApiModalTab] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [selectedDeployment, setSelectedDeployment] = useState<Deployment | null>(null);
   const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({});
-  const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-  const [workflowGroups, setWorkflowGroups] = useState<WorkflowGroup[]>([]);
-  const [isExecutionModalOpen, setIsExecutionModalOpen] = useState(false);
-  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [selectedExecutionDeployment, setSelectedExecutionDeployment] = useState<Deployment | null>(null);
-  const [executionInput, setExecutionInput] = useState<string>('{}');
-  const [executionResult, setExecutionResult] = useState<any>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
   const expandedStatesRef = useRef<Map<string, boolean>>(new Map());
   const navigate = useNavigate();
   
@@ -83,19 +84,26 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
           workflowName,
           deployments: [],
           isExpanded: isExpanded, // useRef에서 가져온 확장 상태 사용
-          activeDeployment: null
+          environments: {
+            dev: {
+              isExpanded: false,
+              deployments: []
+            },
+            prod: {
+              isExpanded: false,
+              deployments: []
+            }
+          }
         });
       }
 
       const group = workflowMap.get(workflowName)!;
       group.deployments.push(deployment);
 
-      // 활성 배포 찾기 (가장 최근에 활성화된 배포를 우선)
-      if (deployment.status === DeploymentStatus.ACTIVE) {
-        if (!group.activeDeployment || 
-            new Date(deployment.updatedAt) > new Date(group.activeDeployment.updatedAt)) {
-          group.activeDeployment = deployment;
-        }
+                    // 각 환경별로 배포 분류
+              const envKey = deployment.environment.toLowerCase() as 'dev' | 'prod';
+              if (envKey === 'dev' || envKey === 'prod') {
+                group.environments[envKey].deployments.push(deployment);
       }
     });
 
@@ -104,6 +112,13 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
       group.deployments.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+      
+      // 각 환경별 배포도 정렬
+      Object.values(group.environments).forEach(env => {
+        env.deployments.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      });
     });
 
     setWorkflowGroups(Array.from(workflowMap.values()));
@@ -123,6 +138,25 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     );
   };
 
+  const toggleEnvironmentExpansion = (workflowName: string, environment: 'dev' | 'prod') => {
+    setWorkflowGroups(prev => 
+      prev.map(group => 
+        group.workflowName === workflowName 
+          ? { 
+              ...group, 
+              environments: {
+                ...group.environments,
+                [environment]: {
+                  ...group.environments[environment],
+                  isExpanded: !group.environments[environment].isExpanded
+                }
+              }
+            }
+          : group
+      )
+    );
+  };
+
   const handleStatusToggle = async (e: React.MouseEvent, deployment: Deployment) => {
     e.stopPropagation();
     
@@ -133,6 +167,8 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
       if (deployment.status === DeploymentStatus.ACTIVE) {
         await handleDeactivateDeployment(deploymentId);
       } else {
+        // 백엔드에서 같은 환경의 다른 배포들을 자동으로 비활성화하므로
+        // 프론트엔드에서는 단순히 활성화만 요청
         await handleActivateDeployment(deploymentId);
       }
     } catch (error) {
@@ -147,8 +183,18 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     try {
       // 선택된 배포 저장
       setSelectedDeployment(deployment);
+      
+      // 배포의 워크플로우 정보 가져오기
+      const deploymentWithVersions = await apiService.getDeploymentStatus(deployment.id);
+      
+      // 워크플로우 정보가 포함된 배포 객체 생성
+      const deploymentWithWorkflow = {
+        ...deployment,
+        versions: deploymentWithVersions.versions
+      };
+      
       // API 호출 예시 코드 생성 (기본값: JavaScript)
-      const apiExampleCode = generateApiExampleCode(deployment, 'javascript');
+      const apiExampleCode = generateApiExampleCode(deploymentWithWorkflow, 'javascript');
       setApiResponseModalContent(apiExampleCode);
       setApiModalTab('javascript'); // 기본 탭을 JavaScript로 설정
     } catch (error) {
@@ -162,110 +208,30 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     navigate(`/flow/${encodeURIComponent(deployment.workflowName)}`);
   };
 
-  const handleExecuteDeployment = (deployment: Deployment) => {
-    setSelectedExecutionDeployment(deployment);
-    setExecutionInput('{}');
-    setExecutionResult(null);
-    setExecutionLogs([]);
-    setIsExecutionModalOpen(true);
-  };
 
-  const handleViewLogs = (deployment: Deployment) => {
-    setSelectedExecutionDeployment(deployment);
-    fetchExecutionLogs(deployment.id);
-    setIsLogModalOpen(true);
-  };
 
-  const fetchExecutionLogs = async (deploymentId: string) => {
-    try {
-      const response = await fetch(`/api/workflows/${deploymentId}/executions`);
-      const data = await response.json();
-      if (data.success) {
-        setExecutionLogs(data.executions.map((exec: any) => 
-          `[${new Date(exec.start_time).toLocaleString()}] ${exec.status.toUpperCase()}: ${exec.name}`
-        ));
-      }
-    } catch (error) {
-      console.error('Error fetching execution logs:', error);
-      setExecutionLogs(['Error fetching logs']);
-    }
-  };
-
-  const executeDeployment = async () => {
-    if (!selectedExecutionDeployment) return;
-
-    setIsExecuting(true);
-    setExecutionLogs([]);
-    
-    try {
-      // 입력 데이터 파싱
-      const inputData = JSON.parse(executionInput);
-      
-      // 실행 시작
-      const response = await fetch(`/api/workflows/${selectedExecutionDeployment.id}/executions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: `execution-${Date.now()}`,
-          input: inputData
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setExecutionResult(data.execution);
-        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Started execution: ${data.execution.name}`]);
-        
-        // 실행 상태 모니터링
-        monitorExecution(data.execution.id);
-      } else {
-        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${data.message}`]);
-      }
-    } catch (error) {
-      console.error('Error executing deployment:', error);
-              setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error: ${error}`]);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
-  const monitorExecution = async (executionId: string) => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`/api/executions/${executionId}/status`);
-        const data = await response.json();
-        
-        if (data.success) {
-          setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Status: ${data.status}`]);
-          
-          if (data.status === 'succeeded' || data.status === 'failed' || data.status === 'aborted') {
-            // 실행 완료
-            if (data.status === 'succeeded') {
-              setExecutionResult((prev: any) => ({ ...prev, status: data.status, output: data.output }));
-            }
-            return; // 모니터링 중단
-          }
-          
-          // 1초 후 다시 체크
-          setTimeout(checkStatus, 1000);
-        }
-      } catch (error) {
-        console.error('Error monitoring execution:', error);
-        setExecutionLogs((prev: string[]) => [...prev, `[${new Date().toLocaleString()}] Error monitoring: ${error}`]);
-      }
-    };
-    
-    checkStatus();
-  };
-
-  const handleTabChange = (language: 'javascript' | 'python' | 'curl') => {
+  const handleTabChange = async (language: 'javascript' | 'python' | 'curl') => {
     if (selectedDeployment) {
       setApiModalTab(language);
-      const apiExampleCode = generateApiExampleCode(selectedDeployment, language);
-      setApiResponseModalContent(apiExampleCode);
+      
+      try {
+        // 배포의 워크플로우 정보 가져오기
+        const deploymentWithVersions = await apiService.getDeploymentStatus(selectedDeployment.id);
+        
+        // 워크플로우 정보가 포함된 배포 객체 생성
+        const deploymentWithWorkflow = {
+          ...selectedDeployment,
+          versions: deploymentWithVersions.versions
+        };
+        
+        const apiExampleCode = generateApiExampleCode(deploymentWithWorkflow, language);
+        setApiResponseModalContent(apiExampleCode);
+      } catch (error) {
+        console.error('Failed to generate API example code for tab change:', error);
+        // 에러가 발생하면 기본 샘플 코드 사용
+        const apiExampleCode = generateApiExampleCode(selectedDeployment, language);
+        setApiResponseModalContent(apiExampleCode);
+      }
     }
   };
 
@@ -289,9 +255,67 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
     const baseUrl = `${protocol}//${hostname}:8000`;
     const deploymentId = deployment.id;
     
+    // Start 노드의 설정에서 샘플 입력 데이터 생성
+    const generateSampleInput = () => {
+      try {
+        // 배포의 워크플로우 스냅샷에서 Start 노드 찾기
+        const workflowSnapshot = deployment.versions?.[0]?.workflowSnapshot;
+        if (!workflowSnapshot?.nodes) {
+          return { user_input: "Hello! This is a test message." };
+        }
+
+        const startNode = workflowSnapshot.nodes.find((node: any) => node.type === 'startNode');
+        if (!startNode?.data?.config?.variables) {
+          return { user_input: "Hello! This is a test message." };
+        }
+
+        // Start 노드의 변수 설정을 기반으로 샘플 입력 생성
+        const sampleInput: any = {};
+        startNode.data.config.variables.forEach((variable: any) => {
+          if (variable.defaultValue !== undefined && variable.defaultValue !== null) {
+            sampleInput[variable.name] = variable.defaultValue;
+          } else {
+            // 기본값이 없으면 타입에 따른 기본값 설정
+            switch (variable.type) {
+              case 'string':
+                sampleInput[variable.name] = "Sample text";
+                break;
+              case 'number':
+                sampleInput[variable.name] = 42;
+                break;
+              case 'boolean':
+                sampleInput[variable.name] = true;
+                break;
+              case 'array':
+                sampleInput[variable.name] = ["item1", "item2"];
+                break;
+              case 'object':
+                sampleInput[variable.name] = { key: "value" };
+                break;
+              default:
+                sampleInput[variable.name] = "Sample value";
+            }
+          }
+        });
+
+        return sampleInput;
+      } catch (error) {
+        console.error('Error generating sample input:', error);
+        return { user_input: "Hello! This is a test message." };
+      }
+    };
+
+    const sampleInput = generateSampleInput();
+    const sampleInputJson = JSON.stringify(sampleInput, null, 2);
+    
     switch (language) {
       case 'javascript':
         return `// Execute deployment
+/**
+ * Function to execute deployment
+ * @param {Object} inputData - Input data matching the Start node configuration
+ * @returns {Promise<Object>} Execution result
+ */
 const runDeployment = async (inputData) => {
   try {
     const response = await fetch('${baseUrl}/api/deployment/${deploymentId}/run', {
@@ -299,9 +323,7 @@ const runDeployment = async (inputData) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        input_data: inputData
-      })
+      body: JSON.stringify({ input_data: inputData })
     });
 
     const result = await response.json();
@@ -320,12 +342,16 @@ const runDeployment = async (inputData) => {
 };
 
 // Usage example
-runDeployment("Hello! This is a test message.")
+// 실제 배포된 워크플로우의 입력 데이터 형태
+const inputData = ${sampleInputJson};
+
+// API 호출
+runDeployment(inputData)
   .then(result => console.log('Result:', result))
   .catch(error => console.error('Error:', error));`;
 
-      case 'python':
-        return `import requests
+                          case 'python':
+                      return `import requests
 import json
 
 def run_deployment(input_data):
@@ -333,16 +359,14 @@ def run_deployment(input_data):
     Function to execute deployment
     
     Args:
-        input_data (str): User input data
+        input_data (dict): Input data matching the Start node configuration
     
     Returns:
         dict: Execution result
     """
     url = "${baseUrl}/api/deployment/${deploymentId}/run"
     
-    payload = {
-        "input_data": input_data
-    }
+    payload = { "input_data": input_data }
     
     headers = {
         "Content-Type": "application/json"
@@ -368,18 +392,23 @@ def run_deployment(input_data):
 # Usage example
 if __name__ == "__main__":
     try:
-        result = run_deployment("Hello! This is a test message.")
+        # 실제 배포된 워크플로우의 입력 데이터 형태
+        input_data = ${sampleInputJson}
+        
+        # API 호출
+        result = run_deployment(input_data)
         print("Result:", result)
     except Exception as e:
         print("Error:", e)`;
 
       case 'curl':
-        return `# Execute deployment
+                              return `# Execute deployment
+# 실제 배포된 워크플로우의 입력 데이터 형태
+INPUT_DATA='${sampleInputJson}'
+
 curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "input_data": "Hello! This is a test message."
-  }'`;
+  -d "{\\"input_data\\": $INPUT_DATA}"`;
 
       default:
         return '';
@@ -406,9 +435,8 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
   const getEnvironmentColor = (environment: DeploymentEnvironment) => {
     switch (environment) {
       case DeploymentEnvironment.PROD:
-        return 'text-red-600 bg-red-100 dark:bg-red-900/20 dark:text-red-200';
-      case DeploymentEnvironment.STAGING:
-        return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-200';
+        return 'text-green-600 bg-green-100 dark:bg-green-900/20 dark:text-green-200';
+
       case DeploymentEnvironment.DEV:
         return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-200';
       default:
@@ -468,10 +496,10 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  ChatFlow
+                  ChatFlow & Environments
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Active Version
+                  Version
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Environment
@@ -483,7 +511,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                   Description
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Last Deployed
+                  Last Updated
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Actions
@@ -493,7 +521,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {workflowGroups.map((group) => (
                 <React.Fragment key={group.workflowName}>
-                  {/* ChatFlow Row */}
+                  {/* Workflow Row */}
                   <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
@@ -513,58 +541,110 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                             {group.workflowName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {group.deployments.length} version{group.deployments.length !== 1 ? 's' : ''}
+                            {group.deployments.length} deployment{group.deployments.length !== 1 ? 's' : ''}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {group.activeDeployment ? (
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          v{group.activeDeployment.version}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No active version</span>
-                      )}
+                      <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {group.activeDeployment && (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEnvironmentColor(group.activeDeployment.environment)}`}>
-                          {group.activeDeployment.environment}
-                        </span>
-                      )}
+                      <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {group.activeDeployment && (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(group.activeDeployment.status)}`}>
-                          {group.activeDeployment.status}
-                        </span>
-                      )}
+                      <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {group.activeDeployment && group.activeDeployment.description ? (
-                        <div className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate" title={group.activeDeployment.description}>
-                          {group.activeDeployment.description}
+                      {group.deployments[0] && group.deployments[0].description ? (
+                        <div className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate" title={group.deployments[0].description}>
+                          {group.deployments[0].description}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      {group.activeDeployment ? 
-                        new Date(group.activeDeployment.deployedAt || group.activeDeployment.createdAt).toLocaleDateString() :
+                      {group.deployments[0] ? 
+                        new Date(group.deployments[0].updatedAt).toLocaleDateString() :
                         '-'
                       }
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {/* 상위 ChatFlow 항목에서는 액션 버튼 숨김 */}
+                      <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     </td>
                   </tr>
 
-                  {/* Version Rows (Expanded) */}
-                  {group.isExpanded && group.deployments.map((deployment) => (
-                    <tr key={deployment.id} className="bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800">
+                  {/* Environment Rows (Expanded) */}
+                  {group.isExpanded && (
+                    <>
+                                             {/* Dev Environment */}
+                       <tr className="bg-gray-50 dark:bg-gray-900">
                       <td className="px-6 py-3 pl-16">
+                           <div className="flex items-center">
+                             <button
+                               onClick={() => toggleEnvironmentExpansion(group.workflowName, 'dev')}
+                               className="mr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                             >
+                               {group.environments.dev.isExpanded ? (
+                                 <ChevronDown className="h-4 w-4" />
+                               ) : (
+                                 <ChevronRight className="h-4 w-4" />
+                               )}
+                             </button>
+                             <div className="w-4 h-4 bg-blue-500 rounded mr-3"></div>
+                             <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                               Development
+                             </div>
+                             <div className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                               ({group.environments.dev.deployments.length})
+                             </div>
+                           </div>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           {(() => {
+                             const activeDeployment = group.environments.dev.deployments.find(d => d.status === DeploymentStatus.ACTIVE);
+                             return activeDeployment ? (
+                               <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                 v{activeDeployment.version}
+                               </div>
+                             ) : (
+                               <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                             );
+                           })()}
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200">
+                             DEV
+                           </span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           {(() => {
+                             const activeDeployment = group.environments.dev.deployments.find(d => d.status === DeploymentStatus.ACTIVE);
+                             return activeDeployment ? (
+                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-200">
+                                 ACTIVE
+                               </span>
+                             ) : (
+                               <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                             );
+                           })()}
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                       </tr>
+
+                      {/* Dev Deployments */}
+                      {group.environments.dev.isExpanded && group.environments.dev.deployments.map((deployment) => (
+                        <tr key={deployment.id} className="bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800">
+                          <td className="px-6 py-3 pl-24">
                         <div 
                           className="flex items-center cursor-pointer"
                           onClick={() => navigate(`/deployment/${deployment.id}`)}
@@ -587,12 +667,12 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                       </td>
                       <td className="px-6 py-3 text-center">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEnvironmentColor(deployment.environment)}`}>
-                          {deployment.environment}
+                              {deployment.environment.toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-center">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(deployment.status)}`}>
-                          {deployment.status}
+                              {deployment.status.toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-center">
@@ -629,20 +709,6 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                             </button>
                           )}
                           <button 
-                            title="Execute Deployment" 
-                            onClick={(e) => { e.stopPropagation(); handleExecuteDeployment(deployment); }}
-                            className="p-1 text-orange-600 hover:text-orange-800"
-                          >
-                            <Zap className="h-4 w-4" />
-                          </button>
-                          <button 
-                            title="View Logs" 
-                            onClick={(e) => { e.stopPropagation(); handleViewLogs(deployment); }}
-                            className="p-1 text-purple-600 hover:text-purple-800"
-                          >
-                            <Activity className="h-4 w-4" />
-                          </button>
-                          <button 
                             title="Open Workflow" 
                             onClick={(e) => { e.stopPropagation(); handleOpenWorkflow(deployment); }}
                             className="p-1 text-blue-600 hover:text-blue-800"
@@ -667,152 +733,170 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                       </td>
                     </tr>
                   ))}
+
+
+
+                                             {/* Production Environment */}
+                       <tr className="bg-gray-50 dark:bg-gray-900">
+                         <td className="px-6 py-3 pl-16">
+                           <div className="flex items-center">
+                  <button
+                               onClick={() => toggleEnvironmentExpansion(group.workflowName, 'prod')}
+                               className="mr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                             >
+                               {group.environments.prod.isExpanded ? (
+                                 <ChevronDown className="h-4 w-4" />
+                               ) : (
+                                 <ChevronRight className="h-4 w-4" />
+                    )}
+                  </button>
+                             <div className="w-4 h-4 bg-green-500 rounded mr-3"></div>
+                             <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                               Production
+                </div>
+                             <div className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                               ({group.environments.prod.deployments.length})
+              </div>
+                    </div>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           {(() => {
+                             const activeDeployment = group.environments.prod.deployments.find(d => d.status === DeploymentStatus.ACTIVE);
+                             return activeDeployment ? (
+                               <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                 v{activeDeployment.version}
+                      </div>
+                             ) : (
+                               <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                             );
+                           })()}
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-200">
+                             PRODUCTION
+                           </span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           {(() => {
+                             const activeDeployment = group.environments.prod.deployments.find(d => d.status === DeploymentStatus.ACTIVE);
+                             return activeDeployment ? (
+                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-200">
+                                 ACTIVE
+                               </span>
+                             ) : (
+                               <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                             );
+                           })()}
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                         </td>
+                       </tr>
+
+                      {/* Production Deployments */}
+                      {group.environments.prod.isExpanded && group.environments.prod.deployments.map((deployment) => (
+                        <tr key={deployment.id} className="bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800">
+                          <td className="px-6 py-3 pl-24">
+                            <div 
+                              className="flex items-center cursor-pointer"
+                              onClick={() => navigate(`/deployment/${deployment.id}`)}
+                            >
+                              <FileText className="h-4 w-4 text-gray-400 mr-3" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600">
+                                  {deployment.name}
+                    </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  ID: {deployment.id.slice(0, 8)}...
+                  </div>
+              </div>
+            </div>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              v{deployment.version}
+          </div>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEnvironmentColor(deployment.environment)}`}>
+                              {deployment.environment.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(deployment.status)}`}>
+                              {deployment.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            {deployment.description ? (
+                              <div className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate" title={deployment.description}>
+                                {deployment.description}
+        </div>
+                            ) : (
+                              <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(deployment.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <div className="flex justify-center items-center space-x-2">
+                              {deployment.status === DeploymentStatus.ACTIVE ? (
+              <button
+                                  title="Deactivate" 
+                                  onClick={(e) => { e.stopPropagation(); handleStatusToggle(e, deployment); }}
+                                  disabled={isProcessing[deployment.id]}
+                                  className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+                                >
+                                  <Pause className="h-4 w-4" />
+              </button>
+                              ) : (
+                                <button 
+                                  title="Activate" 
+                                  onClick={(e) => { e.stopPropagation(); handleStatusToggle(e, deployment); }}
+                                  disabled={isProcessing[deployment.id]}
+                                  className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                                >
+                                  <Play className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button 
+                                title="Open Workflow" 
+                                onClick={(e) => { e.stopPropagation(); handleOpenWorkflow(deployment); }}
+                                className="p-1 text-blue-600 hover:text-blue-800"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </button>
+                              <button 
+                                title="View API Call Example" 
+                                onClick={(e) => { e.stopPropagation(); handleViewCode(deployment); }}
+                                className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                              >
+                                <Code className="h-4 w-4" />
+                              </button>
+                              <button 
+                                title="Delete Deployment" 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteDeployment(deployment.id); }}
+                                className="p-1 text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                    </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
                 </React.Fragment>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {/* Execution Modal */}
-      {isExecutionModalOpen && selectedExecutionDeployment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-4">
-                <Zap className="h-6 w-6 text-orange-500" />
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    Execute Deployment
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedExecutionDeployment.name} (v{selectedExecutionDeployment.version})
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsExecutionModalOpen(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-hidden flex">
-              {/* Input Panel */}
-              <div className="w-1/2 p-6 border-r border-gray-200 dark:border-gray-700">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">
-                  Input Parameters
-                </h4>
-                <Editor
-                  height="300px"
-                  language="json"
-                  value={executionInput}
-                  onChange={(value) => setExecutionInput(value || '{}')}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 12,
-                    theme: isDarkMode() ? 'vs-dark' : 'vs-light'
-                  }}
-                />
-                <div className="mt-4">
-                  <button
-                    onClick={executeDeployment}
-                    disabled={isExecuting}
-                    className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isExecuting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Executing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-4 w-4" />
-                        <span>Execute</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              {/* Output Panel */}
-              <div className="w-1/2 p-6">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">
-                  Execution Logs
-                </h4>
-                <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 h-64 overflow-y-auto font-mono text-xs">
-                  {executionLogs.length === 0 ? (
-                    <div className="text-gray-500 dark:text-gray-400">
-                      No logs yet. Click Execute to start...
-                    </div>
-                  ) : (
-                    executionLogs.map((log, index) => (
-                      <div key={index} className="mb-1">
-                        <span className="text-gray-600 dark:text-gray-400">{log}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-                
-                {executionResult && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      Result
-                    </h4>
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 max-h-32 overflow-y-auto">
-                      <pre className="text-xs text-gray-700 dark:text-gray-300">
-                        {JSON.stringify(executionResult, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Logs Modal */}
-      {isLogModalOpen && selectedExecutionDeployment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-4">
-                <Activity className="h-6 w-6 text-purple-500" />
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    Execution Logs
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedExecutionDeployment.name} (v{selectedExecutionDeployment.version})
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsLogModalOpen(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="flex-1 p-6 overflow-hidden">
-              <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 h-full overflow-y-auto font-mono text-xs">
-                {executionLogs.length === 0 ? (
-                  <div className="text-gray-500 dark:text-gray-400">
-                    No execution logs found.
-                  </div>
-                ) : (
-                  executionLogs.map((log, index) => (
-                    <div key={index} className="mb-1">
-                      <span className="text-gray-600 dark:text-gray-400">{log}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

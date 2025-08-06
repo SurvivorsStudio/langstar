@@ -2,7 +2,7 @@ import os
 import json
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from server.models.deployment import (
     Deployment, DeploymentVersion, DeploymentFormData, 
@@ -33,7 +33,7 @@ class DeploymentService:
             # 1. 배포 ID 생성
             deployment_id = str(uuid.uuid4())
             workflow_id = str(uuid.uuid4())
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             
             # 2. 배포 객체 생성
             deployment = Deployment(
@@ -119,46 +119,6 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             "error": str(e)
         }}
 
-# API를 통한 배포 실행 함수
-def run_deployment_via_api(input_data):
-    import requests
-    import json
-    
-    url = "http://localhost:8000/api/deployment/{deployment_id}/run"
-    
-    payload = {{
-        "input_data": input_data
-    }}
-    
-    headers = {{
-        "Content-Type": "application/json"
-    }}
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        
-        result = response.json()
-        
-        if result.get("success"):
-            print("Deployment execution successful:", result["result"])
-            return result["result"]
-        else:
-            print("Deployment execution failed:", result.get("error"))
-            raise Exception(result.get("error"))
-            
-    except requests.exceptions.RequestException as e:
-        print("API call error:", e)
-        raise e
-
-# 사용 예시
-if __name__ == "__main__":
-    try:
-        # API를 통한 실행
-        result = run_deployment_via_api("Hello! This is a test message.")
-        print("Result:", result)
-    except Exception as e:
-        print("Error:", e)
 """
             
             # 4. flower_manager에 배포 등록 (임시로 비활성화)
@@ -197,14 +157,22 @@ if __name__ == "__main__":
             if not deployment:
                 raise ValueError(f"Deployment {deployment_id} not found")
             
+            # 2. 입력 데이터 정규화 (문자열인 경우 딕셔너리로 변환)
+            if isinstance(input_data, str):
+                input_data = {"user_input": input_data}
+            elif not isinstance(input_data, dict):
+                input_data = {"user_input": str(input_data)}    
+            
+            input_data = {"Start" : input_data}
+
             # 2. 배포가 활성 상태인지 확인
             if deployment.status != DeploymentStatus.ACTIVE:
                 raise ValueError(f"Deployment {deployment_id} is not active (status: {deployment.status})")
             
             # 3. 실행 기록 생성
             execution_id = str(uuid.uuid4())
-            execution_name = f"{deployment.name}_execution_{int(datetime.utcnow().timestamp())}"
-            start_time = datetime.utcnow().isoformat()
+            execution_name = f"{deployment.name}_execution_{int(datetime.now(timezone.utc).timestamp())}"
+            start_time = datetime.now(timezone.utc).isoformat()
             
             # 4. 워크플로우 스냅샷에서 노드 정보 추출
             workflow_snapshot = None
@@ -234,20 +202,65 @@ if __name__ == "__main__":
             # 6. 실제 LangGraph 실행 (로깅 포함)
             try:
                 if workflow_snapshot:
-                    # 로깅이 포함된 LangGraph 생성
-                    app = create_langgraph_with_logging(
-                        workflow_snapshot.dict(),
-                        execution_id,
-                        deployment_id,
-                        versions[0].id
-                    )
+                    # 환경 변수 설정 (로깅을 위해) - 더 일찍 설정
+                    os.environ["CURRENT_EXECUTION_ID"] = execution_id
+                    os.environ["CURRENT_DEPLOYMENT_ID"] = deployment_id
+                    os.environ["CURRENT_VERSION_ID"] = versions[0].id
                     
-                    # LangGraph 실행
-                    result = app.invoke(input_data)
+                    # 로그 디렉토리 미리 생성
+                    deployment_executions_dir = os.path.join("deployments", deployment_id, "executions")
+                    execution_log_dir = os.path.join(
+                        deployment_executions_dir,
+                        execution_id
+                    )
+                    os.makedirs(execution_log_dir, exist_ok=True)
+                    
+                    # 실제 생성된 deployment 코드 실행
+                    deployment_code_path = os.path.join(self.deployments_dir, deployment_id, "deployment_code.py")
+                    
+                    if os.path.exists(deployment_code_path):
+                        # deployment 코드를 동적으로 로드하고 실행
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(f"deployment_{deployment_id}", deployment_code_path)
+                        deployment_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(deployment_module)
+                        
+                        # 실행 함수 호출
+                        run_function_name = f"run_deployment_{deployment_id.replace('-', '_')}"
+                        if hasattr(deployment_module, run_function_name):
+                            run_function = getattr(deployment_module, run_function_name)
+                            result = run_function(input_data)
+                            print("=================")
+                            print(run_function_name)
+                            print(input_data)
+                            print("=================")
+                            
+                            if isinstance(result, dict) and result.get("success"):
+                                result = result.get("result", result)
+                            else:
+                                result = result
+                        else:
+                            # 실행 함수가 없으면 기본 LangGraph 실행
+                            app = create_langgraph_with_logging(
+                                workflow_snapshot.dict(),
+                                execution_id,
+                                deployment_id,
+                                versions[0].id
+                            )
+                            result = app.invoke(input_data)
+                    else:
+                        # deployment 코드가 없으면 기본 LangGraph 실행
+                        app = create_langgraph_with_logging(
+                            workflow_snapshot.dict(),
+                            execution_id,
+                            deployment_id,
+                            versions[0].id
+                        )
+                        result = app.invoke(input_data)
                     
                     # 실행 완료 시간 기록
-                    end_time = datetime.utcnow().isoformat()
-                    duration_ms = int((datetime.utcnow() - datetime.fromisoformat(start_time)).total_seconds() * 1000)
+                    end_time = datetime.now(timezone.utc).isoformat()
+                    duration_ms = int((datetime.now(timezone.utc) - datetime.fromisoformat(start_time)).total_seconds() * 1000)
                     
                     # 노드 실행 히스토리 조회
                     node_execution_logs = execution_logger.get_execution_logs(
@@ -256,9 +269,27 @@ if __name__ == "__main__":
                         execution_id
                     )
                     
-                    # 노드 실행 히스토리 변환
+                    # 노드 실행 히스토리 변환 (필요한 정보만 포함)
                     node_execution_history = []
                     for log in node_execution_logs:
+                        # 노드별로 실제 입력/출력 데이터만 추출
+                        node_input = {}
+                        node_output = {}
+                        
+                        if log.input_data:
+                            # 노드 이름으로 시작하는 키만 추출
+                            for key, value in log.input_data.items():
+                                if key == log.node_name or key == log.node_id:
+                                    node_input = value if isinstance(value, dict) else {"data": value}
+                                    break
+                        
+                        if log.output_data:
+                            # 노드 이름으로 시작하는 키만 추출
+                            for key, value in log.output_data.items():
+                                if key == log.node_name or key == log.node_id:
+                                    node_output = value if isinstance(value, dict) else {"data": value}
+                                    break
+                        
                         node_history = {
                             "node_id": log.node_id,
                             "node_type": log.node_type,
@@ -267,8 +298,8 @@ if __name__ == "__main__":
                             "start_time": log.start_time.isoformat(),
                             "end_time": log.end_time.isoformat() if log.end_time else None,
                             "duration_ms": log.duration_ms,
-                            "input": log.input_data,
-                            "output": log.output_data,
+                            "input": node_input,
+                            "output": node_output,
                             "error_message": log.error_message,
                             "position": log.position
                         }
@@ -291,8 +322,55 @@ if __name__ == "__main__":
                     
             except Exception as e:
                 # 에러 발생 시
-                end_time = datetime.utcnow().isoformat()
-                duration_ms = int((datetime.utcnow() - datetime.fromisoformat(start_time)).total_seconds() * 1000)
+                end_time = datetime.now(timezone.utc).isoformat()
+                duration_ms = int((datetime.now(timezone.utc) - datetime.fromisoformat(start_time)).total_seconds() * 1000)
+                
+                # 에러 발생 시에도 노드 실행 히스토리 조회
+                try:
+                    node_execution_logs = execution_logger.get_execution_logs(
+                        deployment_id, 
+                        versions[0].id, 
+                        execution_id
+                    )
+                    
+                    # 노드 실행 히스토리 변환 (필요한 정보만 포함)
+                    node_execution_history = []
+                    for log in node_execution_logs:
+                        # 노드별로 실제 입력/출력 데이터만 추출
+                        node_input = {}
+                        node_output = {}
+                        
+                        if log.input_data:
+                            # 노드 이름으로 시작하는 키만 추출
+                            for key, value in log.input_data.items():
+                                if key == log.node_name or key == log.node_id:
+                                    node_input = value if isinstance(value, dict) else {"data": value}
+                                    break
+                        
+                        if log.output_data:
+                            # 노드 이름으로 시작하는 키만 추출
+                            for key, value in log.output_data.items():
+                                if key == log.node_name or key == log.node_id:
+                                    node_output = value if isinstance(value, dict) else {"data": value}
+                                    break
+                        
+                        node_history = {
+                            "node_id": log.node_id,
+                            "node_type": log.node_type,
+                            "node_name": log.node_name,
+                            "status": log.status.value,
+                            "start_time": log.start_time.isoformat(),
+                            "end_time": log.end_time.isoformat() if log.end_time else None,
+                            "duration_ms": log.duration_ms,
+                            "input": node_input,
+                            "output": node_output,
+                            "error_message": log.error_message,
+                            "position": log.position
+                        }
+                        node_execution_history.append(node_history)
+                except Exception as log_error:
+                    logger.warning(f"Failed to get execution logs: {str(log_error)}")
+                    node_execution_history = []
                 
                 output_result = {
                     "message": f"Deployment {deployment.name} execution failed",
@@ -303,46 +381,64 @@ if __name__ == "__main__":
                 
                 logger.error(f"Error executing deployment {deployment_id}: {str(e)}")
             
-            # 7. 실행 기록 저장
+            # 실행 성공 여부 판단 (output_result.error 또는 result.success 확인)
+            is_execution_successful = (
+                "error" not in output_result and 
+                (not isinstance(output_result.get("result"), dict) or 
+                 output_result.get("result", {}).get("success", True))
+            )
+            
+            # 상태 전이 정보 생성
+            state_transitions = [
+                {
+                    "timestamp": start_time,
+                    "state": "started",
+                    "node_id": "workflow",
+                    "node_name": "Workflow",
+                    "input": input_data
+                },
+                {
+                    "timestamp": end_time,
+                    "state": "succeeded" if is_execution_successful else "failed",
+                    "node_id": "workflow",
+                    "node_name": "Workflow",
+                    "output": result
+                }
+            ]
+            
+            # 6. 실행 기록 생성
             execution_record = {
                 "id": execution_id,
-                "name": execution_name,
-                "workflow_id": deployment.workflowId,
+                "name": f"execution-{execution_id[:8]}",
+                "arn": f"langstar:ap-northeast-2:123456789012:execution:{execution_id}",
+                "workflow_id": deployment_id,
+                "workflow_name": deployment.name,
                 "deployment_id": deployment_id,
-                "status": "succeeded" if "error" not in output_result else "failed",
+                "version_id": versions[0].id,
+                "status": "succeeded" if is_execution_successful else "failed",
                 "start_time": start_time,
                 "end_time": end_time,
                 "duration_ms": duration_ms,
                 "input": input_data,
-                "output": output_result,
-                "error_message": output_result.get("error"),
-                "workflow_snapshot": workflow_snapshot.dict() if workflow_snapshot else None,
+                "output": result,
+                "error_message": output_result.get("error") or (
+                    output_result.get("result", {}).get("error") if not is_execution_successful else None
+                ),
                 "node_execution_history": node_execution_history,
-                "state_transitions": [
-                    {
-                        "timestamp": start_time,
-                        "state": "started",
-                        "node_id": "workflow",
-                        "node_name": "Workflow",
-                        "input": input_data
-                    },
-                    {
-                        "timestamp": end_time,
-                        "state": "succeeded" if "error" not in output_result else "failed",
-                        "node_id": "workflow",
-                        "node_name": "Workflow",
-                        "output": output_result
-                    }
-                ],
-                # 외부 API 호출 정보 추가
+                "state_transitions": len(state_transitions),  # 상태 전이 개수
+                "state_transitions_list": state_transitions,  # 상태 전이 상세 정보
                 "api_call_info": api_call_info,
                 "execution_source": execution_source
             }
             
-            # 8. 실행 기록을 파일로 저장
-            self._save_execution_record(execution_record)
+            # 8. 워크플로우 스냅샷을 별도 파일로 저장
+            if workflow_snapshot:
+                self._save_workflow_snapshot(deployment_id, execution_id, workflow_snapshot)
             
-            # 7. 응답 반환
+            # 9. workflow_snap.json의 실행 메타데이터 업데이트
+            self._update_workflow_snap_metadata(deployment_id, execution_id, execution_record)
+            
+            # 7. 응답 반환 (노드 실행 결과 전체 포함)
             return {
                 "success": True,
                 "deployment_id": deployment_id,
@@ -350,7 +446,22 @@ if __name__ == "__main__":
                 "result": {
                     "message": f"Deployment {deployment.name} executed successfully",
                     "input_received": input_data,
-                    "status": "executed"
+                    "status": "executed",
+                    "output": output_result.get("result").get("response"),
+                    "error": output_result.get("error"),
+                    "execution_summary": {
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "duration_ms": duration_ms,
+                        "total_nodes": len(node_execution_history),
+                        "successful_nodes": len([n for n in node_execution_history if n["status"] == "success"]),
+                        "failed_nodes": len([n for n in node_execution_history if n["status"] == "failed"]),
+                        "overall_status": "succeeded" if is_execution_successful else "failed"
+                    },
+                    # "node_execution_history": node_execution_history,
+                    "state_transitions": state_transitions,
+                    "api_call_info": api_call_info,
+                    "execution_source": execution_source
                 }
             }
             
@@ -435,21 +546,22 @@ if __name__ == "__main__":
             if not deployment:
                 raise ValueError(f"Deployment {deployment_id} not found")
             
-            # 활성화하려는 경우, 같은 ChatFlow의 다른 배포들을 비활성화
+            # 활성화하려는 경우, 같은 ChatFlow의 같은 환경에 있는 다른 배포들만 비활성화
             if status == DeploymentStatus.ACTIVE:
                 all_deployments = self.get_all_deployments()
                 for other_deployment in all_deployments:
                     if (other_deployment.id != deployment_id and 
                         other_deployment.workflowName == deployment.workflowName and 
+                        other_deployment.environment == deployment.environment and
                         other_deployment.status == DeploymentStatus.ACTIVE):
                         
-                        logger.info(f"Deactivating other deployment {other_deployment.id} for same ChatFlow {deployment.workflowName}")
+                        logger.info(f"Deactivating other deployment {other_deployment.id} for same ChatFlow {deployment.workflowName} in {deployment.environment} environment")
                         other_deployment.status = DeploymentStatus.INACTIVE
-                        other_deployment.updatedAt = datetime.utcnow().isoformat()
+                        other_deployment.updatedAt = datetime.now(timezone.utc).isoformat()
                         self._save_deployment_to_file(other_deployment)
             
             deployment.status = status
-            deployment.updatedAt = datetime.utcnow().isoformat()
+            deployment.updatedAt = datetime.now(timezone.utc).isoformat()
             
             if status == DeploymentStatus.ACTIVE:
                 deployment.deployedAt = deployment.updatedAt
@@ -485,12 +597,12 @@ if __name__ == "__main__":
                 nodes=workflow_data.get("nodes", []),
                 edges=workflow_data.get("edges", []),
                 viewport=workflow_data.get("viewport", {}),
-                lastModified=workflow_data.get("lastModified", datetime.utcnow().isoformat())
+                lastModified=workflow_data.get("lastModified", datetime.now(timezone.utc).isoformat())
             )
             
             # 새 버전 생성
             version_id = str(uuid.uuid4())
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             
             deployment_version = DeploymentVersion(
                 id=version_id,
@@ -566,46 +678,6 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             "error": str(e)
         }}
 
-# API를 통한 배포 실행 함수
-def run_deployment_via_api(input_data):
-    import requests
-    import json
-    
-    url = "http://localhost:8000/api/deployment/{deployment_id}/run"
-    
-    payload = {{
-        "input_data": input_data
-    }}
-    
-    headers = {{
-        "Content-Type": "application/json"
-    }}
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        
-        result = response.json()
-        
-        if result.get("success"):
-            print("Deployment execution successful:", result["result"])
-            return result["result"]
-        else:
-            print("Deployment execution failed:", result.get("error"))
-            raise Exception(result.get("error"))
-            
-    except requests.exceptions.RequestException as e:
-        print("API call error:", e)
-        raise e
-
-# 사용 예시
-if __name__ == "__main__":
-    try:
-        # API를 통한 실행
-        result = run_deployment_via_api("Hello! This is a test message.")
-        print("Result:", result)
-    except Exception as e:
-        print("Error:", e)
 """
             
             logger.info(f"Generated code for deployment {deployment_id} version {version_id}")
@@ -652,24 +724,6 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Error saving deployment version to file: {str(e)}")
             raise
-    
-    def _save_execution_record(self, execution_record: Dict[str, Any]):
-        """실행 기록을 파일로 저장합니다."""
-        try:
-            executions_dir = os.path.join(self.deployments_dir, "executions")
-            if not os.path.exists(executions_dir):
-                os.makedirs(executions_dir)
-            
-            # 실행 기록을 파일로 저장
-            execution_file = os.path.join(executions_dir, f"{execution_record['id']}.json")
-            with open(execution_file, 'w', encoding='utf-8') as f:
-                json.dump(execution_record, f, indent=2, ensure_ascii=False)
-            
-            logger.info(f"Saved execution record: {execution_record['id']}")
-            
-        except Exception as e:
-            logger.error(f"Error saving execution record: {str(e)}")
-            raise
 
     def delete_deployment(self, deployment_id: str) -> bool:
         """배포를 삭제합니다."""
@@ -678,22 +732,140 @@ if __name__ == "__main__":
             if not deployment:
                 return False
             
-            # 배포 디렉토리 삭제
+            # 1. 관련된 실행 기록 삭제
+            executions_dir = os.path.join(self.deployments_dir, "executions")
+            if os.path.exists(executions_dir):
+                # 해당 배포의 실행 기록들을 찾아서 삭제
+                for filename in os.listdir(executions_dir):
+                    if filename.endswith('.json'):
+                        execution_file = os.path.join(executions_dir, filename)
+                        try:
+                            with open(execution_file, 'r', encoding='utf-8') as f:
+                                execution_data = json.load(f)
+                                if execution_data.get('deployment_id') == deployment_id:
+                                    os.remove(execution_file)
+                                    logger.info(f"Deleted execution record: {filename}")
+                        except Exception as e:
+                            logger.warning(f"Error reading execution file {filename}: {str(e)}")
+                            continue
+            
+            # 2. 관련된 실행 로그 삭제 (deployments/{deployment_id}/executions 디렉토리)
+            deployment_executions_dir = os.path.join("deployments", deployment_id, "executions")
+            if os.path.exists(deployment_executions_dir):
+                import shutil
+                shutil.rmtree(deployment_executions_dir)
+                logger.info(f"Deleted execution logs for deployment: {deployment_id}")
+            
+            # 3. 배포 디렉토리 삭제
             deployment_dir = os.path.join(self.deployments_dir, deployment_id)
             if os.path.exists(deployment_dir):
                 import shutil
                 shutil.rmtree(deployment_dir)
             
-            # 배포 파일 삭제
+            # 4. 배포 파일 삭제
             deployment_file = os.path.join(self.deployments_dir, f"{deployment_id}.json")
             if os.path.exists(deployment_file):
                 os.remove(deployment_file)
             
-            logger.info(f"Deleted deployment: {deployment_id}")
+            logger.info(f"Deleted deployment and all related data: {deployment_id}")
             return True
             
         except Exception as e:
             logger.error(f"Error deleting deployment {deployment_id}: {str(e)}")
+            raise
+
+
+
+    def _save_workflow_snapshot(self, deployment_id: str, execution_id: str, workflow_snapshot: WorkflowSnapshot):
+        """워크플로우 스냅샷과 실행 메타데이터를 통합하여 저장합니다."""
+        try:
+            # 실행 디렉토리에 직접 저장
+            execution_dir = os.path.join("deployments", deployment_id, "executions", execution_id)
+            if not os.path.exists(execution_dir):
+                os.makedirs(execution_dir)
+            
+            # 워크플로우 스냅샷과 실행 메타데이터를 통합하여 workflow_snap.json으로 저장
+            snapshot_file = os.path.join(execution_dir, "workflow_snap.json")
+            
+            # 통합 데이터 구성
+            integrated_data = {
+                # 워크플로우 스냅샷 정보
+                "workflow_snapshot": workflow_snapshot.dict(),
+                # 실행 메타데이터
+                "execution_metadata": {
+                    "id": execution_id,
+                    "name": f"execution-{execution_id[:8]}",
+                    "arn": f"langstar:ap-northeast-2:123456789012:execution:{execution_id}",
+                    "workflow_id": deployment_id,
+                    "workflow_name": "Unknown Workflow",  # 나중에 업데이트
+                    "deployment_id": deployment_id,
+                    "version_id": "unknown",  # 나중에 업데이트
+                    "status": "succeeded",  # 나중에 업데이트
+                    "start_time": None,  # 나중에 업데이트
+                    "end_time": None,  # 나중에 업데이트
+                    "duration_ms": None,  # 나중에 업데이트
+                    "input": {},  # 나중에 업데이트
+                    "output": {},  # 나중에 업데이트
+                    "error_message": None,  # 나중에 업데이트
+                    "state_transitions": 0,  # 나중에 업데이트
+                    "state_transitions_list": [],  # 나중에 업데이트
+                    "api_call_info": None,  # 나중에 업데이트
+                    "execution_source": "internal"  # 나중에 업데이트
+                }
+            }
+            
+            with open(snapshot_file, 'w', encoding='utf-8') as f:
+                json.dump(integrated_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Saved integrated workflow snapshot for execution {execution_id}: workflow_snap.json")
+            
+        except Exception as e:
+            logger.error(f"Error saving workflow snapshot: {str(e)}")
+            raise
+
+    def _update_workflow_snap_metadata(self, deployment_id: str, execution_id: str, execution_record: Dict[str, Any]):
+        """workflow_snap.json의 실행 메타데이터를 업데이트합니다."""
+        try:
+            execution_dir = os.path.join("deployments", deployment_id, "executions", execution_id)
+            if not os.path.exists(execution_dir):
+                logger.warning(f"Execution directory not found for metadata update: {execution_dir}")
+                return
+
+            snapshot_file = os.path.join(execution_dir, "workflow_snap.json")
+            if not os.path.exists(snapshot_file):
+                logger.warning(f"Workflow snapshot file not found for metadata update: {snapshot_file}")
+                return
+
+            with open(snapshot_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # 실행 메타데이터 업데이트
+            data["execution_metadata"]["id"] = execution_record["id"]
+            data["execution_metadata"]["name"] = execution_record["name"]
+            data["execution_metadata"]["arn"] = execution_record["arn"]
+            data["execution_metadata"]["workflow_id"] = execution_record["workflow_id"]
+            data["execution_metadata"]["workflow_name"] = execution_record["workflow_name"]
+            data["execution_metadata"]["deployment_id"] = execution_record["deployment_id"]
+            data["execution_metadata"]["version_id"] = execution_record["version_id"]
+            data["execution_metadata"]["status"] = execution_record["status"]
+            data["execution_metadata"]["start_time"] = execution_record["start_time"]
+            data["execution_metadata"]["end_time"] = execution_record["end_time"]
+            data["execution_metadata"]["duration_ms"] = execution_record["duration_ms"]
+            data["execution_metadata"]["input"] = execution_record["input"]
+            data["execution_metadata"]["output"] = execution_record["output"]
+            data["execution_metadata"]["error_message"] = execution_record["error_message"]
+            data["execution_metadata"]["state_transitions"] = len(execution_record["state_transitions_list"])
+            data["execution_metadata"]["state_transitions_list"] = execution_record["state_transitions_list"]
+            data["execution_metadata"]["api_call_info"] = execution_record["api_call_info"]
+            data["execution_metadata"]["execution_source"] = execution_record["execution_source"]
+
+            with open(snapshot_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Updated workflow snapshot metadata for execution {execution_id}: {snapshot_file}")
+
+        except Exception as e:
+            logger.error(f"Error updating workflow snapshot metadata: {str(e)}")
             raise
 
 # 싱글톤 인스턴스
