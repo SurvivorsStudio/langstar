@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Settings, Code, AlertCircle, LogIn, Play, Database } from 'lucide-react';
+import { X, Settings, Code, AlertCircle, LogIn, Play } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import ConditionSettings from './nodes/ConditionSettings';
@@ -155,62 +155,40 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const handleInputDataClick = async (edgeId: string, sourceNodeId: string, inputData: Record<string, VariableValue>) => {
     setManuallySelectedEdgeId(edgeId);
     
-    // Mock Data인 경우와 실제 edge인 경우를 구분
-    if (edgeId === 'mock-data') {
-      // Mock Data인 경우
-      if (currentNode) {
-        try {
-          // input data를 노드에 설정
-          updateNodeData(nodeId, {
-            ...currentNode.data,
-            inputData: inputData
-          });
-          
-          // 노드 실행
-          await executeNode(nodeId);
-          
-          console.log(`Node ${nodeId} executed with mock data`);
-        } catch (error) {
-          console.error('Error executing node with mock data:', error);
+    // store에 수동 선택 정보 저장
+    setManuallySelectedEdge(nodeId, edgeId);
+    
+    // 선택된 input data로 노드 실행
+    if (currentNode) {
+      try {
+        // input data를 노드에 설정
+        updateNodeData(nodeId, {
+          ...currentNode.data,
+          inputData: inputData
+        });
+        
+        // 노드 실행을 위해 임시로 edge 데이터 수정
+        const originalEdgeData = edges.find(e => e.id === edgeId)?.data;
+        
+        // 선택된 input data로 edge 업데이트
+        updateEdgeData(edgeId, {
+          output: inputData,
+          timestamp: Date.now()
+        });
+        
+        // 노드 실행
+        await executeNode(nodeId);
+        
+        // 원래 edge 데이터 복원 (선택적)
+        if (originalEdgeData) {
+          setTimeout(() => {
+            updateEdgeData(edgeId, originalEdgeData);
+          }, 100);
         }
-      }
-    } else {
-      // 실제 edge인 경우
-      // store에 수동 선택 정보 저장
-      setManuallySelectedEdge(nodeId, edgeId);
-      
-      // 선택된 input data로 노드 실행
-      if (currentNode) {
-        try {
-          // input data를 노드에 설정
-          updateNodeData(nodeId, {
-            ...currentNode.data,
-            inputData: inputData
-          });
-          
-          // 노드 실행을 위해 임시로 edge 데이터 수정
-          const originalEdgeData = edges.find(e => e.id === edgeId)?.data;
-          
-          // 선택된 input data로 edge 업데이트
-          updateEdgeData(edgeId, {
-            output: inputData,
-            timestamp: Date.now()
-          });
-          
-          // 노드 실행
-          await executeNode(nodeId);
-          
-          // 원래 edge 데이터 복원 (선택적)
-          if (originalEdgeData) {
-            setTimeout(() => {
-              updateEdgeData(edgeId, originalEdgeData);
-            }, 100);
-          }
-          
-          console.log(`Node ${nodeId} executed with manually selected input from node ${sourceNodeId}`);
-        } catch (error) {
-          console.error('Error executing node with selected input:', error);
-        }
+        
+        console.log(`Node ${nodeId} executed with manually selected input from node ${sourceNodeId}`);
+      } catch (error) {
+        console.error('Error executing node with selected input:', error);
       }
     }
   };
@@ -246,59 +224,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
     }
   };
 
-  // Mock Data 생성 핸들러
-  const handleGenerateMockData = () => {
-    const mockData = generateMockData();
-    
-    // Mock data를 노드에 설정
-    if (currentNode) {
-      updateNodeData(nodeId, {
-        ...currentNode.data,
-        inputData: mockData
-      });
-    }
-    
-    // 로컬 상태 업데이트
-    setMergedInputData(mockData);
-    setHasValidInputData(true);
-    setAvailableVariables(Object.keys(mockData));
-    setSelectedEdgeInfo({
-      edgeId: 'mock-data',
-      sourceNodeId: 'mock',
-      timestamp: Date.now()
-    });
-    
-    console.log(`Generated mock data for node ${nodeId}:`, mockData);
-  };
 
-  // Mock Data 생성 함수
-  const generateMockData = () => {
-    const mockTypes = [
-      { name: 'user_input', type: 'string', value: '안녕하세요, 도움이 필요합니다.' },
-      { name: 'user_id', type: 'number', value: 12345 },
-      { name: 'session_id', type: 'string', value: 'session_abc123' },
-      { name: 'timestamp', type: 'number', value: Date.now() },
-      { name: 'user_profile', type: 'object', value: { name: '홍길동', age: 30, city: '서울' } },
-      { name: 'preferences', type: 'array', value: ['AI', '개발', '기술'] },
-      { name: 'is_active', type: 'boolean', value: true },
-      { name: 'score', type: 'number', value: 85.5 },
-      { name: 'tags', type: 'array', value: ['tag1', 'tag2', 'tag3'] },
-      { name: 'metadata', type: 'object', value: { source: 'web', version: '1.0' } }
-    ];
-
-    const mockData: Record<string, any> = {};
-    
-    // 랜덤하게 3-7개의 데이터 선택
-    const selectedCount = Math.floor(Math.random() * 5) + 3;
-    const shuffled = mockTypes.sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, selectedCount);
-    
-    selected.forEach(item => {
-      mockData[item.name] = item.value;
-    });
-    
-    return mockData;
-  };
 
 
 
@@ -397,14 +323,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Incoming Data</h3>
               <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleGenerateMockData}
-                  className="px-2 py-1 text-xs bg-purple-500 hover:bg-purple-600 text-white rounded transition-colors flex items-center"
-                  title="Generate mock data for testing"
-                >
-                  <Database size={12} className="mr-1" />
-                  Mock Data
-                </button>
                 {incomingEdges.length > 0 && hasValidInputData && (
                   <button
                     onClick={handleClearInputData}
@@ -473,35 +391,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                                  {/* 선택된 데이터 표시 */}
                  {selectedEdgeInfo && (
                    <div 
-                     className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                       selectedEdgeInfo.edgeId === 'mock-data' 
-                         ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30' 
-                         : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
-                     } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
+                     className={`border rounded-lg p-3 cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30 ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
                      onClick={() => handleInputDataClick(selectedEdgeInfo.edgeId, selectedEdgeInfo.sourceNodeId, mergedInputData)}
                      title="Click to execute with this input"
                    >
                      <div className="flex items-center justify-between mb-2">
-                       <span className={`text-xs font-medium ${
-                         selectedEdgeInfo.edgeId === 'mock-data'
-                           ? 'text-purple-700 dark:text-purple-300'
-                           : 'text-green-700 dark:text-green-300'
-                       }`}>
-                         {selectedEdgeInfo.edgeId === 'mock-data' ? '🎲 Mock Data' : '✅ Selected Input (Latest)'}
+                       <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                         ✅ Selected Input (Latest)
                        </span>
                        <div className="flex items-center space-x-2">
-                         <span className={`text-xs ${
-                           selectedEdgeInfo.edgeId === 'mock-data'
-                             ? 'text-purple-600 dark:text-purple-400'
-                             : 'text-green-600 dark:text-green-400'
-                         }`}>
+                         <span className="text-xs text-green-600 dark:text-green-400">
                            {new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()}
                          </span>
-                         <Play className={`w-3 h-3 ${
-                           selectedEdgeInfo.edgeId === 'mock-data'
-                             ? 'text-purple-600 dark:text-purple-400'
-                             : 'text-green-600 dark:text-green-400'
-                         }`} />
+                         <Play className="w-3 h-3 text-green-600 dark:text-green-400" />
                        </div>
                      </div>
                      
