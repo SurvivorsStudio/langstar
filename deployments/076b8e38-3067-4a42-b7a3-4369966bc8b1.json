@@ -1,0 +1,20 @@
+{
+  "id": "076b8e38-3067-4a42-b7a3-4369966bc8b1",
+  "name": "일본어 봇",
+  "version": "1.0.0",
+  "description": "",
+  "workflowId": "b3471714-b212-4566-837f-e5f25f5913f1",
+  "workflowName": "(예제) 일본어 번역봇",
+  "status": "active",
+  "environment": "dev",
+  "createdAt": "2025-08-06T00:32:31.241785",
+  "updatedAt": "2025-08-06T00:33:24.180766",
+  "deployedAt": "2025-08-06T00:33:24.180766",
+  "deploymentUrl": null,
+  "config": {},
+  "arn": null,
+  "type": "STANDARD",
+  "xray_tracing": false,
+  "execution_count": 0,
+  "last_execution_time": null
+}

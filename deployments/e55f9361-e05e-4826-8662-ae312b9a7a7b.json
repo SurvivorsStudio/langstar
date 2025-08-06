@@ -1,0 +1,20 @@
+{
+  "id": "e55f9361-e05e-4826-8662-ae312b9a7a7b",
+  "name": "강도영",
+  "version": "1.0.0",
+  "description": "",
+  "workflowId": "2c2613c7-ba5f-42ef-93e9-73c755f91793",
+  "workflowName": "S&OP 수요 예측 챗봇4",
+  "status": "active",
+  "environment": "dev",
+  "createdAt": "2025-08-06T00:31:27.642468",
+  "updatedAt": "2025-08-06T00:31:46.063556",
+  "deployedAt": "2025-08-06T00:31:46.063556",
+  "deploymentUrl": null,
+  "config": {},
+  "arn": null,
+  "type": "STANDARD",
+  "xray_tracing": false,
+  "execution_count": 0,
+  "last_execution_time": null
+}
