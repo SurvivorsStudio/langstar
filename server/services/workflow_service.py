@@ -3,8 +3,6 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-
 import types
 import uuid
 import ast
@@ -59,35 +57,18 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
 
     # 도구 있어
     elif memory == "" and len(tool_info) != 0:
-        print("aaa")
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"{system_prompt}"),
             ("human", "{user_prompt}"),
             ("placeholder", "{agent_scratchpad}"),
         ])
 
-        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        
-        # 안전한 response 파싱
-        try:
-            if isinstance(response, dict) and "output" in response:
-                output = response["output"]
-                if isinstance(output, list) and len(output) > 0:
-                    text_content = output[0].get('text', '')
-                    if '</thinking>\n\n' in text_content:
-                        return text_content.split('</thinking>\n\n')[1]
-                    else:
-                        return text_content
-                else:
-                    return str(response)
-            else:
-                return str(response)
-        except Exception as e:
-            logger.error(f"Error parsing agent response: {str(e)}")
-            return str(response)
+        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+        return response
 
     # 도구 있어, 메모리 있어
     elif memory != "" and len(tool_info) != 0:
@@ -98,28 +79,12 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             ("placeholder", "{agent_scratchpad}"),
         ])
 
-        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        tools = [WorkflowService.create_tool_from_api(**tool_info) for tool_info in tools_data]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=[product_search_tool, weather_tool], verbose=False)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        
-        # 안전한 response 파싱
-        try:
-            if isinstance(response, dict) and "output" in response:
-                output = response["output"]
-                if isinstance(output, list) and len(output) > 0:
-                    text_content = output[0].get('text', '')
-                    if '</thinking>\n\n' in text_content:
-                        return text_content.split('</thinking>\n\n')[1]
-                    else:
-                        return text_content
-                else:
-                    return str(response)
-            else:
-                return str(response)
-        except Exception as e:
-            logger.error(f"Error parsing agent response: {str(e)}")
-            return str(response)
+        response = response["output"][0]['text'].split('</thinking>\n\n')[1]
+        return response
 
 
 
@@ -243,7 +208,7 @@ class WorkflowService:
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
-            tool = StructuredTool.from_function(
+            tool = Tool.from_function(
                 name=tool_name,
                 description=tool_description,
                 func=tool_func
