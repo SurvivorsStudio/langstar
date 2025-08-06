@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState } from 'react';
 import { EdgeProps, getBezierPath, EdgeLabelRenderer } from 'reactflow';
 import { X, Trash2 } from 'lucide-react';
 import OutputInspector from '../OutputInspector';
@@ -23,44 +23,22 @@ const CustomEdge = ({
   style = {},
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
-  const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode, updateEdgeData } = useFlowStore();
+  const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode } = useFlowStore();
   const sourceNode = nodes.find(n => n.id === source);
   const isEdgeTextFocused = focusedElement.type === 'edge' && focusedElement.id === id;
-
-  // 드래그 가능한 중간점 상태
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(
-    data?.dragPoint || null
-  );
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
   const centerY = (sourceY + targetY) / 2;
 
-  // 드래그 포인트가 있으면 그것을 사용하고, 없으면 기본 중간점 사용
-  const controlPointX: number = dragPoint ? dragPoint.x : centerX;
-  const controlPointY: number = dragPoint ? dragPoint.y : centerY;
-
-  // 커스텀 베지어 경로 생성
-  const createCustomPath = useCallback(() => {
-    if (!dragPoint) {
-      // 드래그 포인트가 없으면 기본 베지어 경로 사용
-      return getBezierPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-      });
-    }
-
-    // 드래그 포인트를 사용한 커스텀 경로 생성
-    const path = `M ${sourceX} ${sourceY} Q ${controlPointX} ${controlPointY} ${targetX} ${targetY}`;
-    return [path, String(controlPointX), String(controlPointY)];
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, controlPointX, controlPointY, dragPoint]);
-
-  const [edgePath, labelX, labelY] = createCustomPath();
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
 
   const conditionDescription = data?.conditionDescription;
   const isConditionEdge = sourceNode?.type === 'conditionNode';
@@ -78,69 +56,6 @@ const CustomEdge = ({
     setEdgeOutput(id, null);
   };
 
-  // 드래그 핸들러
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-    setFocusedElement('edge', id);
-  }, [id, setFocusedElement]);
-
-  const handleDrag = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.stopPropagation();
-    
-    // 마우스 위치를 SVG 좌표로 변환
-    const svgElement = e.currentTarget.closest('svg');
-    if (!svgElement) return;
-    
-    const rect = svgElement.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setDragPoint({ x, y });
-  }, [isDragging]);
-
-  const handleDragEnd = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      // 드래그 포인트를 edge 데이터에 저장
-      if (dragPoint) {
-        updateEdgeData(id, { dragPoint });
-      }
-    }
-  }, [isDragging, dragPoint, id, updateEdgeData]);
-
-  // 마우스 이벤트 리스너 추가
-  React.useEffect(() => {
-    if (isDragging) {
-      const handleMouseMove = (e: MouseEvent) => {
-        const svgElement = document.querySelector('svg');
-        if (!svgElement) return;
-        
-        const rect = svgElement.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        setDragPoint({ x, y });
-      };
-
-      const handleMouseUp = () => {
-        setIsDragging(false);
-        if (dragPoint) {
-          updateEdgeData(id, { dragPoint });
-        }
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, dragPoint, id, updateEdgeData]);
-
   return (
     <>
       <defs>
@@ -156,8 +71,6 @@ const CustomEdge = ({
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
         </marker>
       </defs>
-      
-      {/* 메인 edge 경로 */}
       <path
         id={id}
         style={style}
@@ -166,38 +79,12 @@ const CustomEdge = ({
         markerEnd="url(#arrow)"
       />
 
-      {/* 드래그 가능한 중간점 */}
-      <circle
-        cx={controlPointX}
-        cy={controlPointY}
-        r={6}
-        fill="#94a3b8"
-        stroke="#64748b"
-        strokeWidth={2}
-        className="cursor-move hover:fill-slate-500 transition-colors"
-        onMouseDown={handleDragStart}
-        style={{ pointerEvents: 'all' }}
-      />
-
-      {/* 드래그 중일 때 시각적 피드백 */}
-      {isDragging && (
-        <circle
-          cx={controlPointX}
-          cy={controlPointY}
-          r={12}
-          fill="rgba(148, 163, 184, 0.2)"
-          stroke="rgba(148, 163, 184, 0.5)"
-          strokeWidth={2}
-          style={{ pointerEvents: 'none' }}
-        />
-      )}
-
       {isConditionEdge && conditionDescription && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${Number(labelY) - 35}px)`, // Y 위치 조정
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY - 35}px)`, // Y 위치 조정
               padding: '3px 8px',
               borderRadius: '12px',
               fontSize: '10px',
@@ -214,8 +101,8 @@ const CustomEdge = ({
       <foreignObject
         width={200}
         height={100}
-        x={controlPointX - 100}
-        y={controlPointY - 20}
+        x={centerX - 100}
+        y={centerY - 20}
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
