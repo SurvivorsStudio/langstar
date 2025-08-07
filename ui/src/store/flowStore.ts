@@ -1624,6 +1624,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             connName: modelDetails.name,
             providerName: modelDetails.provider,
             modelName: modelDetails.model,
+            // 모델 설정 값들 추가
+            temperature: finalNodeData.config?.temperature ?? 0.7,
+            maxTokens: finalNodeData.config?.maxTokens ?? 1000,
+            topK: finalNodeData.config?.topK ?? 40,
+            topP: finalNodeData.config?.topP ?? 1,
           };
           if (modelDetails.provider.toLowerCase() === 'aws') {
             modelConfigForExport.accessKeyId = modelDetails.accessKeyId;
