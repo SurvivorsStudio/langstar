@@ -205,15 +205,15 @@ const CustomEdge = ({
 
       {/* 통합된 데이터 표시 및 드래그 영역 */}
       <foreignObject
-        width={220}
-        height={120}
-        x={dataBoxCenterX - 110}
-        y={dataBoxCenterY - 60}
+        width={200}
+        height={80}
+        x={dataBoxCenterX - 100}
+        y={dataBoxCenterY - 40}
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
         <div 
-          className={`relative bg-white dark:bg-gray-800 shadow-md rounded-lg border max-h-32 overflow-y-auto transition-all duration-200 ${
+          className={`relative bg-white dark:bg-gray-800 shadow-md rounded-lg border h-20 overflow-hidden transition-all duration-200 ${
             isDragging 
               ? 'border-blue-500 shadow-lg scale-105' 
               : isEdgeTextFocused 
@@ -249,7 +249,7 @@ const CustomEdge = ({
           )}
 
           {/* 액션 버튼들 */}
-          <div className="absolute -top-2 -right-2 flex gap-1 z-10">
+          <div className="absolute top-1 right-1 flex gap-1 z-10">
             <button
               onClick={handleClearOutput}
               className="p-1 bg-gray-500 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-full shadow-sm transition-colors"
@@ -268,7 +268,7 @@ const CustomEdge = ({
 
           {/* 데이터 내용 */}
           <div 
-            className="p-3 text-xs"
+            className="p-2 text-xs"
             onClick={e => { 
               e.stopPropagation(); 
               setFocusedElement('edge', id);
@@ -276,7 +276,7 @@ const CustomEdge = ({
               setShowInspector(true); 
             }}
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Edge Data
               </span>
@@ -286,8 +286,8 @@ const CustomEdge = ({
                 </span>
               )}
             </div>
-            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words text-xs leading-relaxed">
-              {outputPreview.length > 150 ? outputPreview.slice(0, 150) + '...' : outputPreview}
+            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words text-xs leading-tight line-clamp-2">
+              {outputPreview.length > 100 ? outputPreview.slice(0, 100) + '...' : outputPreview}
             </pre>
           </div>
 
