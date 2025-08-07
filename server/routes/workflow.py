@@ -28,6 +28,7 @@ def prompt_node(data: PromptNodeInput):
 @router.post('/workflow/node/pythonnode')
 def python_node(msg: dict = Body(...)):
     try:
+        print( msg )
         logger.info("Received python node request")
         result = WorkflowService.process_python_node(msg)
         logger.info("Python node request processed successfully")

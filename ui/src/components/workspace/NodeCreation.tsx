@@ -15,7 +15,7 @@ const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
   const [outputVariable, setOutputVariable] = useState('');
   const [streamEnabled, setStreamEnabled] = useState(false);
   const [parameters, setParameters] = useState([
-    { name: '메뉴 이름', inputType: 'select box', required: true }
+    { name: '메뉴 이름', userparam: '', inputType: 'text box', required: true }
   ]);
   const [functionName, setFunctionName] = useState('my_function');
   const [returnType, setReturnType] = useState('str');
@@ -34,7 +34,7 @@ def my_function(input_data) -> str:
     pass`);
 
   const addParameter = () => {
-    setParameters([...parameters, { name: '', inputType: 'select box', required: false }]);
+    setParameters([...parameters, { name: '', inputType: 'text box', required: false, userparam: '' }]);
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
@@ -146,8 +146,8 @@ def my_function(input_data) -> str:
                        onChange={(e) => updateParameter(index, 'inputType', e.target.value)}
                        className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                      >
-                       <option value="select box">select box</option>
                        <option value="text box">text box</option>
+                       <option value="select box">select box</option>
                      </select>
                      <button
                        onClick={() => removeParameter(index)}
@@ -156,6 +156,17 @@ def my_function(input_data) -> str:
                        삭제
                      </button>
                    </div>
+                   {param.inputType === 'text box' && (
+                     <div className="mb-2">
+                       <input
+                         type="text"
+                         value={param.userparam || ''}
+                         onChange={(e) => updateParameter(index, 'userparam', e.target.value)}
+                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                         placeholder="텍스트 박스 값 입력"
+                       />
+                     </div>
+                   )}
                  </div>
                ))}
               <button
