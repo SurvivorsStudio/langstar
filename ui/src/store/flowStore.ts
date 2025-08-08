@@ -1677,12 +1677,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             }
           }
 
-          // 변환된 객체로 기존 config를 대체합니다.
+          // 모델 설정값들을 포함하여 변환된 객체로 기존 config를 대체합니다.
           finalNodeData.config = {
             ...finalNodeData.config,
             model: modelConfigForExport,
             memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
             tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
+            // 모델 설정값들 추가
+            topK: finalNodeData.config.topK ?? 40,
+            topP: finalNodeData.config.topP ?? 1,
+            temperature: finalNodeData.config.temperature ?? 0.7,
+            maxTokens: finalNodeData.config.maxTokens ?? 1000,
           };
         }
       }
