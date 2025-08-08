@@ -15,7 +15,9 @@ const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
   const [outputVariable, setOutputVariable] = useState('');
   const [streamEnabled, setStreamEnabled] = useState(false);
   const [parameters, setParameters] = useState([
+
     { name: 'menu_name', inputType: 'select box', required: true, funcArgs: '메뉴 이름', matchData: '' }
+
   ]);
   const [functionName, setFunctionName] = useState('my_function');
   const [returnType, setReturnType] = useState('str');
@@ -34,7 +36,9 @@ def my_function(input_data) -> str:
     pass`);
 
   const addParameter = () => {
+
     setParameters([...parameters, { name: '', inputType: 'select box', required: false, funcArgs: '', matchData: '' }]);
+
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
@@ -50,7 +54,9 @@ def my_function(input_data) -> str:
   const handleSave = async () => {
     try {
       // UserNode로 저장
+
       const savedUserNode = await addUserNode({
+
         name: nodeName,
         type: 'UserNode',
         code: code,
@@ -70,6 +76,7 @@ def my_function(input_data) -> str:
         code
       });
       
+
       // 이름이 자동으로 변경된 경우 사용자에게 알림
       if (savedUserNode.name !== nodeName) {
         alert(`${nodeName} 노드가 카탈로그에 추가되었습니다!\n\n참고: 이름이 "${savedUserNode.name}"로 자동 변경되었습니다. (기존에 동일한 이름의 노드가 있었습니다.)`);
@@ -77,6 +84,7 @@ def my_function(input_data) -> str:
         alert(`${nodeName} 노드가 카탈로그에 추가되었습니다!`);
       }
       
+
       onSave?.(); // 저장 후 콜백 호출
     } catch (error) {
       console.error('노드 저장 중 오류:', error);
@@ -128,6 +136,7 @@ def my_function(input_data) -> str:
             <div className="space-y-3">
                              {parameters.map((param, index) => (
                  <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+
                    <div className="space-y-3">
                      <div className="grid grid-cols-4 gap-2">
                        <input
@@ -178,6 +187,7 @@ def my_function(input_data) -> str:
                        </button>
                      </div>
                    </div>
+
                  </div>
                ))}
               <button

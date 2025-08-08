@@ -76,8 +76,10 @@ export interface UserNode {
     name: string;
     inputType: string; // 'select box' 또는 'text box'
     required: boolean;
+
     funcArgs?: string; // 매개변수별 funcArgs 추가
     matchData?: string; // 매개변수별 matchData 추가
+
   }>;
   functionName: string;
   returnType: string;

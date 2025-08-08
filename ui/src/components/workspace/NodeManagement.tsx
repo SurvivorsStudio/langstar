@@ -103,6 +103,7 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
             {userNodes.map((node) => {
               // 중복된 이름이 있는지 확인
               const duplicateNames = userNodes.filter(n => n.name === node.name);
@@ -167,6 +168,7 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
                 </div>
               );
             })}
+
           </div>
         )}
       </div>

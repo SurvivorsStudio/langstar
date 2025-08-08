@@ -568,7 +568,6 @@ def node_{function_name}(state):
 
 def condition_node_code( node, node_id_to_node_label ) :
     node_name = node['data']['label']
-
     node_id = node['id']
     node_type = node['type']
     condition_config = []
@@ -581,7 +580,6 @@ def condition_node_code( node, node_id_to_node_label ) :
     code += condition_sub1_node_code(node_name, condition_config, node_id, node_name, node_type)
     code += condition_sub2_node_code(node_name, condition_config, node_id, node_name, node_type)
     return code 
-
 
 # create_function_node
 def python_function_node_code( node ):

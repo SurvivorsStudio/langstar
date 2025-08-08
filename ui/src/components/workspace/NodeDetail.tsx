@@ -65,7 +65,9 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   };
 
   const addParameter = () => {
+
     setEditParameters([...editParameters, { name: '', inputType: 'select box', required: false, funcArgs: '', matchData: '' }]);
+
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
@@ -227,12 +229,15 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                 {(isEditing ? editParameters : node.parameters).map((param, index) => (
                   <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
                     {isEditing ? (
+
                       <div className="space-y-3">
                         <div className="grid grid-cols-4 gap-2">
+
                           <input
                             type="text"
                             value={param.name}
                             onChange={(e) => updateParameter(index, 'name', e.target.value)}
+
                             placeholder="메뉴 이름"
                             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                           />
@@ -251,12 +256,14 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                           />
                           <div className="flex items-center justify-center">
+
                             <input
                               type="checkbox"
                               checked={param.required}
                               onChange={(e) => updateParameter(index, 'required', e.target.checked)}
                               className="mr-2"
                             />
+
                             <span className="text-sm text-gray-700 dark:text-gray-300">필수</span>
                           </div>
                         </div>
@@ -269,6 +276,7 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                             <option value="select box">Select Box</option>
                             <option value="text box">Text Box</option>
                           </select>
+
                           <button
                             onClick={() => removeParameter(index)}
                             className="text-red-500 hover:text-red-700"
@@ -283,8 +291,10 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                           <p className="font-medium text-gray-900 dark:text-gray-100">{param.name}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {param.inputType} • {param.required ? 'Required' : 'Optional'}
+
                             {param.funcArgs && ` • Func Args: ${param.funcArgs}`}
                             {param.matchData && ` • Match Data: ${param.matchData}`}
+
                           </p>
                         </div>
                       </div>
