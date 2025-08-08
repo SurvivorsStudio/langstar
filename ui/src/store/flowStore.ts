@@ -76,6 +76,8 @@ export interface UserNode {
     name: string;
     inputType: string; // 'select box' 또는 'text box'
     required: boolean;
+    funcArgs?: string; // 매개변수별 funcArgs 추가
+    matchData?: string; // 매개변수별 matchData 추가
   }>;
   functionName: string;
   returnType: string;
@@ -1678,6 +1680,31 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
             tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
           };
+        }
+      }
+
+      // UserNode의 경우 parameters에 matchData 추가 및 inputData 변환
+      if (currentNode.type === 'userNode' && finalNodeData.config?.parameters) {
+        // parameters에 matchData 추가
+        finalNodeData.config.parameters = finalNodeData.config.parameters.map((param: any) => {
+          const matchData = finalNodeData.config?.inputData?.[param.name] || '';
+          return {
+            ...param,
+            matchData: matchData
+          };
+        });
+
+        // inputData를 funcArgs 기반으로 변환
+        if (finalNodeData.config?.inputData && Object.keys(finalNodeData.config.inputData).length > 0) {
+          const newInputData: any = {};
+          finalNodeData.config.parameters.forEach((param: any) => {
+            if (param.funcArgs && finalNodeData.config?.inputData?.[param.name]) {
+              newInputData[param.funcArgs] = finalNodeData.config.inputData[param.name];
+            }
+          });
+          if (Object.keys(newInputData).length > 0) {
+            finalNodeData.config.inputData = newInputData;
+          }
         }
       }
 

@@ -15,7 +15,7 @@ const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
   const [outputVariable, setOutputVariable] = useState('');
   const [streamEnabled, setStreamEnabled] = useState(false);
   const [parameters, setParameters] = useState([
-    { name: '메뉴 이름', inputType: 'select box', required: true }
+    { name: 'menu_name', inputType: 'select box', required: true, funcArgs: '메뉴 이름', matchData: '' }
   ]);
   const [functionName, setFunctionName] = useState('my_function');
   const [returnType, setReturnType] = useState('str');
@@ -34,7 +34,7 @@ def my_function(input_data) -> str:
     pass`);
 
   const addParameter = () => {
-    setParameters([...parameters, { name: '', inputType: 'select box', required: false }]);
+    setParameters([...parameters, { name: '', inputType: 'select box', required: false, funcArgs: '', matchData: '' }]);
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
@@ -50,7 +50,7 @@ def my_function(input_data) -> str:
   const handleSave = async () => {
     try {
       // UserNode로 저장
-      await addUserNode({
+      const savedUserNode = await addUserNode({
         name: nodeName,
         type: 'UserNode',
         code: code,
@@ -70,7 +70,13 @@ def my_function(input_data) -> str:
         code
       });
       
-      alert(`${nodeName} 노드가 카탈로그에 추가되었습니다!`);
+      // 이름이 자동으로 변경된 경우 사용자에게 알림
+      if (savedUserNode.name !== nodeName) {
+        alert(`${nodeName} 노드가 카탈로그에 추가되었습니다!\n\n참고: 이름이 "${savedUserNode.name}"로 자동 변경되었습니다. (기존에 동일한 이름의 노드가 있었습니다.)`);
+      } else {
+        alert(`${nodeName} 노드가 카탈로그에 추가되었습니다!`);
+      }
+      
       onSave?.(); // 저장 후 콜백 호출
     } catch (error) {
       console.error('노드 저장 중 오류:', error);
@@ -122,39 +128,55 @@ def my_function(input_data) -> str:
             <div className="space-y-3">
                              {parameters.map((param, index) => (
                  <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
-                   <div className="flex items-center justify-between mb-2">
-                     <input
-                       type="text"
-                       value={param.name}
-                       onChange={(e) => updateParameter(index, 'name', e.target.value)}
-                       className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                       placeholder="Parameter name"
-                     />
-                     <div className="flex items-center ml-2">
+                   <div className="space-y-3">
+                     <div className="grid grid-cols-4 gap-2">
                        <input
-                         type="checkbox"
-                         checked={param.required}
-                         onChange={(e) => updateParameter(index, 'required', e.target.checked)}
-                         className="mr-1"
+                         type="text"
+                         value={param.name}
+                         onChange={(e) => updateParameter(index, 'name', e.target.value)}
+                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                         placeholder="메뉴 이름"
                        />
-                       <span className="text-xs text-gray-600 dark:text-gray-400">필수</span>
+                       <input
+                         type="text"
+                         value={param.funcArgs || ''}
+                         onChange={(e) => updateParameter(index, 'funcArgs', e.target.value)}
+                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                         placeholder="Func Args"
+                       />
+                       <input
+                         type="text"
+                         value={param.matchData || ''}
+                         onChange={(e) => updateParameter(index, 'matchData', e.target.value)}
+                         className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                         placeholder="Match Data"
+                       />
+                       <div className="flex items-center justify-center">
+                         <input
+                           type="checkbox"
+                           checked={param.required}
+                           onChange={(e) => updateParameter(index, 'required', e.target.checked)}
+                           className="mr-1"
+                         />
+                         <span className="text-xs text-gray-600 dark:text-gray-400">필수</span>
+                       </div>
                      </div>
-                   </div>
-                   <div className="flex items-center justify-between mb-2">
-                     <select
-                       value={param.inputType}
-                       onChange={(e) => updateParameter(index, 'inputType', e.target.value)}
-                       className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                     >
-                       <option value="select box">select box</option>
-                       <option value="text box">text box</option>
-                     </select>
-                     <button
-                       onClick={() => removeParameter(index)}
-                       className="ml-2 px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
-                     >
-                       삭제
-                     </button>
+                     <div className="flex items-center space-x-2">
+                       <select
+                         value={param.inputType}
+                         onChange={(e) => updateParameter(index, 'inputType', e.target.value)}
+                         className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                       >
+                         <option value="select box">select box</option>
+                         <option value="text box">text box</option>
+                       </select>
+                       <button
+                         onClick={() => removeParameter(index)}
+                         className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
+                       >
+                         삭제
+                       </button>
+                     </div>
                    </div>
                  </div>
                ))}
