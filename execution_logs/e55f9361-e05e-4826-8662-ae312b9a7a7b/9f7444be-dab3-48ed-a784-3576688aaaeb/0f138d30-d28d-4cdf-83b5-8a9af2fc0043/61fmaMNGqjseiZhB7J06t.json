@@ -1,0 +1,27 @@
+{
+  "id": "4eca7870-7573-4c16-ad6d-01cec24c55e8",
+  "execution_id": "0f138d30-d28d-4cdf-83b5-8a9af2fc0043",
+  "deployment_id": "e55f9361-e05e-4826-8662-ae312b9a7a7b",
+  "version_id": "9f7444be-dab3-48ed-a784-3576688aaaeb",
+  "node_id": "61fmaMNGqjseiZhB7J06t",
+  "node_name": "Prompt",
+  "node_type": "promptNode",
+  "status": "NodeStatus.FAILED",
+  "start_time": "2025-08-06 00:32:00.335645",
+  "end_time": "2025-08-06 00:32:00.336643",
+  "duration_ms": 0,
+  "input_data": {
+    "response": {}
+  },
+  "output_data": null,
+  "error_message": "'question'",
+  "error_traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\D4004882\\Downloads\\langstar\\server\\utils\\execution_logger.py\", line 189, in wrapper\n    result = func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\Downloads\\langstar\\server\\utils\\execution_logger.py\", line 297, in prompt_node\n    prompt = prompt_template.format(**state)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\site-packages\\langchain_core\\prompts\\prompt.py\", line 186, in format\n    return DEFAULT_FORMATTER_MAPPING[self.template_format](self.template, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\string.py\", line 190, in format\n    return self.vformat(format_string, args, kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\site-packages\\langchain_core\\utils\\formatting.py\", line 33, in vformat\n    return super().vformat(format_string, args, kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\string.py\", line 194, in vformat\n    result, _ = self._vformat(format_string, args, kwargs, used_args, 2)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\string.py\", line 234, in _vformat\n    obj, arg_used = self.get_field(field_name, args, kwargs)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\string.py\", line 299, in get_field\n    obj = self.get_value(first, args, kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\D4004882\\AppData\\Local\\anaconda3\\Lib\\string.py\", line 256, in get_value\n    return kwargs[key]\n           ~~~~~~^^^^^\nKeyError: 'question'\n",
+  "position": {
+    "x": 305.0211214110535,
+    "y": -417.3811882760695
+  },
+  "metadata": {
+    "function_name": "prompt_node",
+    "module": "server.utils.execution_logger"
+  }
+}

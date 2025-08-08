@@ -582,6 +582,7 @@ def condition_node_code( node, node_id_to_node_label ) :
     return code 
 
 
+
 # create_function_node
 def python_function_node_code( node ):
     node_name = node['data']['label']

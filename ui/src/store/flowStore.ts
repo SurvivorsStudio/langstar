@@ -136,6 +136,11 @@ export interface FlowState {
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
 
 
+  // 수동 선택된 edge 정보
+  manuallySelectedEdges: Record<string, string | null>; // nodeId -> edgeId
+  setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => void;
+
+
 
   // 배포 관련 상태 및 함수
   deployments: Deployment[];
@@ -484,6 +489,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   focusedElement: { type: null, id: null },
 
 
+  // 수동 선택된 edge 정보
+  manuallySelectedEdges: {},
+  setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => set({ manuallySelectedEdges: { ...get().manuallySelectedEdges, [nodeId]: edgeId } }),
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
@@ -707,7 +715,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           // For other node types, propagate the node's output to the edge's data.output
           return {
             ...edge,
-            data: { ...edge.data, output }
+            data: { 
+              ...edge.data, 
+              output,
+              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+            }
           };
         }
         return edge;
@@ -723,7 +735,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         if (edge.id === edgeId) {
           return {
             ...edge,
-            data: { ...edge.data, output }
+            data: { 
+              ...edge.data, 
+              output,
+              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+            }
           };
         }
         return edge;
@@ -776,8 +792,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     get().updateNodeData(nodeId, { ...node.data, inputData: null }); // 실행 전 inputData 초기화 (선택적)
     get().setNodeExecuting(nodeId, true);
     
-    const incomingEdge = get().edges.find(edge => edge.target === nodeId);
-    const input = incomingEdge?.data?.output || {};
+    // Node Inspector와 동일한 방식으로 input data 선택
+    const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
+    let input: Record<string, any> = {};
+    
+    if (incomingEdges.length > 0) {
+      // 수동으로 선택된 edge가 있는지 확인
+      const manuallySelectedEdgeId = get().manuallySelectedEdges[nodeId];
+      
+      if (manuallySelectedEdgeId) {
+        // 수동으로 선택된 edge의 데이터 사용
+        const selectedEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
+        if (selectedEdge && selectedEdge.data?.output && typeof selectedEdge.data.output === 'object') {
+          input = selectedEdge.data.output;
+        }
+      } else {
+        // 수동 선택이 없으면 가장 최근에 실행된 노드의 데이터 사용
+        const edgesWithTimestamps = incomingEdges
+          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+          .map(edge => ({
+            edge,
+            timestamp: edge.data?.timestamp || 0,
+            output: edge.data.output
+          }))
+          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+
+        if (edgesWithTimestamps.length > 0) {
+          input = edgesWithTimestamps[0].output;
+        }
+      }
+    }
 
     try {
       let output;
@@ -1144,6 +1188,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         case 'mergeNode': {
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
           const allInputsFromEdges: Record<string, any> = {};
+          
+          // 모든 source node가 완료되었는지 확인
+          const sourceNodeIds = [...new Set(incomingEdges.map(edge => edge.source))];
+          const completedSourceNodes = sourceNodeIds.filter(sourceId => {
+            const sourceNode = get().nodes.find(n => n.id === sourceId);
+            return sourceNode && sourceNode.data.output && !sourceNode.data.isExecuting;
+          });
+          
+          // 모든 source node가 완료되지 않았다면 대기
+          if (completedSourceNodes.length < sourceNodeIds.length) {
+            console.log(`[MergeNode ${nodeId}] Waiting for all source nodes to complete. Completed: ${completedSourceNodes.length}/${sourceNodeIds.length}`);
+            output = { 
+              status: 'waiting',
+              message: `Waiting for all source nodes to complete (${completedSourceNodes.length}/${sourceNodeIds.length})`,
+              completedNodes: completedSourceNodes,
+              totalNodes: sourceNodeIds.length
+            };
+            break;
+          }
+          
+          // 모든 source node가 완료되었으므로 merge 처리
+          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge.`);
+          
           incomingEdges.forEach(edge => {
             if (edge.data?.output && typeof edge.data.output === 'object') {
               // Store all outputs keyed by their source node ID for easy lookup
@@ -1174,6 +1241,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             // Fallback or error if no mappings? For now, empty if no valid mappings.
             console.warn(`MergeNode (${nodeId}): No merge mappings defined or mappings are empty. Output will be empty.`);
           }
+          
+          console.log(`[MergeNode ${nodeId}] Merge completed successfully:`, mergedOutput);
           output = mergedOutput;
           break;
         }
@@ -1190,11 +1259,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
-  runWorkflow: async (chatId?: string) => { // chatId 파라미터 추가
-    const { nodes, executeNode, getNodeById, setWorkflowRunning } = get();
-
+  runWorkflow: async (chatId?: string) => { 
+    const { nodes, edges, getNodeById, executeNode, setWorkflowRunning } = get();
     setWorkflowRunning(true);
-    console.log("=========================================");
+    
     console.log("🚀 워크플로우 실행 시작");
     console.log("=========================================");
 
@@ -1208,27 +1276,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     console.log(`➡️ 시작 노드 발견: ${startNode.data.label} (ID: ${startNode.id})`);
 
     const executionQueue: string[] = [startNode.id];
-    const visitedInThisRun = new Set<string>(); // 현재 실행에서 방문한 노드 추적
     let head = 0; // 큐 처리를 위한 포인터
 
     while(head < executionQueue.length) {
       const currentNodeId = executionQueue[head++];
       console.log(`\nProcessing queue item: ${currentNodeId}`);
 
-      if (visitedInThisRun.has(currentNodeId)) {
-        console.log(`⏭️ 노드 ${currentNodeId}는 이번 실행에서 이미 방문했습니다. 건너<0xEB><0x81><0xB5>니다.`);
-        continue; 
-      }
-
       const nodeToExecute = getNodeById(currentNodeId);
       if (!nodeToExecute) {
-        console.warn(`⚠️ 실행 중 ID ${currentNodeId}를 가진 노드를 찾을 수 없습니다. 이 노드는 건너<0xEB><0x81><0xB5>니다.`);
+        console.warn(`⚠️ 실행 중 ID ${currentNodeId}를 가진 노드를 찾을 수 없습니다. 이 노드는 건너뜁니다.`);
         continue;
       }
       
       console.log(`⚙️ 노드 실행 중: ${nodeToExecute.data.label} (ID: ${currentNodeId}, 타입: ${nodeToExecute.type})`);
       await executeNode(currentNodeId, chatId); // executeNode 호출 시 chatId 전달
-      visitedInThisRun.add(currentNodeId);
 
       const executedNode = getNodeById(currentNodeId); // 실행 후 최신 노드 정보 가져오기
       console.log(`✅ 노드 ${currentNodeId} (${executedNode?.data.label}) 실행 완료. 출력:`, executedNode?.data.output);
@@ -1239,13 +1300,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       for (const edge of outgoingEdges) {
         if (edge.data?.output !== null && edge.data?.output !== undefined) {
-          if (!visitedInThisRun.has(edge.target) && !executionQueue.slice(head).includes(edge.target)) {
-            executionQueue.push(edge.target);
-            console.log(`    ➕ 다음 실행을 위해 엣지 ${edge.id}의 타겟 노드 ${edge.target}을 큐에 추가합니다.`);
-          }
+          // 순환 참조 허용: 이미 큐에 있는 노드도 다시 추가 가능
+          executionQueue.push(edge.target);
+          console.log(`    ➕ 다음 실행을 위해 엣지 ${edge.id}의 타겟 노드 ${edge.target}을 큐에 추가합니다.`);
         } else {
           console.log(`    ➖ 엣지 ${edge.id} (타겟: ${edge.target})로 데이터가 전달되지 않았습니다. (조건: ${edge.data?.label || 'N/A'}, 출력: ${edge.data?.output})`);
         }
+      }
+      
+      // Merge node가 대기 상태인지 확인하고 재실행
+      const currentExecutedNode = getNodeById(currentNodeId);
+      if (currentExecutedNode?.type === 'mergeNode' && currentExecutedNode.data.output?.status === 'waiting') {
+        console.log(`🔄 Merge node ${currentNodeId} is waiting. Re-adding to queue for retry.`);
+        executionQueue.push(currentNodeId);
       }
     }
     console.log("\n=========================================");
