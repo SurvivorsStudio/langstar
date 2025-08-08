@@ -48,6 +48,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       node.data.config.parameters.forEach(param => {
         if (param.inputType === 'select box') {
           // select box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
+
           initialInputData[param.name] = existingInputData[param.name] || '';
         } else if (param.inputType === 'text box') {
           // text box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
@@ -58,7 +59,9 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       setSettings(initialSettings);
       setInputData(initialInputData);
     }
-  }, [node?.id]); // node.id로 변경하여 노드가 변경될 때만 실행
+
+  }, [node?.id, node?.data.config?.inputData]); // inputData 변경도 감지
+
 
   const handleSettingChange = (paramName: string, value: any) => {
     const newSettings = { ...settings, [paramName]: value };
@@ -134,27 +137,40 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
                 <select
                   value={inputData[param.name] || ''}
                   onChange={(e) => handleInputDataChange(param.name, e.target.value)}
-                  disabled={availableInputKeys.length === 0}
+
+                  disabled={availableInputKeys.length === 0 && !inputData[param.name]}
                   className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                    availableInputKeys.length === 0 
+                    availableInputKeys.length === 0 && !inputData[param.name]
+
                       ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
                       : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                   }`}
                 >
                   <option value="">
-                    {availableInputKeys.length === 0 ? '사용 가능한 키가 없습니다' : '키를 선택하세요'}
+
+                    {availableInputKeys.length === 0 ? '키를 선택하세요' : '키를 선택하세요'}
+
                   </option>
                   {availableInputKeys.map(key => (
                     <option key={key} value={key}>
                       {key}
                     </option>
                   ))}
+
+                  {/* 기존 설정값이 있지만 현재 사용 가능한 키에 없으면 표시 */}
+                  {inputData[param.name] && !availableInputKeys.includes(inputData[param.name]) && (
+                    <option value={inputData[param.name]} disabled>
+                      {inputData[param.name]}
+                    </option>
+                  )}
                 </select>
-                {availableInputKeys.length === 0 && (
+                {availableInputKeys.length === 0 && !inputData[param.name] && (
+
                   <p className="text-xs text-red-500 dark:text-red-400 mt-1">
                     이전 노드에서 데이터가 전달되지 않았습니다.
                   </p>
                 )}
+
               </div>
             ) : param.inputType === 'text box' ? (
               <input

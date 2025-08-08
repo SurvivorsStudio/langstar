@@ -1,6 +1,8 @@
 import React, { memo, useState, useCallback } from 'react';
+
 import { EdgeProps, getBezierPath, EdgeLabelRenderer, useReactFlow } from 'reactflow';
 import { X, Trash2, Move } from 'lucide-react';
+
 import OutputInspector from '../OutputInspector';
 import { useFlowStore } from '../../store/flowStore';
 
@@ -24,7 +26,9 @@ const CustomEdge = ({
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
   const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode, updateEdgeData } = useFlowStore();
+
   const { screenToFlowPosition } = useReactFlow();
+
   const sourceNode = nodes.find(n => n.id === source);
   const isEdgeTextFocused = focusedElement.type === 'edge' && focusedElement.id === id;
 
@@ -33,12 +37,15 @@ const CustomEdge = ({
   const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(
     data?.dragPoint || null
   );
+
   const [clickPoint, setClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
+
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
   const centerY = (sourceY + targetY) / 2;
+
 
   // Edge Data 박스 위치 계산 (박스의 왼쪽 상단 모서리)
   // 드래그 중일 때는 클릭 포인트를 사용, 아니면 저장된 드래그 포인트 또는 기본 중간점 사용
@@ -81,6 +88,7 @@ const CustomEdge = ({
     });
   }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, centerX, centerY, isDragging, clickPoint, dragPoint]);
 
+
   const [edgePath, labelX, labelY] = createCustomPath();
 
   const conditionDescription = data?.conditionDescription;
@@ -98,6 +106,7 @@ const CustomEdge = ({
     e.stopPropagation();
     setEdgeOutput(id, null);
   };
+
 
   // 마우스 위치를 React Flow 좌표로 변환하는 함수
   const getReactFlowCoordinates = useCallback((clientX: number, clientY: number) => {
@@ -120,9 +129,11 @@ const CustomEdge = ({
     }
   }, [id, setFocusedElement, getReactFlowCoordinates]);
 
+
   const handleDrag = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
     e.stopPropagation();
+
     e.preventDefault();
     
     // 마우스 위치를 React Flow 좌표로 변환
@@ -132,9 +143,11 @@ const CustomEdge = ({
     }
   }, [isDragging, getReactFlowCoordinates]);
 
+
   const handleDragEnd = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
+
       // 클릭 포인트를 드래그 포인트로 저장
       if (clickPoint) {
         setDragPoint(clickPoint);
@@ -144,19 +157,23 @@ const CustomEdge = ({
     }
   }, [isDragging, clickPoint, id, updateEdgeData]);
 
+
   // 마우스 이벤트 리스너 추가
   React.useEffect(() => {
     if (isDragging) {
       const handleMouseMove = (e: MouseEvent) => {
+
         const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
         if (coordinates) {
           setClickPoint(coordinates);
           setLastMousePosition(coordinates);
         }
+
       };
 
       const handleMouseUp = () => {
         setIsDragging(false);
+
         // 마지막 마우스 위치를 드래그 포인트로 저장
         if (lastMousePosition) {
           setDragPoint(lastMousePosition);
@@ -164,6 +181,7 @@ const CustomEdge = ({
         }
         setClickPoint(null);
         setLastMousePosition(null);
+
       };
 
       document.addEventListener('mousemove', handleMouseMove);
@@ -174,7 +192,9 @@ const CustomEdge = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+
   }, [isDragging, lastMousePosition, id, updateEdgeData, getReactFlowCoordinates]);
+
 
   return (
     <>
@@ -203,12 +223,14 @@ const CustomEdge = ({
         markerEnd="url(#arrow)"
       />
 
+
       {/* 통합된 데이터 표시 및 드래그 영역 */}
       <foreignObject
         width={200}
         height={80}
         x={dataBoxCenterX - 100}
         y={dataBoxCenterY - 40}
+
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >

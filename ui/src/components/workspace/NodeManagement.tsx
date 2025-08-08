@@ -103,54 +103,72 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {userNodes.map((node) => (
-                             <div
-                 key={node.id}
-                 onClick={() => handleNodeClick(node.id)}
-                 className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer group"
-               >
-                <div className="flex items-start justify-between mb-4">
-                                     <div className="flex items-center">
-                     <Code className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors" />
-                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                       {node.name}
-                     </h3>
-                   </div>
-                  <button
-                    onClick={(e) => handleDeleteNode(node.id, node.name, e)}
-                    className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+            {userNodes.map((node) => {
+              // 중복된 이름이 있는지 확인
+              const duplicateNames = userNodes.filter(n => n.name === node.name);
+              const isDuplicate = duplicateNames.length > 1;
+              
+              return (
+                <div
+                  key={node.id}
+                  onClick={() => handleNodeClick(node.id)}
+                  className={`rounded-lg border p-6 hover:shadow-lg transition-all duration-200 cursor-pointer group ${
+                    isDuplicate 
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-600 hover:border-yellow-400 dark:hover:border-yellow-500' 
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700'
+                  }`}
+                  title={isDuplicate ? `중복된 이름: "${node.name}" (${duplicateNames.length}개)` : ''}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center">
+                      <Code className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {node.name}
+                      </h3>
+                      {isDuplicate && (
+                        <span className="ml-2 px-2 py-1 text-xs bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-full">
+                          중복
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => handleDeleteNode(node.id, node.name, e)}
+                      className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                    {node.functionDescription || 'No description provided'}
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Function:</span>
+                      <span className="ml-1">{node.functionName}</span>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Parameters:</span>
+                      <span className="ml-1">{node.parameters.length}</span>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Last modified:</span>
+                      <span className="ml-1">
+                        {new Date(node.lastModified).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="pt-2 mt-2 border-t border-gray-200 dark:border-gray-600">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to view details →
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-                  {node.functionDescription || 'No description provided'}
-                </p>
-                
-                                 <div className="space-y-2">
-                   <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                     <span className="font-medium">Function:</span>
-                     <span className="ml-1">{node.functionName}</span>
-                   </div>
-                   <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                     <span className="font-medium">Parameters:</span>
-                     <span className="ml-1">{node.parameters.length}</span>
-                   </div>
-                   <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                     <span className="font-medium">Last modified:</span>
-                     <span className="ml-1">
-                       {new Date(node.lastModified).toLocaleDateString()}
-                     </span>
-                   </div>
-                   <div className="pt-2 mt-2 border-t border-gray-200 dark:border-gray-600">
-                     <p className="text-xs text-blue-600 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                       Click to view details →
-                     </p>
-                   </div>
-                 </div>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
         )}
       </div>

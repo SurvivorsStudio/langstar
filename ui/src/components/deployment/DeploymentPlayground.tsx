@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader2, Copy, Check, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiService } from '../services/apiService';
-import { Deployment } from '../types/deployment';
+import { apiService } from '../../services/apiService';
+import { Deployment } from '../../types/deployment';
 
 interface DeploymentPlaygroundProps {
   isOpen: boolean;
@@ -97,7 +97,7 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: result.success 
-          ? JSON.stringify(result.result, null, 2)
+          ? JSON.stringify(result.result.output, null, 2)
           : `An error occurred: ${result.result?.error || 'Unknown error'}`,
         timestamp: new Date(),
         deploymentId: selectedDeployment.id,
