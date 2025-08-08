@@ -162,6 +162,7 @@ export interface FlowState {
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
 
+
   // 수동 선택된 edge 정보
   manuallySelectedEdges: Record<string, string | null>; // nodeId -> edgeId
   setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => void;
@@ -523,6 +524,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   
   // 포커스 관리 초기 상태
   focusedElement: { type: null, id: null },
+
 
   // 수동 선택된 edge 정보
   manuallySelectedEdges: {},

@@ -57,8 +57,9 @@ class ExecutionLogger:
         self.current_deployment_id = deployment_id
         self.current_version_id = version_id
         
-        # 실행별 로그 디렉토리 생성
-        execution_log_dir = os.path.join(self.logs_dir, deployment_id, version_id, execution_id)
+        # 배포별 실행 로그 디렉토리 생성 (deployments/{deployment_id}/executions/{execution_id}/)
+        deployment_executions_dir = os.path.join("deployments", deployment_id, "executions")
+        execution_log_dir = os.path.join(deployment_executions_dir, execution_id)
         os.makedirs(execution_log_dir, exist_ok=True)
         
     def log_node_execution(self, node_log: NodeExecutionLog):
@@ -66,57 +67,71 @@ class ExecutionLogger:
         if not self.current_execution_id:
             raise ValueError("Execution not started. Call start_execution() first.")
             
-        # 로그 파일 경로
+        # 배포별 실행 로그 파일 경로
         log_file = os.path.join(
-            self.logs_dir, 
-            self.current_deployment_id, 
-            self.current_version_id, 
+            "deployments",
+            self.current_deployment_id,
+            "executions",
             self.current_execution_id,
-            f"{node_log.node_id}.json"
+            "execution_log.json"
         )
         
-        # 로그 저장
+        # 기존 로그 읽기 (파일이 존재하는 경우)
+        logs = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except Exception as e:
+                print(f"Error reading existing log file: {e}")
+                logs = []
+        
+        # 새 로그 추가
+        logs.append(asdict(node_log))
+        
+        # 통합 로그 파일 저장
         with open(log_file, 'w', encoding='utf-8') as f:
-            json.dump(asdict(node_log), f, indent=2, default=str, ensure_ascii=False)
+            json.dump(logs, f, indent=2, default=str, ensure_ascii=False)
             
     def get_execution_logs(self, deployment_id: str, version_id: str, execution_id: str) -> list[NodeExecutionLog]:
         """실행 로그 조회"""
-        log_dir = os.path.join(self.logs_dir, deployment_id, version_id, execution_id)
-        if not os.path.exists(log_dir):
+        # 배포별 실행 로그 파일 경로
+        log_file = os.path.join("deployments", deployment_id, "executions", execution_id, "execution_log.json")
+        if not os.path.exists(log_file):
             return []
             
         logs = []
-        for filename in os.listdir(log_dir):
-            if filename.endswith('.json'):
-                file_path = os.path.join(log_dir, filename)
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        log_data = json.load(f)
-                        # datetime 문자열을 datetime 객체로 변환
-                        log_data['start_time'] = datetime.fromisoformat(log_data['start_time'])
-                        if log_data.get('end_time'):
-                            log_data['end_time'] = datetime.fromisoformat(log_data['end_time'])
-                        
-                        # status 필드 처리 - "NodeStatus.SUCCEEDED" 형태를 "succeeded"로 변환
-                        status_str = log_data['status']
-                        if status_str.startswith('NodeStatus.'):
-                            status_str = status_str.replace('NodeStatus.', '').lower()
-                        log_data['status'] = NodeStatus(status_str)
-                        logs.append(NodeExecutionLog(**log_data))
-                except Exception as e:
-                    print(f"Error loading log file {filename}: {e}")
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                logs_data = json.load(f)
+                
+                for log_data in logs_data:
+                    # datetime 문자열을 datetime 객체로 변환
+                    log_data['start_time'] = datetime.fromisoformat(log_data['start_time'])
+                    if log_data.get('end_time'):
+                        log_data['end_time'] = datetime.fromisoformat(log_data['end_time'])
+                    
+                    # status 필드 처리 - "NodeStatus.SUCCEEDED" 형태를 "succeeded"로 변환
+                    status_str = log_data['status']
+                    if status_str.startswith('NodeStatus.'):
+                        status_str = status_str.replace('NodeStatus.', '').lower()
+                    log_data['status'] = NodeStatus(status_str)
+                    logs.append(NodeExecutionLog(**log_data))
+        except Exception as e:
+            print(f"Error loading log file: {e}")
                     
         return sorted(logs, key=lambda x: x.start_time)
         
     def get_deployment_logs(self, deployment_id: str, version_id: str) -> Dict[str, list[NodeExecutionLog]]:
-        """배포 버전의 모든 실행 로그 조회"""
-        version_log_dir = os.path.join(self.logs_dir, deployment_id, version_id)
-        if not os.path.exists(version_log_dir):
+        """배포의 모든 실행 로그 조회"""
+        # 배포별 실행 로그 디렉토리 경로
+        deployment_executions_dir = os.path.join("deployments", deployment_id, "executions")
+        if not os.path.exists(deployment_executions_dir):
             return {}
             
         execution_logs = {}
-        for execution_id in os.listdir(version_log_dir):
-            execution_path = os.path.join(version_log_dir, execution_id)
+        for execution_id in os.listdir(deployment_executions_dir):
+            execution_path = os.path.join(deployment_executions_dir, execution_id)
             if os.path.isdir(execution_path):
                 execution_logs[execution_id] = self.get_execution_logs(deployment_id, version_id, execution_id)
                 
@@ -164,14 +179,14 @@ def log_node_execution(node_id: str, node_name: str, node_type: str, position: O
             # 입력 데이터 추출 (LangGraph state)
             try:
                 state = kwargs.get('state', args[0] if args else {})
-                # 민감 정보 보호를 위해 일부만 로깅
+                # 전체 입력 데이터 로깅 (길이 제한 완화)
                 input_data = {}
                 for key, value in state.items():
                     if isinstance(value, (str, int, float, bool, list, dict)):
-                        if isinstance(value, str) and len(value) > 200:
-                            input_data[key] = value[:200] + "..."
-                        elif isinstance(value, (list, dict)) and len(str(value)) > 500:
-                            input_data[key] = str(value)[:500] + "..."
+                        if isinstance(value, str) and len(value) > 1000:
+                            input_data[key] = value[:1000] + "... (truncated)"
+                        elif isinstance(value, (list, dict)) and len(str(value)) > 2000:
+                            input_data[key] = str(value)[:2000] + "... (truncated)"
                         else:
                             input_data[key] = value
                     else:
@@ -198,16 +213,16 @@ def log_node_execution(node_id: str, node_name: str, node_type: str, position: O
                         output_data = {}
                         for key, value in result.items():
                             if isinstance(value, (str, int, float, bool, list, dict)):
-                                if isinstance(value, str) and len(value) > 200:
-                                    output_data[key] = value[:200] + "..."
-                                elif isinstance(value, (list, dict)) and len(str(value)) > 500:
-                                    output_data[key] = str(value)[:500] + "..."
+                                if isinstance(value, str) and len(value) > 1000:
+                                    output_data[key] = value[:1000] + "... (truncated)"
+                                elif isinstance(value, (list, dict)) and len(str(value)) > 2000:
+                                    output_data[key] = str(value)[:2000] + "... (truncated)"
                                 else:
                                     output_data[key] = value
                             else:
                                 output_data[key] = f"<{type(value).__name__}>"
                     else:
-                        output_data = {"result": str(result)[:500] + "..." if len(str(result)) > 500 else str(result)}
+                        output_data = {"result": str(result)[:2000] + "... (truncated)" if len(str(result)) > 2000 else str(result)}
                         
                     node_log.output_data = output_data
                 except Exception as e:
@@ -244,13 +259,41 @@ def create_langgraph_with_logging(workflow_snapshot: Dict[str, Any], execution_i
     """
     워크플로우 스냅샷을 기반으로 로깅이 포함된 LangGraph를 생성합니다.
     """
+    import os
     from langgraph.graph import StateGraph, START, END
     from langchain_core.prompts import PromptTemplate
     from typing import TypedDict, Annotated
     import operator
     
+    # 환경 변수 설정 (생성된 코드에서 사용)
+    os.environ["CURRENT_EXECUTION_ID"] = execution_id
+    os.environ["CURRENT_DEPLOYMENT_ID"] = deployment_id
+    os.environ["CURRENT_VERSION_ID"] = version_id
+    
     # 실행 로거 시작
     execution_logger.start_execution(execution_id, deployment_id, version_id)
+    
+    # 딕셔너리 병합 함수 정의
+    def merge_dicts(dict1: Any, dict2: Any) -> Dict[str, Any]:
+        """두 값을 병합합니다. 딕셔너리가 아닌 경우 적절히 처리합니다."""
+        # 첫 번째 값이 딕셔너리가 아닌 경우
+        if not isinstance(dict1, dict):
+            # 문자열이나 다른 값은 그대로 사용
+            dict1 = dict1
+        
+        # 두 번째 값이 딕셔너리가 아닌 경우
+        if not isinstance(dict2, dict):
+            # 문자열이나 다른 값은 그대로 사용
+            dict2 = dict2
+        
+        # 두 값이 모두 딕셔너리인 경우에만 병합
+        if isinstance(dict1, dict) and isinstance(dict2, dict):
+            result = dict1.copy()
+            result.update(dict2)
+            return result
+        else:
+            # 딕셔너리가 아닌 경우 두 번째 값을 반환
+            return dict2
     
     # 동적으로 State 클래스 생성
     state_fields = {}
@@ -261,10 +304,10 @@ def create_langgraph_with_logging(workflow_snapshot: Dict[str, Any], execution_i
             for var in variables:
                 var_name = var.get("name", "")
                 if var_name:
-                    state_fields[var_name] = Annotated[Any, operator.add]
+                    state_fields[var_name] = Any
     
     # 기본 필드 추가
-    state_fields["response"] = Annotated[Dict[str, Any], operator.add]
+    state_fields["response"] = Dict[str, Any]
     
     # 동적으로 State 클래스 생성
     StateClass = TypedDict("StateClass", state_fields)
@@ -310,6 +353,36 @@ def create_langgraph_with_logging(workflow_snapshot: Dict[str, Any], execution_i
                 return state
             return end_node
             
+        elif node_type == "conditionNode":
+            # condition 노드의 분기 로직 구현
+            config = node_data.get("config", {})
+            conditions = config.get("conditions", [])
+            
+            @log_node_execution(node_id, node_name, node_type, position)
+            def condition_node(state: StateClass):
+                # 조건 평가
+                for condition_config in conditions:
+                    condition = condition_config.get("condition", "")
+                    target_node_label = condition_config.get("targetNodeLabel", "")
+                    
+                    # 조건 문자열을 파싱하여 평가
+                    try:
+                        # 간단한 조건 평가 (실제로는 더 복잡한 파싱이 필요)
+                        if "user_input" in condition:
+                            if "== '1'" in condition and state.get("user_input") == "1":
+                                return {"next_node": target_node_label, "data": state}
+                            elif "== '2'" in condition and state.get("user_input") == "2":
+                                return {"next_node": target_node_label, "data": state}
+                            elif "else" in condition:
+                                return {"next_node": target_node_label, "data": state}
+                    except Exception as e:
+                        # logger.error(f"Error evaluating condition: {condition}, error: {str(e)}") # Original code had this line commented out
+                        pass # Keep the original code's commented-out line as is
+                
+                # 기본값 반환
+                return state
+            return condition_node
+            
         else:
             # 기본 노드
             @log_node_execution(node_id, node_name, node_type, position)
@@ -340,9 +413,13 @@ def create_langgraph_with_logging(workflow_snapshot: Dict[str, Any], execution_i
         target = edge["target"]
         
         if source == "start":
-            graph.add_edge(START, target)
+            # START -> start 노드 -> target
+            graph.add_edge(START, source)
+            graph.add_edge(source, target)
         elif target == "end":
-            graph.add_edge(source, END)
+            # source -> end 노드 -> END
+            graph.add_edge(source, target)
+            graph.add_edge(target, END)
         else:
             graph.add_edge(source, target)
     
