@@ -143,11 +143,50 @@ const FlowBuilder: React.FC = () => {
       x: event.clientX - reactFlowBounds.left,
       y: event.clientY - reactFlowBounds.top,
     });
-    addNode({
-      type,
-      position,
-      data: { label, code: '', config: {} }
-    });
+
+    // UserNode인 경우 특별한 처리
+    if (type === 'userNode') {
+      // UserNode 정보를 가져와서 노드 생성
+      const userNodes = useFlowStore.getState().userNodes;
+      const userNode = userNodes.find(node => node.name === label);
+      
+      console.log('FlowBuilder - UserNode drag:', { type, label });
+      console.log('FlowBuilder - userNodes:', userNodes);
+      console.log('FlowBuilder - found userNode:', userNode);
+      
+      if (userNode) {
+        const nodeData = { 
+          label: userNode.name, 
+          code: userNode.code,
+          config: {
+            parameters: userNode.parameters,
+            functionName: userNode.functionName,
+            returnType: userNode.returnType,
+            functionDescription: userNode.functionDescription
+          }
+        };
+        
+        console.log('FlowBuilder - creating UserNode with data:', nodeData);
+        console.log('FlowBuilder - userNode.parameters:', userNode.parameters);
+        console.log('FlowBuilder - nodeData.config.parameters:', nodeData.config.parameters);
+        
+        addNode({
+          type: 'userNode',
+          position,
+          data: nodeData
+        });
+      } else {
+        console.error('FlowBuilder - UserNode not found:', label);
+        console.error('FlowBuilder - Available userNodes:', userNodes.map(n => n.name));
+      }
+    } else {
+      // 기존 노드 타입들
+      addNode({
+        type,
+        position,
+        data: { label, code: '', config: {} }
+      });
+    }
   }, [addNode, reactFlowInstance]);
 
   if (isLoading) {

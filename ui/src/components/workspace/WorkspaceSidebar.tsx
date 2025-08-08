@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Database, Key, Sun, Moon } from 'lucide-react';
+import { ChevronRight, Database, Key, Sun, Moon, Plus } from 'lucide-react';
 import langstarLogo from '../../assets/common/langstar_logo.png';
 import { useThemeStore } from '../../store/themeStore';
 
@@ -54,6 +54,16 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
         >
           <Database className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">RAG Configuration</span>
+        </button>
+        <button
+          onClick={() => setActiveMenu('node-creation')}
+          className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${activeMenu === 'node-creation'
+            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          <span className="flex-1 text-left">노드 생성</span>
         </button>
         <div>
           <button

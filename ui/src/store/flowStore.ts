@@ -67,6 +67,24 @@ export interface AIConnection {
   lastModified: string; // ISO string
 }
 
+export interface UserNode {
+  id: string; // nanoid로 생성
+  name: string; // Node Name
+  type: 'UserNode';
+  code: string; // 파이썬 코드
+  parameters: Array<{
+    name: string;
+    inputType: string; // 'select box' 또는 'text box'
+    required: boolean;
+    funcArgs?: string; // 매개변수별 funcArgs 추가
+    matchData?: string; // 매개변수별 matchData 추가
+  }>;
+  functionName: string;
+  returnType: string;
+  functionDescription: string;
+  lastModified: string; // ISO string
+}
+
 export interface Workflow {
   projectId: string;
   projectName: string;
@@ -130,6 +148,15 @@ export interface FlowState {
   addAIConnection: (connection: Omit<AIConnection, 'id' | 'lastModified'>) => Promise<AIConnection>;
   updateAIConnection: (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => Promise<AIConnection>;
   deleteAIConnection: (connectionId: string) => Promise<void>;
+  
+  // UserNode 관련 상태 및 함수
+  userNodes: UserNode[];
+  isLoadingUserNodes: boolean;
+  loadErrorUserNodes: string | null;
+  fetchUserNodes: () => Promise<void>;
+  addUserNode: (userNode: Omit<UserNode, 'id' | 'lastModified'>) => Promise<UserNode>;
+  updateUserNode: (userNodeId: string, updates: Partial<Omit<UserNode, 'id' | 'lastModified'>>) => Promise<UserNode>;
+  deleteUserNode: (userNodeId: string) => Promise<void>;
   
   // 포커스 관리
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
@@ -415,7 +442,8 @@ const generateEmbedding = (input: Record<string, any>, config: NodeData['config'
 const DB_NAME = 'WorkflowDatabase';
 const WORKFLOWS_STORE_NAME = 'WorkflowsStore';
 const AI_CONNECTIONS_STORE_NAME = 'AIConnectionsStore'; // AI 연결 정보 저장소 이름
-const DB_VERSION = 2; // 데이터베이스 스키마 변경 시 이 버전을 올려야 합니다. (새로운 저장소 추가)
+const USER_NODES_STORE_NAME = 'UserNodesStore'; // UserNode 저장소 이름
+const DB_VERSION = 3; // 데이터베이스 스키마 변경 시 이 버전을 올려야 합니다. (새로운 저장소 추가)
 export const DEFAULT_PROJECT_NAME = 'New Workflow'; // 기본 프로젝트 이름 상수화
 
 // IndexedDB 열기/초기화 헬퍼 함수
@@ -433,6 +461,10 @@ const openDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(AI_CONNECTIONS_STORE_NAME)) {
         db.createObjectStore(AI_CONNECTIONS_STORE_NAME, { keyPath: 'id' });
         console.log(`Object store "${AI_CONNECTIONS_STORE_NAME}" created.`);
+      }
+      if (!db.objectStoreNames.contains(USER_NODES_STORE_NAME)) {
+        db.createObjectStore(USER_NODES_STORE_NAME, { keyPath: 'id' });
+        console.log(`Object store "${USER_NODES_STORE_NAME}" created.`);
       }
       // 예: if (event.oldVersion < 2) { /* 스키마 변경 로직 */ }
     };
@@ -484,6 +516,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   aiConnections: [],
   isLoadingAIConnections: false,
   loadErrorAIConnections: null,
+  
+  // UserNode 관련 초기 상태
+  userNodes: [],
+  isLoadingUserNodes: false,
+  loadErrorUserNodes: null,
   
   // 포커스 관리 초기 상태
   focusedElement: { type: null, id: null },
@@ -551,6 +588,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       mergeMappings: []
     } : type === 'endNode' ? {
       receiveKey: ''
+    } : type === 'userNode' ? {
+      // UserNode의 경우 data.config에서 가져온 설정을 사용
+      ...data.config
     } : {};
 
     // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
@@ -576,7 +616,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         output: null,
         inputData: null, // inputData 초기화
         isExecuting: false,
-        config: defaultConfig
+        config: type === 'userNode' ? data.config : defaultConfig
       },
     };
     
@@ -1246,6 +1286,38 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           output = mergedOutput;
           break;
         }
+        case 'userNode': {
+          const pythonCode = node.data.code || '';
+          const functionName = node.data.config?.functionName || 'user_function';
+          const returnType = node.data.config?.returnType || 'str';
+
+          if (!pythonCode.trim()) {
+            output = { error: 'Python code is empty' };
+            break;
+          }
+
+          try {
+            const payload = {
+              py_code: pythonCode,
+              param: input,
+              return_key: functionName
+            };
+            const response = await fetch('http://localhost:8000/workflow/node/pythonnode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+            output = await response.json();
+          } catch (apiError) {
+            console.error('UserNode API call failed:', apiError);
+            output = { error: 'Failed to execute user node via API', details: (apiError as Error).message };
+          }
+          break;
+        }
         default:
           output = input;
       }
@@ -1610,6 +1682,31 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
             tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
           };
+        }
+      }
+
+      // UserNode의 경우 parameters에 matchData 추가 및 inputData 변환
+      if (currentNode.type === 'userNode' && finalNodeData.config?.parameters) {
+        // parameters에 matchData 추가
+        finalNodeData.config.parameters = finalNodeData.config.parameters.map((param: any) => {
+          const matchData = finalNodeData.config?.inputData?.[param.name] || '';
+          return {
+            ...param,
+            matchData: matchData
+          };
+        });
+
+        // inputData를 funcArgs 기반으로 변환
+        if (finalNodeData.config?.inputData && Object.keys(finalNodeData.config.inputData).length > 0) {
+          const newInputData: any = {};
+          finalNodeData.config.parameters.forEach((param: any) => {
+            if (param.funcArgs && finalNodeData.config?.inputData?.[param.name]) {
+              newInputData[param.funcArgs] = finalNodeData.config.inputData[param.name];
+            }
+          });
+          if (Object.keys(newInputData).length > 0) {
+            finalNodeData.config.inputData = newInputData;
+          }
         }
       }
 
@@ -2007,6 +2104,142 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     } finally {
       set({ isLoadingDeployments: false });
+    }
+  },
+
+  // UserNode 관련 함수들
+  fetchUserNodes: async () => {
+    set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
+    console.log('FlowStore: Fetching user nodes...');
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readonly');
+      const store = transaction.objectStore(USER_NODES_STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const userNodes = request.result as UserNode[];
+        set({ userNodes, isLoadingUserNodes: false, loadErrorUserNodes: null });
+        console.log(`FlowStore: Found ${userNodes.length} user nodes:`, userNodes);
+      };
+      request.onerror = (event) => {
+        const error = (event.target as IDBRequest).error;
+        set({ loadErrorUserNodes: error?.message || 'Failed to fetch user nodes list', isLoadingUserNodes: false });
+        console.error('FlowStore: Error fetching user nodes list:', error);
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorUserNodes: errorMessage || 'Failed to open DB to fetch user nodes list', isLoadingUserNodes: false });
+      console.error('FlowStore: Error opening DB for fetching user nodes list:', error);
+    }
+  },
+
+  addUserNode: async (userNodeData: Omit<UserNode, 'id' | 'lastModified'>) => {
+    set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
+    const newUserNode: UserNode = {
+      ...userNodeData,
+      id: nanoid(),
+      lastModified: new Date().toISOString(),
+    };
+    console.log('FlowStore: Adding new user node:', newUserNode);
+
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(USER_NODES_STORE_NAME);
+      const request = store.add(newUserNode);
+
+      return new Promise<UserNode>((resolve, reject) => {
+        request.onsuccess = () => {
+          console.log('FlowStore: User node added successfully.');
+          get().fetchUserNodes(); // 목록 새로고침
+          resolve(newUserNode);
+        };
+        request.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          set({ loadErrorUserNodes: error?.message || 'Failed to add user node', isLoadingUserNodes: false });
+          console.error('FlowStore: Error adding user node:', error);
+          reject(error);
+        };
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
+      console.error('FlowStore: Failed to initiate add user node operation:', error);
+      throw error;
+    }
+  },
+
+  updateUserNode: async (userNodeId: string, updates: Partial<Omit<UserNode, 'id' | 'lastModified'>>) => {
+    set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
+    console.log(`FlowStore: Updating user node ID ${userNodeId} with:`, updates);
+
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(USER_NODES_STORE_NAME);
+      const getRequest = store.get(userNodeId);
+
+      return new Promise<UserNode>((resolve, reject) => {
+        getRequest.onsuccess = () => {
+          const existingUserNode = getRequest.result as UserNode | undefined;
+          if (!existingUserNode) {
+            const errorMsg = `User node with ID ${userNodeId} not found.`;
+            set({ loadErrorUserNodes: errorMsg, isLoadingUserNodes: false });
+            console.error(`FlowStore: ${errorMsg}`);
+            return reject(new Error(errorMsg));
+          }
+
+          const updatedUserNode: UserNode = {
+            ...existingUserNode,
+            ...updates,
+            lastModified: new Date().toISOString(),
+          };
+
+          const putRequest = store.put(updatedUserNode);
+          putRequest.onsuccess = () => {
+            console.log('FlowStore: User node updated successfully.');
+            get().fetchUserNodes(); // 목록 새로고침
+            resolve(updatedUserNode);
+          };
+          putRequest.onerror = (event) => reject((event.target as IDBRequest).error);
+        };
+        getRequest.onerror = (event) => reject((event.target as IDBRequest).error);
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
+      console.error('FlowStore: Failed to initiate update user node operation:', error);
+      throw error;
+    }
+  },
+
+  deleteUserNode: async (userNodeId: string) => {
+    set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
+    console.log(`FlowStore: Deleting user node ID ${userNodeId}...`);
+    try {
+      const db = await openDB();
+      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(USER_NODES_STORE_NAME);
+      const request = store.delete(userNodeId);
+      return new Promise<void>((resolve, reject) => {
+        request.onsuccess = () => {
+          console.log('FlowStore: User node deleted successfully.');
+          get().fetchUserNodes();
+          resolve();
+        };
+        request.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          set({ loadErrorUserNodes: error?.message || 'Failed to delete user node', isLoadingUserNodes: false });
+          console.error('FlowStore: Error deleting user node:', error);
+          reject(error);
+        };
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
+      console.error('FlowStore: Failed to initiate delete user node operation:', error);
+      throw error;
     }
   },
 }));
