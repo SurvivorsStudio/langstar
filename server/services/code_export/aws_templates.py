@@ -92,6 +92,7 @@ memory = ConversationBufferMemory(return_messages=True)
 
 def memory_base_agent_code(node) : 
     code = ""
+    code += common_memory_code() 
     node_name = node['data']['label']
     node_id = node['id']
     node_type = node['type']
