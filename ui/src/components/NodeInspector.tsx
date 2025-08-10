@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { X, Settings, Code, AlertCircle, LogIn, Play } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
@@ -36,6 +36,50 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
   const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
 
+  // 크기 조절을 위한 상태와 ref
+  const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const resizeRef = useRef<HTMLDivElement>(null);
+
+  // 크기 조절 이벤트 핸들러
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    // 드래그 중일 때 텍스트 선택 방지
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = window.innerWidth - e.clientX;
+      // 최소 너비 300px, 최대 너비 800px로 제한
+      const clampedWidth = Math.max(300, Math.min(800, newWidth));
+      setWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      // 드래그 종료 시 스타일 복원
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      // 컴포넌트 언마운트 시 스타일 복원
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     const node = nodes.find((n: any) => n.id === nodeId);
@@ -244,7 +288,25 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const isUserNode = currentNode.type === 'userNode';
 
   return (
-    <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10">
+    <div 
+      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10 relative"
+      style={{ width: `${width}px` }}
+    >
+      {/* 크기 조절 핸들 */}
+      <div
+        ref={resizeRef}
+        className={`absolute left-0 top-0 w-2 h-full cursor-col-resize transition-colors z-20 ${
+          isResizing 
+            ? 'bg-blue-500 opacity-75' 
+            : 'bg-transparent hover:bg-blue-500 hover:opacity-50'
+        }`}
+        onMouseDown={handleMouseDown}
+        style={{ transform: 'translateX(-4px)' }}
+      >
+        {/* 크기 조절 핸들 시각적 표시 */}
+        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-gray-400 rounded-full opacity-60" />
+      </div>
+      
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
         <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
         <button
