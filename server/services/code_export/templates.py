@@ -619,7 +619,7 @@ def node_{node_name}(state):
 
 
 def agent_node_code( node ):
-    print( node )
+    # print( node )
     provider = node['data']['config']['model']['providerName'] 
     # tools = node['data']['config']['tools'] 
     tools = (
@@ -636,10 +636,15 @@ def agent_node_code( node ):
         .get('memoryType', '')
     )
 
+    print("-------------------*******************")
+    print( provider )
+    print( memory_type )
+    print( tools )
     if provider == "aws": 
         if memory_type =="" and len(tools) == 0: 
             return aws_templates.base_base_agent_code( node )
         elif memory_type !="" and len(tools) == 0: 
+            print ("??????????????????")
             return aws_templates.memory_base_agent_code( node )
         elif memory_type =="" and len(tools) != 0: 
             return aws_templates.base_tool_agent_code( node )
