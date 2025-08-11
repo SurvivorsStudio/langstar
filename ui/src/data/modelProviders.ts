@@ -157,10 +157,7 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
       { id: 'amazon.nova-reel-v1:0', name: 'amazon.nova-reel-v1:0', displayName: 'Nova Reel', description: 'Amazon Nova Reel', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Reel'] },
       { id: 'amazon.nova-reel-v1:1', name: 'amazon.nova-reel-v1:1', displayName: 'Nova Reel v1:1', description: 'Amazon Nova Reel v1:1', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Reel'] },
       { id: 'amazon.nova-sonic-v1:0', name: 'amazon.nova-sonic-v1:0', displayName: 'Nova Sonic', description: 'Amazon Nova Sonic', maxTokens: 32768, capabilities: ['Speech', 'Text'], tags: ['AWS', 'Nova', 'Sonic'] },
-      { id: 'anthropic.claude-v2:1', name: 'anthropic.claude-v2:1', displayName: 'Claude 2.1', description: 'Anthropic Claude 2.1', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', 'v2.1'] },
-      { id: 'anthropic.claude-v2', name: 'anthropic.claude-v2', displayName: 'Claude 2', description: 'Anthropic Claude 2', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', 'v2'] },
-      { id: 'anthropic.claude-instant-v1', name: 'anthropic.claude-instant-v1', displayName: 'Claude Instant', description: 'Anthropic Claude Instant', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', 'Instant'] },
-      { id: 'anthropic.claude-v2:0', name: 'anthropic.claude-v2:0', displayName: 'Claude', description: 'Anthropic Claude', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude'] },
+      { id: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', displayName: 'Claude 3.5 Sonnet 20241022 v2:0', description: 'Anthropic Claude 3.5 Sonnet 20241022 v2:0', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', '3.5', 'Sonnet'] },
     ],
     authFields: [
       { name: 'accessKeyId', label: 'Access Key ID', type: 'text', required: true, placeholder: 'AKIA...', helpText: 'AWS Access Key ID' },
@@ -353,8 +350,8 @@ export const PROVIDER_CARDS = [
     id: 'aws',
     name: 'AWS',
     logo: '☁️',
-    description: 'Claude, Titan, Llama 2 via Bedrock',
-    modelCount: 4,
+    description: 'Nova, Claude via Bedrock',
+    modelCount: 9,
     color: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
     textColor: 'text-yellow-700',
     iconColor: 'text-yellow-600'

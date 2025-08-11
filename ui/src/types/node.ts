@@ -8,6 +8,7 @@ export interface Group {
   description: string;
   type: 'memory' | 'tools';
   memoryType?: 'ConversationBufferMemory' | 'ConversationBufferWindowMemory';
+  windowSize?: number;
   code?: string;
 }
 

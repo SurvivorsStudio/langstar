@@ -154,6 +154,25 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
             </div>
           )}
 
+          {selectedGroup.type === 'memory' && selectedGroup.memoryType === 'ConversationBufferWindowMemory' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Window Size
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={selectedGroup.windowSize || 5}
+                onChange={(e) => handleUpdateGroup(selectedGroup.id, { windowSize: parseInt(e.target.value) || 5 })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                placeholder="Enter window size (default: 5)"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Number of conversation turns to keep in memory
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Description
