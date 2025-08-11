@@ -96,11 +96,12 @@ def memory_base_agent_code(node) :
     node_name = node['data']['label']
     node_id = node['id']
     node_type = node['type']
-    if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
-        code += f"""
+    # if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
+    code += f"""
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
 
 
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
@@ -176,7 +177,9 @@ def node_{node_name}( state ) :
     return_config = return_update_config( state_dict[node_config_name], user_prompt, node_input[output_value] )
     return return_next_node(node_name, next_node_list, return_value, {{node_config_name : return_config}} )
 """ 
-        return code 
+    return code 
+
+    
 
 
 # tool 에 들어갈 정보들을 생성한다. 
@@ -291,17 +294,24 @@ def node_{node_name}( state ) :
 
 def common_memory_code() : 
     code = """
+
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_aws import ChatBedrockConverse
+from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
+
+
 def get_memory_data( node_config ) : 
     
     memory_type = node_config['config']['memoryGroup']['memoryType']
 
     if memory_type == 'ConversationBufferWindowMemory' : 
-        # limit_size = node_config['config']['memory_type']
+        windowSize = node_config['config']['memoryGroup']['modelConfig']['windowSize']
         if len( node_config['config']['chat_history'] ) == 0 :
-            memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
+            memory_buffer = ConversationBufferWindowMemory(k=windowSize, return_messages=True)
             memory_buffer.chat_memory.messages = []
         else : 
-            memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
+            memory_buffer = ConversationBufferWindowMemory(k=windowSize, return_messages=True)
             memory_buffer.chat_memory.messages = node_config['config']['chat_history']
         
     elif memory_type == 'ConversationBufferMemory' : 

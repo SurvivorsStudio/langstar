@@ -1067,10 +1067,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
           let memoryTypeForAPI: string | undefined = undefined;
           let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
+          let memoryWindowSizeForAPI: number | undefined = undefined; // window size를 저장할 변수
           if (memoryGroup) { // memoryGroup is the ID of the selected group
             const toolsMemoryNode = get().nodes.find(n => n.type === 'toolsMemoryNode');
             if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
-              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; memoryType?: string; [key: string]: any }>;
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; memoryType?: string; windowSize?: number; [key: string]: any }>;
               const selectedGroupDetails = allGroups.find(g => g.id === memoryGroup);
               if (selectedGroupDetails && selectedGroupDetails.type === 'memory') {
                 // groupsNode에 저장된 memoryType 값을 우선 사용합니다.
@@ -1083,6 +1084,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   memoryTypeForAPI = 'ConversationBufferMemory'; 
                   console.log(`[AgentNode ${nodeId}] Memory Type for group '${selectedGroupDetails.name}' (ID: ${selectedGroupDetails.id}) was undefined in store. Using default '${memoryTypeForAPI}' (as per GroupsSettings.tsx display).`);
                 }
+                
+                // ConversationBufferWindowMemory인 경우 window size 설정
+                if (memoryTypeForAPI === 'ConversationBufferWindowMemory') {
+                  memoryWindowSizeForAPI = selectedGroupDetails.windowSize || 5; // 기본값 5
+                  console.log(`[AgentNode ${nodeId}] Window Size for ConversationBufferWindowMemory: ${memoryWindowSizeForAPI}`);
+                }
+                
                 memoryGroupNameForAPI = selectedGroupDetails.name; // 메모리 그룹 이름 저장
                 console.log(`[AgentNode ${nodeId}] 선택된 Memory Group: ${selectedGroupDetails.name}, Memory Type: ${memoryTypeForAPI}`);
               } else {
@@ -1123,6 +1131,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송
             memory_type: memoryTypeForAPI, // This sends the actual memory type string
+            memory_window_size: memoryWindowSizeForAPI, // window size 추가
             return_key: finalAgentOutputVariable // API에 Output Variable 값을 "return_key"로 전달
           } as any; // chat_id를 동적으로 추가하기 위해 any 타입으로 캐스팅
 
@@ -1644,14 +1653,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           if (finalNodeData.config?.memoryGroup) {
             const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
             if (toolsMemoryNode && toolsMemoryNode.data.config?.groups) {
-              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; memoryType?: string; [key: string]: any }>;
+              const allGroups = toolsMemoryNode.data.config.groups as Array<{ id: string; name: string; type: string; description?: string; memoryType?: string; windowSize?: number; [key: string]: any }>;
               const selectedMemoryGroup = allGroups.find(g => g.id === finalNodeData.config!.memoryGroup && g.type === 'memory');
               if (selectedMemoryGroup) {
                 memoryConfigForExport = {
                   id: selectedMemoryGroup.id,
                   name: selectedMemoryGroup.name,
                   description: selectedMemoryGroup.description || '',
-                  memoryType: selectedMemoryGroup.memoryType || 'ConversationBufferMemory'
+                  memoryType: selectedMemoryGroup.memoryType || 'ConversationBufferMemory',
+                  modelConfig: selectedMemoryGroup.memoryType === 'ConversationBufferWindowMemory' ? { windowSize: selectedMemoryGroup.windowSize || 5 } : undefined
                 };
               }
             }
@@ -1678,17 +1688,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
 
           // 모델 설정값들을 포함하여 변환된 객체로 기존 config를 대체합니다.
+          // 중복되거나 불필요한 필드들을 제거하고 깔끔한 구조로 만듭니다.
           finalNodeData.config = {
-            ...finalNodeData.config,
             model: modelConfigForExport,
             memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
             tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
-            // 모델 설정값들 추가
+            // 프롬프트 관련 설정
+            userPromptInputKey: finalNodeData.config.userPromptInputKey || 'user_input',
+            systemPromptInputKey: finalNodeData.config.systemPromptInputKey || 'system_message',
+            agentOutputVariable: finalNodeData.config.agentOutputVariable || 'agent_response',
+            // 모델 설정값들
             topK: finalNodeData.config.topK ?? 40,
             topP: finalNodeData.config.topP ?? 1,
             temperature: finalNodeData.config.temperature ?? 0.7,
             maxTokens: finalNodeData.config.maxTokens ?? 1000,
           };
+
+          // Agent 노드의 최종 JSON 데이터를 콘솔에 출력
+          console.log(`[Export] Agent Node "${currentNode.data.label}" (ID: ${currentNode.id}) JSON 데이터:`, JSON.stringify({
+            id: currentNode.id,
+            type: currentNode.type,
+            label: currentNode.data.label,
+            config: finalNodeData.config
+          }, null, 2));
         }
       }
 
