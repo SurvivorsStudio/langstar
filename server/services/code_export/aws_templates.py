@@ -299,53 +299,77 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
+from langchain.schema import HumanMessage, AIMessage
 
-
-def get_memory_data( node_config ) : 
+def convert_to_message_objects(chat_history):
     
+    messages = []
+    
+    for item in chat_history:
+        if isinstance(item, dict):
+            # 딕셔너리 형태의 메시지를 객체로 변환
+            if item.get('type') == 'human':
+                messages.append(HumanMessage(content=item['content']))
+            elif item.get('type') == 'ai':
+                messages.append(AIMessage(content=item['content']))
+        elif hasattr(item, 'content'):
+            # 이미 메시지 객체인 경우 그대로 사용
+            messages.append(item)
+        elif isinstance(item, str):
+            # 문자열인 경우 HumanMessage로 변환 (fallback)
+            messages.append(HumanMessage(content=item))
+    
+    return messages
+
+def get_memory_data(node_config):
     memory_type = node_config['config']['memoryGroup']['memoryType']
 
-    if memory_type == 'ConversationBufferWindowMemory' : 
+    if memory_type == 'ConversationBufferWindowMemory':
         windowSize = node_config['config']['memoryGroup']['modelConfig']['windowSize']
-        if len( node_config['config']['chat_history'] ) == 0 :
-            memory_buffer = ConversationBufferWindowMemory(k=windowSize, return_messages=True)
-            memory_buffer.chat_memory.messages = []
-        else : 
-            memory_buffer = ConversationBufferWindowMemory(k=windowSize, return_messages=True)
-            memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+        windowSize = windowSize * 2
+        memory_buffer = ConversationBufferWindowMemory(k=windowSize, return_messages=True)
         
-    elif memory_type == 'ConversationBufferMemory' : 
-        if len( node_config['config']['chat_history'] ) == 0 :
-            memory_buffer = ConversationBufferMemory(return_messages=True)
+        if len(node_config['config']['chat_history']) == 0:
             memory_buffer.chat_memory.messages = []
-        else : 
-            memory_buffer = ConversationBufferMemory(return_messages=True)
-            memory_buffer.chat_memory.messages = node_config['config']['chat_history']
+        else:
+            # 히스토리를 메시지 객체로 변환
+            messages = convert_to_message_objects(node_config['config']['chat_history'])
+            memory_buffer.chat_memory.messages = messages
+            
+    elif memory_type == 'ConversationBufferMemory':
+        memory_buffer = ConversationBufferMemory(return_messages=True)
+        
+        if len(node_config['config']['chat_history']) == 0:
+            memory_buffer.chat_memory.messages = []
+        else:
+            # 히스토리를 메시지 객체로 변환
+            messages = convert_to_message_objects(node_config['config']['chat_history'])
+            memory_buffer.chat_memory.messages = messages
 
     return memory_buffer
-        
 
-
-def return_update_config( node_config, user_message_content, ai_message_content  ) :
-   
+def return_update_config(node_config, user_message_content, ai_message_content):
+    # 현재 chat_history를 메시지 객체로 변환
+    if node_config['config']['chat_history']:
+        current_history = convert_to_message_objects(node_config['config']['chat_history'])
+    else:
+        current_history = []
+    
+    # 새로운 메시지 추가
+    current_history.append(HumanMessage(content=user_message_content))
+    current_history.append(AIMessage(content=ai_message_content))
+    
+    # 메모리 타입에 따른 크기 관리
     memory_type = node_config['config']['memoryGroup']['memoryType']
     
-    if memory_type == 'ConversationBufferWindowMemory' : 
-        limit_size = 2
-        memory_buffer = ConversationBufferWindowMemory(k=limit_size, return_messages=True)
-        memory_buffer.chat_memory.messages = node_config['config']['chat_history']
-
-    elif memory_type == 'ConversationBufferMemory' : 
-        memory_buffer = ConversationBufferMemory(return_messages=True)
-        memory_buffer.chat_memory.messages = node_config['config']['chat_history']
-        
-    # set value
-    memory_buffer.chat_memory.add_user_message(user_message_content)
-    memory_buffer.chat_memory.add_ai_message(ai_message_content)
-
-    # get update value
-    current_buffered_history = memory_buffer.load_memory_variables({})['history']
-    node_config['config']['chat_history'] = current_buffered_history
+    if memory_type == 'ConversationBufferWindowMemory':
+        windowSize = node_config['config']['memoryGroup']['modelConfig']['windowSize']
+        if len(current_history) > windowSize:
+            current_history = current_history[-windowSize:]
+    
+    # 메시지 객체들을 저장 (LangChain이 자동으로 직렬화 처리)
+    node_config['config']['chat_history'] = current_history
+    
     return node_config
     """
     return code 
