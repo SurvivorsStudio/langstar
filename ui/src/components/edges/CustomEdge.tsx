@@ -274,6 +274,7 @@ const CustomEdge = ({
           <div className="absolute top-1 right-1 flex gap-1 z-10">
             <button
               onClick={handleClearOutput}
+              onMouseDown={(e) => e.stopPropagation()}
               className="p-1 bg-gray-500 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-full shadow-sm transition-colors"
               title="Clear Output"
             >
@@ -281,6 +282,7 @@ const CustomEdge = ({
             </button>
             <button
               onClick={handleDelete}
+              onMouseDown={(e) => e.stopPropagation()}
               className="p-1 bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white rounded-full shadow-sm transition-colors"
               title="Remove Connection"
             >
