@@ -167,11 +167,25 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   };
 
   /**
+   * 노드 이름 유효성 검사 함수
+   * @param {string} name - 검사할 노드 이름
+   * @returns {boolean} 유효하면 true, 그렇지 않으면 false
+   */
+  const validateNodeName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
+
+  /**
    * 노드 이름 변경 핸들러 (input 값 변경 시).
    * @param {React.ChangeEvent<HTMLInputElement>} event - 변경 이벤트 객체.
    */
   const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setNodeName(event.target.value);
+    const value = event.target.value;
+    // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+    const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+    setNodeName(filteredValue);
   };
 
   /**
@@ -179,12 +193,26 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    */
   const handleNameSubmit = () => {
     const trimmedName = nodeName.trim();
-    // 이름이 유효하고 변경된 경우에만 업데이트
-    if (trimmedName && trimmedName !== data.label) {
-      updateNodeData(id, { ...data, label: trimmedName });
-    } else {
-      // 유효하지 않거나 변경되지 않은 경우 원래 이름으로 복원
+    
+    // 이름이 비어있는 경우
+    if (!trimmedName) {
+      alert('노드 이름을 입력해주세요.');
       setNodeName(data.label);
+      setIsEditing(false);
+      return;
+    }
+    
+    // 이름 유효성 검사
+    if (!validateNodeName(trimmedName)) {
+      alert('노드 이름에는 영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다. 띄어쓰기와 특수문자는 사용할 수 없습니다.');
+      setNodeName(data.label);
+      setIsEditing(false);
+      return;
+    }
+    
+    // 이름이 유효하고 변경된 경우에만 업데이트
+    if (trimmedName !== data.label) {
+      updateNodeData(id, { ...data, label: trimmedName });
     }
     setIsEditing(false);
   };
@@ -430,6 +458,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               onChange={handleNameChange}
               onBlur={handleNameSubmit}
               onKeyDown={handleKeyPress}
+              placeholder="영문자, 숫자, _만 사용"
               className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               autoFocus
             />

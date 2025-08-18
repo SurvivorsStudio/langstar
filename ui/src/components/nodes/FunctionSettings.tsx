@@ -8,6 +8,13 @@ interface FunctionSettingsProps {
 const FunctionSettings: React.FC<FunctionSettingsProps> = ({ nodeId }) => {
   const { nodes, updateNodeData } = useFlowStore();
   const node = nodes.find(n => n.id === nodeId);
+  
+  // 함수 이름 유효성 검사 함수
+  const validateFunctionName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
 
   if (!node) {
     return <div>Node not found</div>;
@@ -32,16 +39,19 @@ const FunctionSettings: React.FC<FunctionSettingsProps> = ({ nodeId }) => {
           type="text"
           value={node.data.config?.functionName || 'sample_code'}
           onChange={(e) => {
+            const value = e.target.value;
+            // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+            const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
             updateNodeData(nodeId, {
               ...node.data,
               config: {
                 ...node.data.config,
-                functionName: e.target.value
+                functionName: filteredValue
               }
             });
           }}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
-          placeholder="Enter function name"
+          placeholder="영문자, 숫자, _만 사용"
         />
       </div>
 

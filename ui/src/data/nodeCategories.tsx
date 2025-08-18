@@ -65,23 +65,23 @@ export const nodeCategories: NodeCategory[] = [
         icon: (className = '') => <GitMerge size={20} className={className} />
       }
     ]
-  },
-  {
-    id: 'rag',
-    title: 'RAG Nodes',
-    nodes: [
-      {
-        type: 'embeddingNode',
-        label: 'Embedding',
-        description: 'Generate embeddings from text using configured models',
-        icon: (className = '') => <Cpu size={20} className={className} />
-      },
-      {
-        type: 'ragNode',
-        label: 'RAG',
-        description: 'Retrieval-Augmented Generation using vector store',
-        icon: (className = '') => <Database size={20} className={className} />
-      }
-    ]
   }
+  // {
+  //   id: 'rag',
+  //   title: 'RAG Nodes',
+  //   nodes: [
+  //     {
+  //       type: 'embeddingNode',
+  //       label: 'Embedding',
+  //       description: 'Generate embeddings from text using configured models',
+  //       icon: (className = '') => <Cpu size={20} className={className} />
+  //     },
+  //     {
+  //       type: 'ragNode',
+  //       label: 'RAG',
+  //       description: 'Retrieval-Augmented Generation using vector store',
+  //       icon: (className = '') => <Database size={20} className={className} />
+  //     }
+  //   ]
+  // }
 ];

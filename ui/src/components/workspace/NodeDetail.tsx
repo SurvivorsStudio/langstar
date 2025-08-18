@@ -19,6 +19,13 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   const [editDescription, setEditDescription] = useState(node?.functionDescription || '');
   const [editCode, setEditCode] = useState(node?.code || '');
   const [editParameters, setEditParameters] = useState(node?.parameters || []);
+  
+  // 이름 유효성 검사 함수
+  const validateName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
 
   if (!node) {
     return (
@@ -40,8 +47,19 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
 
   const handleSave = async () => {
     try {
+      // 노드 이름 유효성 검사
+      if (!editName.trim()) {
+        alert('노드 이름을 입력해주세요.');
+        return;
+      }
+      
+      if (!validateName(editName.trim())) {
+        alert('노드 이름에는 영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다. 띄어쓰기와 특수문자는 사용할 수 없습니다.');
+        return;
+      }
+      
       await updateUserNode(nodeId, {
-        name: editName,
+        name: editName.trim(),
         functionDescription: editDescription,
         code: editCode,
         parameters: editParameters,
@@ -71,8 +89,16 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
+    let processedValue = value;
+    
+    // 매개변수 이름인 경우 유효성 검사 적용
+    if (field === 'name' && typeof value === 'string') {
+      // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+      processedValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+    }
+    
     const newParameters = [...editParameters];
-    newParameters[index] = { ...newParameters[index], [field]: value };
+    newParameters[index] = { ...newParameters[index], [field]: processedValue };
     setEditParameters(newParameters);
   };
 
@@ -160,7 +186,13 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                     <input
                       type="text"
                       value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+                        const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+                        setEditName(filteredValue);
+                      }}
+                      placeholder="영문자, 숫자, _만 사용"
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     />
                   ) : (
@@ -237,8 +269,7 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                             type="text"
                             value={param.name}
                             onChange={(e) => updateParameter(index, 'name', e.target.value)}
-
-                            placeholder="메뉴 이름"
+                            placeholder="영문자, 숫자, _만 사용"
                             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                           />
                           <input
