@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ChevronDown, AlertCircle, Pencil, Check } from 'lucide-react';
+import { AlertCircle, Pencil, Check } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import type { AIConnection } from '../../store/flowStore';
 import CustomSelect from '../Common/CustomSelect';
+import MultiSelect from '../Common/MultiSelect';
 
 // Define an interface for the group objects for better type safety
 interface GroupData {
@@ -36,8 +37,6 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   }));
 
   const node = nodes.find(n => n.id === nodeId);
-  const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   
   // 이전 노드에서 사용 가능한 입력 키 및 연결 상태 가져오기
@@ -83,16 +82,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsToolsOpen(false);
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleModelChange = (value: string) => {
     // Find the full connection object from activeConnections
@@ -187,27 +177,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     });
   };
 
-  const toggleTool = (toolId: string) => {
-    const newTools = currentTools.includes(toolId)
-      ? currentTools.filter((id: string) => id !== toolId)
-      : [...currentTools, toolId];
 
-    updateNodeData(nodeId, {
-      config: {
-        tools: newTools // 'selectedTools' -> 'tools'로 변경
-      }
-    });
-  };
-
-  const removeTool = (event: React.MouseEvent, toolId: string) => {
-    event.stopPropagation();
-    const newTools = currentTools.filter((id: string) => id !== toolId);
-    updateNodeData(nodeId, {
-      config: {
-        tools: newTools // 'selectedTools' -> 'tools'로 변경
-      }
-    });
-  };
 
   // Filter active AI connections
   // 스토어에서 가져온 AI 연결 중 언어 모델(active)만 필터링
@@ -418,71 +388,31 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           )}
         </div>
 
-        <div className="space-y-2" ref={dropdownRef}>
+        <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Tools
           </label>
-          <div
-            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 min-h-[42px] flex flex-wrap items-center cursor-pointer"
-            onClick={() => setIsToolsOpen(!isToolsOpen)}
-          >
-            {currentTools.length > 0 ? ( // 'selectedTools' -> 'currentTools'로 변경
-              toolsGroups
-                .filter((tool: GroupData) => currentTools.includes(tool.id)) // 'selectedTools' -> 'currentTools'로 변경
-                .map((tool: GroupData) => (
-                  <span
-                    key={tool.id}
-                    className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm mr-2 mb-1 flex items-center"
-                  >
-                    {tool.name}
-                    <button
-                      onClick={(e) => removeTool(e, tool.id)}
-                      className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
-                    >
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))
-            ) : (
-              <span className="text-gray-500 dark:text-gray-400 text-sm">Select tools</span>
-            )}
-            <div className="ml-auto">
-              <ChevronDown size={16} className="text-gray-400 dark:text-gray-500" />
-            </div>
-          </div>
-          {isToolsOpen && (
-            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-              {toolsGroups.length > 0 ? (
-                toolsGroups.map((tool: GroupData) => (
-                  <div
-                    key={tool.id}
-                    className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      currentTools.includes(tool.id) ? 'bg-gray-50 dark:bg-gray-700' : '' // 'selectedTools' -> 'currentTools'로 변경
-                    }`}
-                    onClick={() => toggleTool(tool.id)}
-                  >
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={currentTools.includes(tool.id)} // 'selectedTools' -> 'currentTools'로 변경
-                        onChange={() => {}}
-                        className="mr-2"
-                      />
-                      <div>
-                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{tool.name}</div>
-                        {tool.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
-                  No tools available. Add tools in the Groups node.
-                </div>
-              )}
-            </div>
+          <MultiSelect
+            value={currentTools}
+            onChange={(selectedTools) => {
+              updateNodeData(nodeId, {
+                config: {
+                  tools: selectedTools
+                }
+              });
+            }}
+            options={toolsGroups.map((tool: GroupData) => ({
+              value: tool.id,
+              label: tool.name,
+              description: tool.description
+            }))}
+            placeholder="Select tools"
+            disabled={toolsGroups.length === 0}
+          />
+          {toolsGroups.length === 0 && (
+            <p className="text-xs text-amber-500">
+              No tools available. Add tools in the Groups node.
+            </p>
           )}
         </div>
 

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Settings, Code, AlertCircle, LogIn, Play } from 'lucide-react';
+import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2 } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
+import CodeEditorPopup from './nodes/CodeEditorPopup';
 import ConditionSettings from './nodes/ConditionSettings';
 import PromptSettings from './nodes/PromptSettings';
 import SystemPromptSettings from './nodes/SystemPromptSettings';
@@ -27,12 +28,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
-  const [selectedVariable, setSelectedVariable] = useState<string>('');
+  const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
   
   const [incomingEdges, setIncomingEdges] = useState<Edge[]>([]);
   const [mergedInputData, setMergedInputData] = useState<Record<string, VariableValue>>({});
   const [hasValidInputData, setHasValidInputData] = useState<boolean>(false);
-  const [availableVariables, setAvailableVariables] = useState<string[]>([]);
   const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
   const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
 
@@ -85,7 +85,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
     const node = nodes.find((n: any) => n.id === nodeId);
     if (node) {
       setCurrentNode(node as any);
-      setCode(node.data.code || '# Write your Python code here\n\n');
+      setCode(node.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state');
       setNodeName(node.data.label || 'Untitled Node');
 
       const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
@@ -143,29 +143,49 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
 
       const currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
       setHasValidInputData(currentHasValidInputData);
-      setAvailableVariables(currentHasValidInputData ? Object.keys(currentMergedInputData) : []);
 
       // Adjust active tab based on node type and current active tab validity
       const nodeType = node.type;
       let newDefaultTab: 'input_data' | 'code' | 'settings' = 'input_data';
       let currentTabIsValid = true;
 
+      // 노드 타입별로 유효한 탭 정의
+      const validTabsByNodeType: Record<string, ('input_data' | 'code' | 'settings')[]> = {
+        'startNode': ['settings'],
+        'endNode': ['input_data', 'settings'],
+        'promptNode': ['input_data', 'code'],
+        'systemPromptNode': ['input_data', 'code'],
+        'agentNode': ['input_data', 'settings'],
+        'conditionNode': ['input_data', 'settings'],
+        'groupsNode': ['input_data', 'settings'],
+        'embeddingNode': ['input_data', 'settings'],
+        'ragNode': ['input_data', 'settings'],
+        'mergeNode': ['input_data', 'settings'],
+        'toolsMemoryNode': ['input_data', 'settings'],
+        'userNode': ['input_data', 'settings'],
+        'functionNode': ['input_data', 'code', 'settings']
+      };
+
+      // 현재 노드 타입의 유효한 탭들 가져오기
+      const validTabs = validTabsByNodeType[nodeType || ''] || ['input_data'];
+      
+      // 현재 활성 탭이 유효한지 확인
+      if (!validTabs.includes(activeTab)) {
+        currentTabIsValid = false;
+        // 유효하지 않으면 첫 번째 유효한 탭으로 설정
+        newDefaultTab = validTabs[0];
+      }
+
+      // 노드 타입별 기본 탭 설정
       if (nodeType === 'startNode') {
         newDefaultTab = 'settings';
-        if (activeTab !== 'settings') currentTabIsValid = false; 
       } else if (nodeType === 'endNode') {
-        const validTabsForEndNode = ['input_data', 'settings'];
-        if (!validTabsForEndNode.includes(activeTab)) {
-          currentTabIsValid = false;
-          newDefaultTab = 'settings';
-        }
+        newDefaultTab = 'settings';
       } else if (nodeType === 'promptNode' || nodeType === 'systemPromptNode') {
-        if (activeTab === 'settings') currentTabIsValid = false;
         newDefaultTab = 'input_data';
-      } else if (
-        nodeType && ['agentNode', 'conditionNode', 'groupsNode', 'embeddingNode', 'ragNode', 'mergeNode'].includes(nodeType)
-      ) {
-        if (activeTab === 'code') currentTabIsValid = false;
+      } else if (nodeType === 'toolsMemoryNode') {
+        newDefaultTab = 'input_data';
+      } else if (nodeType === 'functionNode') {
         newDefaultTab = 'input_data';
       }
 
@@ -262,7 +282,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       // 로컬 상태 초기화
       setMergedInputData({});
       setHasValidInputData(false);
-      setAvailableVariables([]);
       setSelectedEdgeInfo(null);
       
       console.log(`Cleared all input data for node ${nodeId}`);
@@ -429,7 +448,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                         
                         const currentHasValidInputData = targetEdge.output && Object.keys(targetEdge.output).length > 0;
                         setHasValidInputData(currentHasValidInputData);
-                        setAvailableVariables(currentHasValidInputData ? Object.keys(targetEdge.output) : []);
                       }
                     }
                   }}
@@ -534,51 +552,31 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
             ) : isSystemPromptNode ? (
               <SystemPromptSettings nodeId={nodeId} />
             ) : (
-              <>
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                      Available Input Variables
-                    </label>
-                    <select
-                      value={selectedVariable}
-                      onChange={(e) => setSelectedVariable(e.target.value)}
-                      className={`w-full px-3 py-2 border ${
-                        !hasValidInputData 
-                          ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                      } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-                      disabled={!hasValidInputData}
-                    >
-                      <option value="">Select a variable</option>
-                      {availableVariables.map((variable) => (
-                        <option key={variable} value={variable}>
-                          {variable}: {JSON.stringify(mergedInputData[variable])}
-                        </option>
-                      ))}
-                    </select>
-                    {incomingEdges.length === 0 && (
-                      <div className="flex items-center mt-1 text-amber-500 text-xs">
-                        <AlertCircle size={12} className="mr-1" />
-                        Connect an input node to access variables.
-                      </div>
-                    )}
-                    {incomingEdges.length > 0 && !hasValidInputData && (
-                      <div className="flex items-center mt-1 text-amber-500 text-xs">
-                        <AlertCircle size={12} className="mr-1" />
-                        Execute the connected node(s) to access their output variables.
-                      </div>
-                    )}
+              <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <Code className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Python Code
+                    </span>
                   </div>
+                  <button
+                    onClick={() => setIsCodePopupOpen(true)}
+                    className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center"
+                    title="Open in full screen editor"
+                  >
+                    <Maximize2 size={14} className="mr-1" />
+                    Full Screen
+                  </button>
                 </div>
-                <div className="h-[calc(100%-80px)]">
+                <div className="flex-1">
                   <CodeEditor
                     value={code}
                     onChange={handleCodeChange}
                     language="python"
                   />
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -607,6 +605,17 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
           </div>
         )}
       </div>
+      
+      {/* Code Editor Popup */}
+      <CodeEditorPopup
+        isOpen={isCodePopupOpen}
+        onClose={() => setIsCodePopupOpen(false)}
+        value={code}
+        onChange={handleCodeChange}
+        edgeData={mergedInputData}
+        sourceNode={selectedEdgeInfo ? nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId) : null}
+        availableVariables={Object.keys(mergedInputData)}
+      />
     </div>
   );
 };

@@ -5,16 +5,33 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   language?: string;
+  onCursorPositionChange?: (position: number) => void;
+  onMount?: (editor: any) => void;
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({ 
   value, 
   onChange, 
-  language = 'python' 
+  language = 'python',
+  onCursorPositionChange,
+  onMount
 }) => {
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
       onChange(value);
+    }
+  };
+
+  const handleEditorDidMount = (editor: any) => {
+    if (onCursorPositionChange) {
+      editor.onDidChangeCursorPosition((e: any) => {
+        const position = editor.getModel().getOffsetAt(e.position);
+        onCursorPositionChange(position);
+      });
+    }
+    
+    if (onMount) {
+      onMount(editor);
     }
   };
 
@@ -25,6 +42,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         defaultLanguage={language}
         value={value}
         onChange={handleEditorChange}
+        onMount={handleEditorDidMount}
         theme="vs-dark"
         options={{
           minimap: { enabled: false },

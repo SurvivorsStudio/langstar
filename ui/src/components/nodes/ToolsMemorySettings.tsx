@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Code, Maximize2 } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
+import CodeEditorPopup from './CodeEditorPopup';
 import { Group, NodeData } from '../../types/node';
 import CustomSelect from '../Common/CustomSelect';
 
@@ -27,6 +28,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
   }, [(node?.data as NodeData)?.selectedGroupId]);
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>((node?.data as NodeData)?.selectedGroupId || null);
+  const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
 
   const checkNameExists = (name: string, currentGroupId: string): boolean => {
@@ -190,8 +192,21 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
 
       {selectedGroup.type === 'tools' && (
         <div className="flex-1 overflow-hidden">
-          <div className="p-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800">
-            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Python Code</h3>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <Code className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Python Code
+              </span>
+            </div>
+            <button
+              onClick={() => setIsCodePopupOpen(true)}
+              className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center"
+              title="Open in full screen editor"
+            >
+              <Maximize2 size={14} className="mr-1" />
+              Full Screen
+            </button>
           </div>
           <div className="h-[calc(100vh-380px)]">
             <CodeEditor
@@ -202,6 +217,22 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
           </div>
         </div>
       )}
+      
+      {/* Code Editor Popup */}
+      <CodeEditorPopup
+        isOpen={isCodePopupOpen}
+        onClose={() => setIsCodePopupOpen(false)}
+        value={selectedGroup?.code || '# Write your Python code here\n'}
+        onChange={(value) => {
+          if (selectedGroup) {
+            handleUpdateGroup(selectedGroup.id, { code: value });
+          }
+        }}
+        edgeData={{}}
+        sourceNode={null}
+        availableVariables={[]}
+        hideInputVariables={true}
+      />
     </div>
   );
 };

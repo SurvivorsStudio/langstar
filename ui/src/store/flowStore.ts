@@ -599,13 +599,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const initialNodeData = { ...data };
     if (type === 'functionNode' && !initialNodeData.code) {
       initialNodeData.code =
-        '# Write your Python code here\n' +
-        '# Input data from the previous node is in the `input_params` dictionary.\n' +
-        '# Example: value = input_params.get("some_key")\n' +
-        '# To return data, assign it to a dictionary named `result`.\n' +
-        '# This `result` dictionary will be the output of this node.\n' +
-        '# Example: result = {"my_custom_output": value * 2}\n' +
-        'result = {}';
+        'def exce_code(state):\n' +
+        '    # Access input variables:\n' +
+        '    # value = state[\'variable_name\']\n' +
+        '    # \n' +
+        '    # Your code here...\n' +
+        '    # \n' +
+        '    return state';
     }
 
     const newNode: Node<NodeData> = {

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import CodeEditor from '../CodeEditor';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle, Pencil, Check } from 'lucide-react';
+import { AlertCircle, Pencil, Check, Maximize2 } from 'lucide-react';
 import CustomSelect from '../Common/CustomSelect';
+import PromptTemplatePopup from './PromptTemplatePopup';
 
 interface PromptSettingsProps {
   nodeId: string;
@@ -12,6 +13,7 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
   const { nodes, edges, updateNodeData } = useFlowStore();
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
   const incomingEdge = edges.find(edge => edge.target === nodeId);
 
   const sourceOutput = incomingEdge?.data?.output || null;
@@ -19,6 +21,9 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
   // Get available variables from source node output
   const availableVariables = hasValidOutput ? Object.keys(sourceOutput) : [];
+
+  // Get source node info
+  const sourceNode = nodes.find(n => n.id === incomingEdge?.source);
 
   const handleOutputVariableChange = (value: string) => {
     if (!node || !node.data) {
@@ -124,10 +129,21 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
       <div className="flex-1 overflow-hidden">
         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/50">
-          <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Prompt Template</h3>
-          <p className="text-sm text-blue-600 dark:text-blue-400">
-            Use {'{variable}'} syntax to insert variables from input
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Prompt Template</h3>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                Use {'{variable}'} syntax to insert variables from input
+              </p>
+            </div>
+            <button
+              onClick={() => setIsPopupOpen(true)}
+              className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md transition-colors"
+              title="Open in full screen editor"
+            >
+              <Maximize2 size={18} />
+            </button>
+          </div>
         </div>
         <div className="h-[calc(100%-180px)]">
           <CodeEditor
@@ -137,6 +153,17 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
           />
         </div>
       </div>
+
+      {/* Prompt Template Popup */}
+      <PromptTemplatePopup
+        isOpen={isPopupOpen}
+        onClose={() => setIsPopupOpen(false)}
+        value={node?.data.config?.template || ''}
+        onChange={handleTemplateChange}
+        edgeData={sourceOutput}
+        sourceNode={sourceNode}
+        availableVariables={availableVariables}
+      />
     </div>
   );
 };

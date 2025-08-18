@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
 interface CustomSelectProps {
@@ -7,6 +7,12 @@ interface CustomSelectProps {
   options: { value: string; label: string }[];
   placeholder?: string;
   disabled?: boolean;
+  groupedOptions?: Array<{
+    groupLabel: string;
+    nodeId: string;
+    options: Array<{ value: string; label: string; nodeId: string; nodeKey: string; nodeLabel: string }>;
+  }>;
+  selectedLabel?: string;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -15,6 +21,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   options,
   placeholder = 'Select...',
   disabled = false,
+  groupedOptions,
+  selectedLabel,
 }) => {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -70,6 +78,12 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     }
   }, [open, value, options]);
 
+  // 그룹화된 옵션을 플랫한 리스트로 변환 (키보드 네비게이션용)
+  const flattenedGroupedOptions = useMemo(() => {
+    if (!groupedOptions) return [];
+    return groupedOptions.flatMap(group => group.options);
+  }, [groupedOptions]);
+
   return (
     <div className="relative">
       <button
@@ -82,7 +96,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         aria-expanded={open}
       >
         <span className={selected ? '' : 'text-gray-400 dark:text-gray-500'}>
-          {selected ? selected.label : placeholder}
+          {selectedLabel || (selected ? selected.label : placeholder)}
         </span>
         <ChevronDown size={18} className="ml-2 text-gray-400 dark:text-gray-500" />
       </button>
@@ -93,31 +107,72 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           tabIndex={-1}
           role="listbox"
         >
-          {allOptions.length === 0 && (
-            <div className="px-4 py-2 text-gray-400 dark:text-gray-500 text-sm">No options</div>
+          {groupedOptions ? (
+            // 그룹화된 옵션 표시
+            <>
+              {groupedOptions.length === 0 && (
+                <div className="px-4 py-2 text-gray-400 dark:text-gray-500 text-sm">No options</div>
+              )}
+              {groupedOptions.map((group, groupIdx) => (
+                <div key={group.nodeId}>
+                  {/* 그룹 헤더 */}
+                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    📋 {group.groupLabel}
+                  </div>
+                  {/* 그룹 옵션들 */}
+                  {group.options.map((opt, optIdx) => (
+                    <div
+                      key={opt.value}
+                      role="option"
+                      aria-selected={value === opt.value}
+                      className={`px-4 py-2 cursor-pointer text-sm flex items-center transition-colors pl-6
+                        ${value === opt.value ? 'font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20' : ''}
+                        ${highlightedIdx === optIdx ? 'bg-blue-100 dark:bg-blue-900/40' : ''}
+                        ${value === opt.value ? '' : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                      onClick={() => {
+                        onChange(opt.value);
+                        setOpen(false);
+                      }}
+                      onMouseEnter={() => setHighlightedIdx(optIdx)}
+                    >
+                      {value === opt.value && <Check size={16} className="mr-2 text-blue-600 dark:text-blue-300" />}
+                      <span className="text-gray-600 dark:text-gray-300">•</span>
+                      <span className="ml-2">{opt.label}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </>
+          ) : (
+            // 기존 플랫한 옵션 표시
+            <>
+              {allOptions.length === 0 && (
+                <div className="px-4 py-2 text-gray-400 dark:text-gray-500 text-sm">No options</div>
+              )}
+              {allOptions.map((opt, idx) => {
+                const isPlaceholder = opt.value === '';
+                return (
+                  <div
+                    key={opt.value + idx}
+                    role="option"
+                    aria-selected={value === opt.value}
+                    className={`px-4 py-2 cursor-pointer text-sm flex items-center transition-colors
+                      ${value === opt.value ? 'font-semibold text-blue-700 dark:text-blue-300' : ''}
+                      ${highlightedIdx === idx ? 'bg-blue-100 dark:bg-blue-900/40' : ''}
+                      ${isPlaceholder ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    onMouseEnter={() => setHighlightedIdx(idx)}
+                  >
+                    {value === opt.value && <Check size={16} className="mr-2 text-blue-600 dark:text-blue-300" />}
+                    {opt.label}
+                  </div>
+                );
+              })}
+            </>
           )}
-          {allOptions.map((opt, idx) => {
-            const isPlaceholder = opt.value === '';
-            return (
-              <div
-                key={opt.value + idx}
-                role="option"
-                aria-selected={value === opt.value}
-                className={`px-4 py-2 cursor-pointer text-sm flex items-center transition-colors
-                  ${value === opt.value ? 'font-semibold text-blue-700 dark:text-blue-300' : ''}
-                  ${highlightedIdx === idx ? 'bg-blue-100 dark:bg-blue-900/40' : ''}
-                  ${isPlaceholder ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                onMouseEnter={() => setHighlightedIdx(idx)}
-              >
-                {value === opt.value && <Check size={16} className="mr-2 text-blue-600 dark:text-blue-300" />}
-                {opt.label}
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
