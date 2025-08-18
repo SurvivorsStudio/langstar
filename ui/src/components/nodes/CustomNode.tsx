@@ -1,7 +1,8 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { ChevronRight, X, Play, Loader, Edit2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, X, Play, Loader, Edit2, AlertCircle, Plus, Trash2, Eye } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
+import PromptTemplatePopup from './PromptTemplatePopup';
 
 /**
  * CustomNode 컴포넌트
@@ -19,6 +20,16 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [nodeName, setNodeName] = useState(data.label);
   // 재생 버튼 hover 상태 관리
   const [isPlayHovered, setIsPlayHovered] = useState(false);
+
+  // ToolsMemoryNode이고 다른 노드가 포커스되었을 때 selectedGroupId 초기화
+  React.useEffect(() => {
+    if (type === 'toolsMemoryNode' && focusedElement.type === 'node' && focusedElement.id !== id) {
+      // 다른 노드가 포커스되었을 때 selectedGroupId 초기화
+      if (data.selectedGroupId) {
+        updateNodeData(id, { ...data, selectedGroupId: null });
+      }
+    }
+  }, [focusedElement, id, type, data, updateNodeData]);
 
   // 노드 타입에 따른 플래그
   const isStartNode = type === 'startNode';
@@ -259,55 +270,83 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    * @param {'memory' | 'tools'} type - 그룹 타입.
    * @returns {JSX.Element} 그룹 목록을 나타내는 JSX.
    */
-  const renderGroups = (groups: any[], type: 'memory' | 'tools') => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-gray-700 dark:text-gray-300">{type === 'memory' ? 'Memory' : 'Tools'}</span>
-      </div>
-      {groups.map((group) => (
-        <div 
-          key={group.id} 
-          className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors relative group"
-          // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
-          onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-800 dark:text-gray-200">{group.name}</span>
-            <div className="flex items-center">
-              <button
-                onClick={(e) => handleDeleteGroup(e, group.id)}
-                // 마우스 호버 시에만 삭제 버튼 표시
-                className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
-              >
-                <Trash2 size={14} />
-              </button>
-              <ChevronRight size={14} className="text-gray-400 dark:text-gray-500" />
-            </div>
-          </div>
-          {group.description && (
-            <p 
-              className="text-xs text-gray-500 dark:text-gray-400 mt-1 overflow-hidden"
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: 10,
-                WebkitBoxOrient: 'vertical',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {group.description}
-            </p>
-          )}
+  const renderGroups = (groups: any[], type: 'memory' | 'tools') => {
+    // 현재 선택된 그룹 ID 확인
+    const selectedGroupId = data.selectedGroupId;
+    
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-medium text-gray-700 dark:text-gray-300">{type === 'memory' ? 'Memory' : 'Tools'}</span>
         </div>
-      ))}
-      <button
-        onClick={() => handleAddGroup(type)}
-        className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
-      >
-        <Plus size={14} className="mr-1" />
-        Add {type === 'memory' ? 'Memory' : 'Tools'} Group
-      </button>
-    </div>
-  );
+        {groups.map((group) => {
+          // 현재 그룹이 선택되었는지 확인
+          const isSelected = selectedGroupId === group.id;
+          
+          return (
+            <div 
+              key={group.id} 
+              className={`rounded p-2 text-sm cursor-pointer transition-colors relative group ${
+                isSelected 
+                  ? 'bg-gray-200 dark:bg-gray-600 border-2 border-blue-500 dark:border-blue-400' 
+                  : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+              }`}
+              // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
+              onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`font-medium ${
+                  isSelected 
+                    ? 'text-blue-800 dark:text-blue-200' 
+                    : 'text-gray-800 dark:text-gray-200'
+                }`}>
+                  {group.name}
+                </span>
+                <div className="flex items-center">
+                  <button
+                    onClick={(e) => handleDeleteGroup(e, group.id)}
+                    // 마우스 호버 시에만 삭제 버튼 표시
+                    className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <ChevronRight size={14} className={`${
+                    isSelected 
+                      ? 'text-blue-500 dark:text-blue-400' 
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`} />
+                </div>
+              </div>
+              {group.description && (
+                <p 
+                  className={`text-xs mt-1 overflow-hidden ${
+                    isSelected 
+                      ? 'text-blue-600 dark:text-blue-300' 
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 10,
+                    WebkitBoxOrient: 'vertical',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {group.description}
+                </p>
+              )}
+            </div>
+          );
+        })}
+        <button
+          onClick={() => handleAddGroup(type)}
+          className="w-full flex items-center justify-center px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
+        >
+          <Plus size={14} className="mr-1" />
+          Add {type === 'memory' ? 'Memory' : 'Tools'} Group
+        </button>
+      </div>
+    );
+  };
 
   // 노드가 포커스되었는지 확인
   const isNodeFocused = focusedElement.type === 'node' && focusedElement.id === id;

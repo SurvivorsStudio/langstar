@@ -11,6 +11,7 @@ import AIConnectionList from '../components/workspace/AIConnectionList';
 import AIConnectionWizard from '../components/workspace/AIConnectionWizard';
 import NodeCreation from '../components/workspace/NodeCreation';
 import NodeManagement from '../components/workspace/NodeManagement';
+import ImportExportModal from '../components/workspace/ImportExportModal';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
 import { Deployment } from '../types/deployment';
 
@@ -112,6 +113,7 @@ const WorkspacePage: React.FC = () => {
     port: '443',
     embeddingModel: 'OpenAI Ada 002'
   });
+  const [showImportExportModal, setShowImportExportModal] = React.useState(false);
 
   const defaultProjectName = DEFAULT_PROJECT_NAME;
 
@@ -122,6 +124,8 @@ const WorkspacePage: React.FC = () => {
 
     if (activeMenu === 'chatflows') {
       fetchAvailableWorkflows();
+      // 워크플로우 목록을 볼 때도 배포 데이터를 로드하여 상태 표시
+      fetchDeployments();
     } else if (activeMenu === 'deployment') {
       fetchDeployments();
     } else if (
@@ -131,7 +135,7 @@ const WorkspacePage: React.FC = () => {
     ) {
       fetchAIConnections();
     }
-  }, [activeMenu, fetchAvailableWorkflows, fetchAIConnections]);
+  }, [activeMenu, fetchAvailableWorkflows, fetchAIConnections, fetchDeployments]);
 
   const handleDeleteRag = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -256,6 +260,13 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
+  const handleImportSuccess = () => {
+    // import 성공 후 워크플로우 목록 새로고침
+    if (activeMenu === 'chatflows') {
+      fetchAvailableWorkflows();
+    }
+  };
+
   const renderMainContent = () => {
     if (showWizard) {
       return (
@@ -306,6 +317,9 @@ const WorkspacePage: React.FC = () => {
             handleNewWorkflow={handleNewWorkflow}
             handleWorkflowClick={handleWorkflowClick}
             handleDeleteWorkflow={handleDeleteWorkflow}
+            onImportExport={() => setShowImportExportModal(true)}
+            deployments={deployments}
+            isLoadingDeployments={isLoadingDeployments}
           />
         );
       case 'deployment':
@@ -368,9 +382,14 @@ const WorkspacePage: React.FC = () => {
         />
         <div className="flex-1 overflow-auto">
           {renderMainContent()}
-
         </div>
       </div>
+      
+      <ImportExportModal
+        isOpen={showImportExportModal}
+        onClose={() => setShowImportExportModal(false)}
+        onImportSuccess={handleImportSuccess}
+      />
     </div>
   );
 }

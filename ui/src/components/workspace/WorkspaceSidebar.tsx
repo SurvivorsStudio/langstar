@@ -65,6 +65,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           <Plus className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">노드 생성</span>
         </button>
+
         <div>
           <button
             onClick={() => setActiveMenu('ai-model-config')}

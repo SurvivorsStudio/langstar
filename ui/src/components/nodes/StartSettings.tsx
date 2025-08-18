@@ -214,10 +214,9 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                     onChange={value => handleVariableChange(index, 'selectVariable', value)}
                     options={[
                       { value: '', label: 'None' },
-                      { value: 'question', label: 'question' },
-                      { value: 'chat_history', label: 'chat_history' }
+                      { value: 'question', label: 'question' }
                     ]}
-                    placeholder="Select variable"
+                    placeholder=""
                   />
                 </div>
               </div>

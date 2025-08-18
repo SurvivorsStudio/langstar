@@ -18,9 +18,16 @@ interface MergeSettingsProps {
 
 interface SourceOption {
   value: string; // Format: "nodeId.key"
-  label: string; // Format: "Node Label: key"
+  label: string; // Format: "key"
   nodeId: string;
   nodeKey: string;
+  nodeLabel: string; // 노드 라벨 추가
+}
+
+interface GroupedSourceOption {
+  groupLabel: string; // 노드명
+  nodeId: string;
+  options: SourceOption[];
 }
 
 const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
@@ -33,25 +40,43 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
     setMappings(currentNode?.data.config?.mergeMappings || []);
   }, [currentNode?.data.config?.mergeMappings]);
 
-  const availableSourceOptions = useMemo<SourceOption[]>(() => {
-    const options: SourceOption[] = [];
+  // 노드별로 그룹화된 소스 옵션 생성
+  const groupedSourceOptions = useMemo<GroupedSourceOption[]>(() => {
     const incomingEdges = edges.filter(edge => edge.target === nodeId);
+    const grouped: { [nodeId: string]: GroupedSourceOption } = {};
 
     incomingEdges.forEach(edge => {
       const sourceNode = nodes.find(n => n.id === edge.source);
       if (sourceNode && sourceNode.data.output && typeof sourceNode.data.output === 'object') {
+        const nodeOptions: SourceOption[] = [];
+        
         Object.keys(sourceNode.data.output).forEach(key => {
-          options.push({
+          nodeOptions.push({
             value: `${sourceNode.id}.${key}`,
-            label: `${sourceNode.data.label}: ${key}`,
+            label: key,
             nodeId: sourceNode.id,
             nodeKey: key,
+            nodeLabel: sourceNode.data.label,
           });
         });
+
+        if (nodeOptions.length > 0) {
+          grouped[sourceNode.id] = {
+            groupLabel: sourceNode.data.label,
+            nodeId: sourceNode.id,
+            options: nodeOptions,
+          };
+        }
       }
     });
-    return options;
+
+    return Object.values(grouped);
   }, [nodeId, nodes, edges]);
+
+  // 플랫한 옵션 리스트 (기존 호환성을 위해)
+  const availableSourceOptions = useMemo<SourceOption[]>(() => {
+    return groupedSourceOptions.flatMap(group => group.options);
+  }, [groupedSourceOptions]);
 
   const handleAddMapping = () => {
     const newMapping: MergeMapping = {
@@ -95,6 +120,16 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
     });
   };
 
+  // 선택된 값의 표시 라벨 생성
+  const getSelectedLabel = (mapping: MergeMapping) => {
+    if (!mapping.sourceNodeId || !mapping.sourceNodeKey) return '';
+    
+    const sourceNode = nodes.find(n => n.id === mapping.sourceNodeId);
+    if (!sourceNode) return `${mapping.sourceNodeId}.${mapping.sourceNodeKey}`;
+    
+    return `${sourceNode.data.label} → ${mapping.sourceNodeKey}`;
+  };
+
   if (!currentNode) return <div>Loading...</div>;
 
   return (
@@ -125,6 +160,8 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
               onChange={value => handleMappingChange(index, 'sourceNodeId', value)}
               options={availableSourceOptions}
               placeholder="Select Source Value"
+              groupedOptions={groupedSourceOptions}
+              selectedLabel={getSelectedLabel(mapping)}
             />
           </div>
           {/* 삭제 버튼 */}
