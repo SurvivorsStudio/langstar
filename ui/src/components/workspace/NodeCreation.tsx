@@ -11,6 +11,13 @@ const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
   const { addUserNode } = useFlowStore();
   const [activeTab, setActiveTab] = useState<'code' | 'test'>('code');
   const [nodeName, setNodeName] = useState('my_function');
+  
+  // 노드 이름 유효성 검사 함수
+  const validateNodeName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
   const [nodeType, setNodeType] = useState('UserNode');
   const [outputVariable, setOutputVariable] = useState('');
   const [streamEnabled, setStreamEnabled] = useState(false);
@@ -53,11 +60,20 @@ def my_function(input_data) -> str:
 
   const handleSave = async () => {
     try {
+      // 노드 이름 유효성 검사
+      if (!nodeName.trim()) {
+        alert('노드 이름을 입력해주세요.');
+        return;
+      }
+      
+      if (!validateNodeName(nodeName.trim())) {
+        alert('노드 이름에는 영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다. 띄어쓰기와 특수문자는 사용할 수 없습니다.');
+        return;
+      }
+      
       // UserNode로 저장
-
       const savedUserNode = await addUserNode({
-
-        name: nodeName,
+        name: nodeName.trim(),
         type: 'UserNode',
         code: code,
         parameters: parameters,
@@ -110,7 +126,13 @@ def my_function(input_data) -> str:
                        <input
               type="text"
               value={nodeName}
-              onChange={(e) => setNodeName(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+                const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+                setNodeName(filteredValue);
+              }}
+              placeholder="영문자, 숫자, _만 사용"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
          </div>

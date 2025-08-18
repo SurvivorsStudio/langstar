@@ -25,6 +25,13 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
   const [className, setClassName] = useState(config.className || '');
   const [classType, setClassType] = useState<NodeClassType>(config.classType || 'TypedDict');
   const [showClassNameError, setShowClassNameError] = useState(false);
+  
+  // 이름 유효성 검사 함수
+  const validateName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
 
   const handleAddVariable = () => {
     setVariables([
@@ -40,9 +47,17 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
   };
 
   const handleVariableChange = (index: number, field: keyof Variable, value: string) => {
+    let processedValue = value;
+    
+    // 변수 이름인 경우 유효성 검사 적용
+    if (field === 'name') {
+      // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+      processedValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+    }
+    
     const newVariables = variables.map((variable, i) => {
       if (i === index) {
-        return { ...variable, [field]: value };
+        return { ...variable, [field]: processedValue };
       }
       return variable;
     });
@@ -72,9 +87,11 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
   };
 
   const handleClassNameChange = (value: string) => {
-    setClassName(value);
-    setShowClassNameError(!value.trim());
-    updateConfig({ className: value });
+    // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
+    const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
+    setClassName(filteredValue);
+    setShowClassNameError(!filteredValue.trim());
+    updateConfig({ className: filteredValue });
   };
 
   const handleClassTypeChange = (value: string) => {
@@ -97,7 +114,7 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
             type="text"
             value={className}
             onChange={(e) => handleClassNameChange(e.target.value)}
-            placeholder="Enter class name"
+            placeholder="영문자, 숫자, _만 사용"
             className={`w-full px-3 py-2 border ${
               showClassNameError ? 'border-red-300 ring-red-200 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
             } rounded-md focus:outline-none focus:ring-2 ${
@@ -159,7 +176,7 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
                     type="text"
                     value={variable.name}
                     onChange={(e) => handleVariableChange(index, 'name', e.target.value)}
-                    placeholder="Enter variable name"
+                    placeholder="영문자, 숫자, _만 사용"
                     className={`w-full px-3 py-2 border ${
                       !variable.name.trim() ? 'border-red-300 ring-red-200 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
                     } rounded-md focus:outline-none focus:ring-2 ${
