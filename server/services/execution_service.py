@@ -318,7 +318,7 @@ class ExecutionService:
                                                 'workflow_snapshot': None,  # 워크플로우 스냅샷 없음
                                                 'execution_source': 'internal'
                                             }
-                        return Execution(**execution_data)
+                                            return Execution(**execution_data)
             
             # 3. 기존 executions/ 디렉토리에서 찾기 (하위 호환성)
             for workflow_dir in os.listdir(self.executions_dir):
