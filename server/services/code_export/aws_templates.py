@@ -52,10 +52,7 @@ def node_{node_name}( state ) :
     llm = ChatBedrockConverse(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    region_name= region, 
-                    aws_access_key_id= accessKeyId,
-                    aws_secret_access_key= secretAccessKey
+                    max_tokens=max_token
                 )
                 
     prompt = ChatPromptTemplate.from_messages([
@@ -153,10 +150,7 @@ def node_{node_name}( state ) :
     llm  = ChatBedrockConverse(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    region_name= region, 
-                    aws_access_key_id= accessKeyId,
-                    aws_secret_access_key= secretAccessKey
+                    max_tokens=max_token
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -267,10 +261,7 @@ def node_{node_name}( state ) :
     llm  = ChatBedrockConverse(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    region_name= region, 
-                    aws_access_key_id= accessKeyId,
-                    aws_secret_access_key= secretAccessKey                  
+                    max_tokens=max_token
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -445,10 +436,7 @@ def node_{node_name}( state ) :
     llm  = ChatBedrockConverse(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    region_name= region, 
-                    aws_access_key_id= accessKeyId,
-                    aws_secret_access_key= secretAccessKey                    
+                    max_tokens=max_token
                 )
 
     prompt = ChatPromptTemplate.from_messages([
