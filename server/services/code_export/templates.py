@@ -661,6 +661,58 @@ def agent_node_code( node ):
             return aws_templates.memory_tool_agent_code( node )
 
 
+
+def user_node_code( node ) : 
+    node_name = node['data']['label']
+    node_id = node['id']
+    node_type = node['type']
+    py_code = node['data']['code']
+    parsed = ast.parse(py_code)
+    func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
+    function_name = func_def.name     
+
+    indented_code = textwrap.indent(py_code, "    ")
+
+    code = f"""
+@log_node_execution("{node_id}", "{node_name}", "{node_type}")
+def node_{node_name}(state):
+    my_name = "{node_name}"
+    node_name = my_name
+    node_config_key = my_name + "_Config"
+
+    state_dict  = state.model_dump()
+
+{indented_code}
+
+    # 함수 실행
+    input_param = state_dict[ node_name ] 
+
+    node_parameters = state_dict[node_config_key]['parameters']
+    output_value    = state_dict[node_config_key]['outputVariable']
+
+    func_args = {{}}
+    for row in node_parameters:
+        tmp_func_args = row['funcArgs']
+        tmp_match_data = row['matchData']
+        func_args[tmp_func_args] = input_param[tmp_match_data]
+
+    user_result = {function_name}( **func_args ) 
+
+    return_value = input_param.copy() 
+    return_value.update( {{ output_value : user_result }} ) 
+    
+    node_config = state_dict[node_config_key]
+
+    return_config = {{ node_config_key : state_dict[node_config_key] }}    
+    next_node_list = node_config.get('next_node', []) 
+
+    return return_next_node( node_name, next_node_list, return_value, return_config ) 
+
+
+"""
+    return code 
+
+
 def create_start_node_code( node ) : 
     node_name = node['data']['label']
     return f"""
@@ -687,4 +739,5 @@ def create_condition_node_code( node ) :
     code += f"""graph.add_conditional_edges("_{node_name}", node_branch_{node_name}, {node_branch}  )
 """
     return code
+
 

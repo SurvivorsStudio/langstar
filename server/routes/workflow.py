@@ -37,6 +37,21 @@ def python_node(msg: dict = Body(...)):
         logger.error(f"Error in python node endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post('/workflow/node/usernode')
+def user_node(msg: dict = Body(...)):
+    try:
+        print( msg )
+        logger.info("Received user node request")
+        result = WorkflowService.process_user_node(msg)
+        logger.info("user node request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in user node endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
 @router.post('/workflow/node/startnode')
 def start_node(msg: dict = Body(...)):
     try:
