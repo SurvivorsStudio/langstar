@@ -145,6 +145,44 @@ class WorkflowService:
             logger.error(f"Error in prompt node processing: {str(e)}", exc_info=True)
             raise
 
+
+    @staticmethod
+    def process_user_node(msg: Dict[str, Any]) -> Dict[str, Any]:
+        
+        """Process python node"""
+        try:
+            logger.info("Processing user node")
+            python_code = msg['code'] 
+            param = msg.get("parameters", {})
+            real_data = msg.get("inputData", {})
+
+            insert_pram = {} 
+            for row in param : 
+                tmp_data = real_data[ row['matchData'] ] 
+                insert_pram[row['funcArgs']] = tmp_data 
+
+
+            parsed = ast.parse(python_code)
+            func_def = next((node for node in parsed.body if isinstance(node, ast.FunctionDef)), None)
+            
+            if not func_def:
+                error_msg = "No function found in python_code."
+                logger.error(error_msg)
+                return {"error": error_msg}
+
+            function_name = func_def.name
+            exec_globals = {}
+            
+            exec(python_code, exec_globals)
+            func = exec_globals[function_name]
+            result = func(**insert_pram)
+            logger.info(f"Python node processed successfully with function: {function_name}")
+            return result
+        except Exception as e:
+            error_msg = f"Error in python node processing: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"error": str(e)}
+
     @staticmethod
     def process_python_node(msg: Dict[str, Any]) -> Dict[str, Any]:
         """Process python node"""
@@ -345,6 +383,9 @@ class WorkflowService:
 
                     elif node['type'] == 'agentNode': 
                         python_code += templates.agent_node_code( node )
+
+                    elif node['type'] == 'userNode':
+                        python_code += templates.user_node_code( node )
                     
 
                 # create node  
@@ -368,6 +409,9 @@ class WorkflowService:
                         python_code += templates.create_condition_node_code( node )
 
                     elif node['type'] == 'agentNode': 
+                        python_code += templates.create_node_code( node )
+
+                    elif node['type'] == 'userNode':
                         python_code += templates.create_node_code( node )
 
                 python_code += "\n"

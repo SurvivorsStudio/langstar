@@ -170,4 +170,24 @@ def init_node_config( create_node_json ) :
             result.append( temp_config.copy() )
             result.append( {node_name : {}} )  
 
+        elif node['type'] == 'userNode':
+            node_id = node['id']
+            node_type = node['type']
+            node_name = node['data']['label']
+            python_conde = node['data']['code']
+
+            node_parameters = node['data']['config']['parameters']
+            outputVariable = node['data']['config']['outputVariable']
+            
+            temp_config = {}
+            config_id = node_name + "_Config"
+            temp_config[config_id] = {'config': {'code': python_conde}, 'parameters': node_parameters, 'outputVariable': outputVariable}
+            temp_config[config_id]['node_type'] = node_type
+            temp_config[config_id]['next_node'] = edge_relation[node_name]
+            temp_config[config_id]['node_name'] = node_name
+
+            result.append(temp_config.copy())
+            result.append({node_name: {}})
+
+
     return result

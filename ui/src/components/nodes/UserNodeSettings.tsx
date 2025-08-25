@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
+import { AlertCircle, Pencil, Check } from 'lucide-react';
+import CustomSelect from '../Common/CustomSelect';
 
 interface UserNodeSettingsProps {
   nodeId: string;
@@ -13,6 +15,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
   
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [inputData, setInputData] = useState<Record<string, any>>({});
+  const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   
   // Input Data에서 사용 가능한 키 값들을 가져오기
   const getAvailableInputKeys = () => {
@@ -36,6 +39,12 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
   
   const availableInputKeys = getAvailableInputKeys();
 
+  // Get available variables from source node output
+  const incomingEdge = edges.find(edge => edge.target === nodeId);
+  const sourceOutput = incomingEdge?.data?.output || null;
+  const hasValidOutput = sourceOutput && Object.keys(sourceOutput).length > 0;
+  const availableVariables = hasValidOutput ? Object.keys(sourceOutput) : [];
+
   useEffect(() => {
     if (node?.data.config?.parameters) {
       // 기존 설정값을 불러오거나 초기화
@@ -48,7 +57,6 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       node.data.config.parameters.forEach(param => {
         if (param.inputType === 'select box') {
           // select box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
-
           initialInputData[param.name] = existingInputData[param.name] || '';
         } else if (param.inputType === 'text box') {
           // text box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
@@ -56,14 +64,29 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
         }
       });
       
-      setSettings(initialSettings);
-      setInputData(initialInputData);
+      // 현재 상태와 새로운 초기값을 비교하여 변경이 있을 때만 업데이트
+      const currentSettingsStr = JSON.stringify(settings);
+      const currentInputDataStr = JSON.stringify(inputData);
+      const newSettingsStr = JSON.stringify(initialSettings);
+      const newInputDataStr = JSON.stringify(initialInputData);
+      
+      if (currentSettingsStr !== newSettingsStr) {
+        setSettings(initialSettings);
+      }
+      if (currentInputDataStr !== newInputDataStr) {
+        setInputData(initialInputData);
+      }
     }
 
-  }, [node?.id, node?.data.config?.inputData]); // inputData 변경도 감지
+  }, [node?.id, node?.data.config?.parameters]); // inputData 제거하고 parameters만 감지
 
 
   const handleSettingChange = (paramName: string, value: any) => {
+    // 값이 실제로 변경되었는지 확인
+    if (settings[paramName] === value) {
+      return;
+    }
+    
     const newSettings = { ...settings, [paramName]: value };
     setSettings(newSettings);
     
@@ -77,6 +100,11 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
   };
 
   const handleInputDataChange = (paramName: string, value: any) => {
+    // 값이 실제로 변경되었는지 확인
+    if (inputData[paramName] === value) {
+      return;
+    }
+    
     const newInputData = { ...inputData, [paramName]: value };
     setInputData(newInputData);
     
@@ -85,6 +113,26 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       config: {
         ...node?.data.config,
         inputData: newInputData
+      }
+    });
+  };
+
+  const handleOutputVariableChange = (value: string) => {
+    if (!node || !node.data) {
+      console.warn(`[UserNodeSettings] Node data for node ID ${nodeId} is not available. Cannot update outputVariable.`);
+      return;
+    }
+    
+    // 값이 실제로 변경되었는지 확인
+    if (node.data.config?.outputVariable === value) {
+      return;
+    }
+    
+    updateNodeData(nodeId, {
+      ...node.data,
+      config: {
+        ...(node.data.config || {}),
+        outputVariable: value
       }
     });
   };
@@ -119,6 +167,75 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Configure your custom node parameters here.
         </p>
+      </div>
+
+      {/* Output Variable 설정 */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          Output Variable
+        </label>
+        <div className="relative">
+          <div className="flex items-center space-x-2">
+            {isEditingOutputVariable ? (
+              <>
+                <input
+                  type="text"
+                  value={node?.data.config?.outputVariable || 'result'}
+                  onChange={(e) => handleOutputVariableChange(e.target.value)}
+                  placeholder="Enter output variable name"
+                  className={`flex-grow px-3 py-2 border ${
+                    !hasValidOutput && availableVariables.length === 0 
+                      ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
+                      : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
+                />
+                <button
+                  onClick={() => setIsEditingOutputVariable(false)}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0"
+                  aria-label="Confirm output variable"
+                >
+                  <Check size={18} />
+                </button>
+              </>
+            ) : (
+              <>
+                <CustomSelect
+                  value={node?.data.config?.outputVariable || 'result'}
+                  onChange={handleOutputVariableChange}
+                  options={[
+                    { value: 'result', label: 'result (Default)' },
+                    ...(node?.data.config?.outputVariable && !availableVariables.includes(node.data.config.outputVariable) && node.data.config.outputVariable !== 'result'
+                      ? [{ value: node.data.config.outputVariable, label: `${node.data.config.outputVariable} (Custom)` }]
+                      : []),
+                    ...availableVariables.map(variable => ({ value: variable, label: variable }))
+                  ]}
+                  placeholder="Select output variable"
+                  disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
+                />
+                <button 
+                  onClick={() => setIsEditingOutputVariable(true)} 
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" 
+                  aria-label="Edit output variable"
+                >
+                  <Pencil size={18} />
+                </button>
+              </>
+            )}
+          </div>
+          {!incomingEdge && (
+            <div className="flex items-center mt-1 text-amber-500 text-xs">
+              <AlertCircle size={12} className="mr-1" />
+              Connect an input node to access variables
+            </div>
+          )}
+          {incomingEdge && !hasValidOutput && (
+            <div className="flex items-center mt-1 text-amber-500 text-xs">
+              <AlertCircle size={12} className="mr-1" />
+              Execute the connected node to access its output variables
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="space-y-3">

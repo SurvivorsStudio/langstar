@@ -84,6 +84,7 @@ export interface UserNode {
   functionName: string;
   returnType: string;
   functionDescription: string;
+  outputVariable?: string; // 출력 변수명 추가
   lastModified: string; // ISO string
 }
 
@@ -591,7 +592,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     } : type === 'endNode' ? {
       receiveKey: ''
     } : type === 'userNode' ? {
-      // UserNode의 경우 data.config에서 가져온 설정을 사용
+      // UserNode의 경우 data.config에서 가져온 설정을 사용하되, 기본값도 제공
+      outputVariable: 'result',
       ...data.config
     } : {};
 
@@ -1300,20 +1302,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         case 'userNode': {
           const pythonCode = node.data.code || '';
           const functionName = node.data.config?.functionName || 'user_function';
-          const returnType = node.data.config?.returnType || 'str';
+          const parameters = node.data.config?.parameters || [];
+          const outputVariable = node.data.config?.outputVariable || 'result';
 
           if (!pythonCode.trim()) {
             output = { error: 'Python code is empty' };
             break;
           }
 
+          // parameters에 matchData 추가
+          const parametersWithMatchData = parameters.map((param: any) => {
+            const matchData = node.data.config?.inputData?.[param.name] || '';
+            return {
+              ...param,
+              matchData: matchData
+            };
+          });
+
+          // 현재 노드의 최신 inputData 가져오기
+          const currentNode = get().nodes.find(n => n.id === nodeId);
+          const currentInputData = currentNode?.data.inputData || {};
+
           try {
             const payload = {
-              py_code: pythonCode,
-              param: input,
-              return_key: functionName
+              code: pythonCode,
+              functionName: functionName,
+              parameters: parametersWithMatchData,
+              inputData: currentInputData,
+              return_key: outputVariable
             };
-            const response = await fetch('http://localhost:8000/workflow/node/pythonnode', {
+            const response = await fetch('http://localhost:8000/workflow/node/usernode', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -1322,7 +1340,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               const errorText = await response.text();
               throw new Error(`API request failed with status ${response.status}: ${errorText}`);
             }
-            output = await response.json();
+            const apiResponse = await response.json();
+            // input 받은 데이터에 Output Variable에 지정한 key 값에 api가 전달한 값을 추가하여 output 생성
+            output = { ...input, [outputVariable]: apiResponse };
           } catch (apiError) {
             console.error('UserNode API call failed:', apiError);
             output = { error: 'Failed to execute user node via API', details: (apiError as Error).message };
@@ -1736,6 +1756,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           if (Object.keys(newInputData).length > 0) {
             finalNodeData.config.inputData = newInputData;
           }
+        }
+
+        // outputVariable이 설정되지 않은 경우 기본값 설정
+        if (!finalNodeData.config.outputVariable) {
+          finalNodeData.config.outputVariable = 'result';
         }
       }
 
