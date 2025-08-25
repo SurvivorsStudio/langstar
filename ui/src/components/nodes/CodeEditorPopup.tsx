@@ -11,6 +11,7 @@ interface CodeEditorPopupProps {
   sourceNode?: any;
   availableVariables?: string[];
   hideInputVariables?: boolean; // Input Variables 영역을 숨길지 여부
+  readOnly?: boolean; // 읽기 전용 모드
 }
 
 const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
@@ -21,7 +22,8 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
   edgeData,
   sourceNode,
   availableVariables = [],
-  hideInputVariables = false
+  hideInputVariables = false,
+  readOnly = false
 }) => {
   const [tempValue, setTempValue] = useState(value);
   const [hasChanges, setHasChanges] = useState(false);
@@ -38,14 +40,26 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
     }
   }, [isOpen, value]);
 
+  // value가 외부에서 변경될 때 tempValue 동기화
+  useEffect(() => {
+    if (isOpen && !hasChanges) {
+      setTempValue(value);
+    }
+  }, [value, isOpen, hasChanges]);
+
   // 임시 값이 변경될 때마다 변경사항 체크
   useEffect(() => {
     setHasChanges(tempValue !== value);
   }, [tempValue, value]);
 
   const handleSave = () => {
+    console.log(`[CodeEditorPopup] Saving code, length: ${tempValue?.length}`);
     onChange(tempValue);
     setHasChanges(false);
+    // 저장 후 약간의 지연을 두어 상태 동기화 완료 대기
+    setTimeout(() => {
+      console.log(`[CodeEditorPopup] Save completed`);
+    }, 50);
   };
 
   const insertVariableAtCursor = (variableName: string) => {
@@ -90,11 +104,14 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
       
-      // Ctrl+S 또는 Cmd+S로 저장
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (hasChanges) {
-          handleSave();
+      // read-only 모드에서는 저장 단축키 비활성화
+      if (!readOnly) {
+        // Ctrl+S 또는 Cmd+S로 저장
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          if (hasChanges) {
+            handleSave();
+          }
         }
       }
       
@@ -106,7 +123,7 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, hasChanges]);
+  }, [isOpen, hasChanges, readOnly]);
 
   if (!isOpen) return null;
 
@@ -170,9 +187,16 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                         {availableVariables.map((variable) => (
                           <div
                             key={variable}
-                            className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                            onClick={() => insertVariableAtCursor(variable)}
-                            title={`Click to insert state['${variable}'] at cursor position`}
+                            className={`p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md transition-colors ${
+                              readOnly 
+                                ? 'cursor-not-allowed opacity-60' 
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                            }`}
+                            onClick={() => !readOnly && insertVariableAtCursor(variable)}
+                            title={readOnly 
+                              ? 'Read-only mode: Cannot insert variables' 
+                              : `Click to insert state['${variable}'] at cursor position`
+                            }
                           >
                             <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                               {variable}
@@ -224,6 +248,7 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                 value={tempValue}
                 onChange={setTempValue}
                 language="python"
+                readOnly={readOnly}
                 onCursorPositionChange={(position) => {
                   // 변수 삽입 중이 아닐 때만 커서 위치 업데이트
                   if (!isInsertingVariable.current) {
@@ -250,13 +275,13 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                 )}
               </div>
               <div className="text-xs text-gray-400 dark:text-gray-500">
-                Ctrl+S Save | Esc Close
+                {readOnly ? 'Read-only mode' : 'Ctrl+S Save | Esc Close'}
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <button
                 onClick={handleSave}
-                disabled={!hasChanges}
+                disabled={!hasChanges || readOnly}
                 className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 <Save size={16} className="mr-2" />

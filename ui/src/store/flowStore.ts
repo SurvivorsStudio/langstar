@@ -632,10 +632,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
   
   updateNodeData: (nodeId: string, dataUpdate: Partial<NodeData>) => {
+    console.log(`[FlowStore] updateNodeData called - nodeId: ${nodeId}, dataUpdate:`, dataUpdate);
     set(state => {
       const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
-      if (!nodeToUpdate) return state;
+      if (!nodeToUpdate) {
+        console.log(`[FlowStore] Node not found: ${nodeId}`);
+        return state;
+      }
 
+      console.log(`[FlowStore] Current node data:`, nodeToUpdate.data);
       const newData = { ...nodeToUpdate.data, ...dataUpdate };
 
       // config 객체는 얕은 복사되므로, 내부 속성도 병합해줘야 합니다.
@@ -643,7 +648,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         newData.config = { ...nodeToUpdate.data.config, ...dataUpdate.config };
       }
 
-      if (safeCompare(nodeToUpdate.data, newData)) return state;
+      console.log(`[FlowStore] New node data:`, newData);
+      console.log(`[FlowStore] Data changed:`, !safeCompare(nodeToUpdate.data, newData));
+
+      if (safeCompare(nodeToUpdate.data, newData)) {
+        console.log(`[FlowStore] No changes detected, returning current state`);
+        return state;
+      }
 
       const updatedNodes = state.nodes.map(node => {
         if (node.id === nodeId) {
@@ -663,9 +674,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           return edge;
         });
+        console.log(`[FlowStore] Updating nodes and edges`);
         return { nodes: updatedNodes, edges: updatedEdges };
       }
 
+      console.log(`[FlowStore] Updating nodes only`);
       return { nodes: updatedNodes };
     });
   },

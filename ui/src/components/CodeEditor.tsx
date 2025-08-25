@@ -7,6 +7,7 @@ interface CodeEditorProps {
   language?: string;
   onCursorPositionChange?: (position: number) => void;
   onMount?: (editor: any) => void;
+  readOnly?: boolean;
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({ 
@@ -14,7 +15,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   onChange, 
   language = 'python',
   onCursorPositionChange,
-  onMount
+  onMount,
+  readOnly = false
 }) => {
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
@@ -53,7 +55,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           tabSize: 4,
           insertSpaces: true,
           automaticLayout: true,
+          readOnly: readOnly,
         }}
+        key={`${language}-${readOnly}`} // 언어나 읽기 전용 상태가 변경될 때 에디터 재생성
       />
     </div>
   );

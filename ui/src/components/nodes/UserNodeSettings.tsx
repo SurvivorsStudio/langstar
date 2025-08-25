@@ -249,7 +249,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
             {param.inputType === 'select box' ? (
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Input Data에서 사용 가능한 키 값을 선택하세요.
+                  {param.description || 'Input Data에서 사용 가능한 키 값을 선택하세요.'}
                 </p>
                 <select
                   value={inputData[param.name] || ''}

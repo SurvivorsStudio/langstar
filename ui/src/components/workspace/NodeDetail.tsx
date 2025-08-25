@@ -11,6 +11,7 @@ interface NodeDetailProps {
 const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   const { userNodes, updateUserNode, deleteUserNode } = useFlowStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('code');
   
   const node = userNodes.find(n => n.id === nodeId);
   
@@ -19,6 +20,7 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   const [editDescription, setEditDescription] = useState(node?.functionDescription || '');
   const [editCode, setEditCode] = useState(node?.code || '');
   const [editParameters, setEditParameters] = useState(node?.parameters || []);
+  const [editFunctionName, setEditFunctionName] = useState(node?.functionName || '');
   
   // 이름 유효성 검사 함수
   const validateName = (name: string): boolean => {
@@ -60,6 +62,7 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
       
       await updateUserNode(nodeId, {
         name: editName.trim(),
+        functionName: editFunctionName,
         functionDescription: editDescription,
         code: editCode,
         parameters: editParameters,
@@ -83,9 +86,15 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
   };
 
   const addParameter = () => {
-
-    setEditParameters([...editParameters, { name: '', inputType: 'select box', required: false, funcArgs: '', matchData: '' }]);
-
+    const newParam = {
+      name: `Menu Name${editParameters.length + 1}`,
+      inputType: 'select box',
+      required: false,
+      funcArgs: `input_data${editParameters.length + 1}`,
+      matchData: '',
+      description: 'Input Data에서 사용 가능한 키 값을 선택하세요.'
+    };
+    setEditParameters([...editParameters, newParam]);
   };
 
   const updateParameter = (index: number, field: string, value: string | boolean) => {
@@ -100,7 +109,79 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
     const newParameters = [...editParameters];
     newParameters[index] = { ...newParameters[index], [field]: processedValue };
     setEditParameters(newParameters);
+    
+    // 파라미터 이름이나 funcArgs가 변경되면 함수 파라미터도 업데이트
+    if (field === 'name' || field === 'funcArgs') {
+      updateFunctionParameters(newParameters);
+    }
+    // description이 변경되면 즉시 상태 업데이트를 위해 강제 리렌더링
+    if (field === 'description') {
+      setEditParameters([...newParameters]);
+    }
   };
+
+  // Parameters가 변경될 때 함수 파라미터를 자동으로 업데이트하는 함수
+  const updateFunctionParameters = (newParameters: any[]) => {
+    const requiredParams = newParameters
+      .filter(param => param.required && param.name.trim())
+      .map(param => param.funcArgs && param.funcArgs.trim() ? param.funcArgs.trim() : param.name.trim());
+    
+    const optionalParams = newParameters
+      .filter(param => !param.required && param.name.trim())
+      .map(param => param.funcArgs && param.funcArgs.trim() ? param.funcArgs.trim() : param.name.trim());
+    
+    // 모든 파라미터를 required 먼저, 그 다음 optional 순으로 정렬
+    const allParams = [...requiredParams, ...optionalParams];
+    
+    // 함수 파라미터 문자열 생성
+    const paramString = allParams.length > 0 ? allParams.join(', ') : 'input_data';
+    
+    // 기존 코드에서 함수 정의 부분을 찾아서 파라미터만 업데이트
+    const functionRegex = /def\s+([^\s(]+)\s*\([^)]*\)(?:\s*->\s*[^:]+)?:/;
+    const match = editCode.match(functionRegex);
+    
+    if (match) {
+      const functionName = match[1];
+      const newFunctionDef = `def ${functionName}(${paramString}):`;
+      
+      const updatedCode = editCode.replace(functionRegex, newFunctionDef);
+      setEditCode(updatedCode);
+    }
+  };
+
+  // Function Name이 변경될 때 함수 이름을 업데이트하는 함수
+  const updateFunctionName = (newFunctionName: string) => {
+    // 빈 문자열인 경우 함수 이름 업데이트를 건너뛰기
+    if (!newFunctionName.trim()) {
+      return;
+    }
+    
+    const functionRegex = /def\s+([^\s(]+)\s*\([^)]*\)(?:\s*->\s*[^:]+)?:/;
+    const match = editCode.match(functionRegex);
+    
+    if (match) {
+      const currentFunctionName = match[1];
+      const newFunctionDef = editCode.replace(
+        new RegExp(`def\\s+${currentFunctionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`, 'g'),
+        `def ${newFunctionName}(`
+      );
+      setEditCode(newFunctionDef);
+    }
+  };
+
+  // Parameters가 변경될 때마다 함수 파라미터 업데이트
+  React.useEffect(() => {
+    if (isEditing) {
+      updateFunctionParameters(editParameters);
+    }
+  }, [editParameters, isEditing]);
+
+  // Function Name이 변경될 때마다 함수 이름 업데이트
+  React.useEffect(() => {
+    if (isEditing && editFunctionName) {
+      updateFunctionName(editFunctionName);
+    }
+  }, [editFunctionName, isEditing]);
 
   const removeParameter = (index: number) => {
     setEditParameters(editParameters.filter((_, i) => i !== index));
@@ -202,9 +283,30 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Node Type
+                  </label>
+                  <input
+                    type="text"
+                    value="UserNode"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Function Name
                   </label>
-                  <p className="text-gray-900 dark:text-gray-100">{node.functionName}</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editFunctionName}
+                      onChange={(e) => setEditFunctionName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">{node.functionName}</p>
+                  )}
                 </div>
 
                 <div>
@@ -227,19 +329,21 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Return Type
                   </label>
-                  <p className="text-gray-900 dark:text-gray-100">{node.returnType}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Last Modified
-                  </label>
-                  <p className="text-gray-900 dark:text-gray-100">
-                    {new Date(node.lastModified).toLocaleString()}
-                  </p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={node.returnType}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">{node.returnType}</p>
+                  )}
                 </div>
               </div>
             </div>
+
+
 
             {/* Parameters */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
@@ -261,15 +365,13 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                 {(isEditing ? editParameters : node.parameters).map((param, index) => (
                   <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
                     {isEditing ? (
-
                       <div className="space-y-3">
                         <div className="grid grid-cols-4 gap-2">
-
                           <input
                             type="text"
                             value={param.name}
                             onChange={(e) => updateParameter(index, 'name', e.target.value)}
-                            placeholder="영문자, 숫자, _만 사용"
+                            placeholder="Node Inspector menu name (letters, numbers, _ only)"
                             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                           />
                           <input
@@ -279,24 +381,24 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                             placeholder="Func Args"
                             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                           />
-                          <input
-                            type="text"
-                            value={param.matchData || ''}
-                            onChange={(e) => updateParameter(index, 'matchData', e.target.value)}
-                            placeholder="Match Data"
-                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
-                          />
                           <div className="flex items-center justify-center">
-
                             <input
                               type="checkbox"
                               checked={param.required}
                               onChange={(e) => updateParameter(index, 'required', e.target.checked)}
                               className="mr-2"
                             />
-
                             <span className="text-sm text-gray-700 dark:text-gray-300">필수</span>
                           </div>
+                        </div>
+                        <div className="mt-2">
+                          <textarea
+                            value={param.description || ''}
+                            onChange={(e) => updateParameter(index, 'description', e.target.value)}
+                            placeholder="파라미터에 대한 설명을 입력하세요"
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                          />
                         </div>
                         <div className="flex items-center space-x-2">
                           <select
@@ -307,7 +409,6 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                             <option value="select box">Select Box</option>
                             <option value="text box">Text Box</option>
                           </select>
-
                           <button
                             onClick={() => removeParameter(index)}
                             className="text-red-500 hover:text-red-700"
@@ -322,10 +423,7 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
                           <p className="font-medium text-gray-900 dark:text-gray-100">{param.name}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {param.inputType} • {param.required ? 'Required' : 'Optional'}
-
                             {param.funcArgs && ` • Func Args: ${param.funcArgs}`}
-                            {param.matchData && ` • Match Data: ${param.matchData}`}
-
                           </p>
                         </div>
                       </div>
@@ -336,25 +434,135 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
             </div>
           </div>
 
-          {/* Right Column - Code */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Python Code
-            </h3>
-            
-            {isEditing ? (
-              <div className="h-96">
-                <CodeEditor
-                  value={editCode}
-                  onChange={setEditCode}
-                  language="python"
-                />
-              </div>
-            ) : (
-              <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto max-h-96">
-                <pre className="text-sm">{node.code}</pre>
-              </div>
-            )}
+          {/* Right Column - Preview & Code Tabs */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            {/* Tab Headers */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                className={`px-6 py-3 text-sm font-medium ${
+                  activeTab === 'code' 
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-50 dark:bg-gray-700'
+                }`}
+                onClick={() => setActiveTab('code')}
+              >
+                Python Code
+              </button>
+              <button
+                className={`px-6 py-3 text-sm font-medium ${
+                  activeTab === 'preview' 
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-50 dark:bg-gray-700'
+                }`}
+                onClick={() => setActiveTab('preview')}
+              >
+                Node Inspector Preview
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === 'preview' && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      UserNode Settings
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Configure your custom node parameters here.
+                    </p>
+                  </div>
+
+                  {/* Output Variable Preview */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                      Output Variable
+                    </label>
+                    <div className="relative">
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                        disabled
+                      >
+                        <option value="result">result (Default)</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Parameters Preview */}
+                  {(isEditing ? editParameters : node.parameters).length > 0 && (
+                    <div className="space-y-3">
+                      {(isEditing ? editParameters : node.parameters).map((param, index) => (
+                        <div key={index}>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {param.name || 'Parameter Name'}
+                            {param.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          
+                          {param.inputType === 'select box' ? (
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                {param.description || 'Input Data에서 사용 가능한 키 값을 선택하세요.'}
+                              </p>
+                              <select
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed text-sm"
+                                disabled
+                              >
+                                <option value="">키를 선택하세요</option>
+                              </select>
+                              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                                이전 노드에서 데이터가 전달되지 않았습니다.
+                              </p>
+                            </div>
+                          ) : param.inputType === 'text box' ? (
+                            <input
+                              type="text"
+                              placeholder={`${param.name || 'Parameter Name'} 입력`}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                              disabled
+                            />
+                          ) : (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              지원하지 않는 입력 타입: {param.inputType}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Current Settings Preview */}
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      현재 설정값
+                    </h4>
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                      <pre className="text-xs text-gray-600 dark:text-gray-400">
+                        {JSON.stringify({ 
+                          settings: {}, 
+                          inputData: {} 
+                        }, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'code' && (
+                <div className="h-96">
+                  {isEditing ? (
+                    <CodeEditor
+                      value={editCode}
+                      onChange={setEditCode}
+                      language="python"
+                    />
+                  ) : (
+                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto h-full">
+                      <pre className="text-sm">{node.code}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
