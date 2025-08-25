@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
+import { useThemeStore } from '../store/themeStore';
 import { Link, useNavigate } from 'react-router-dom';
 import homeLogo from '../assets/common/home_logo.png';
 import { apiService } from '../services/apiService';
@@ -12,6 +13,7 @@ import CodeEditor from './CodeEditor';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
+  const { isDarkMode } = useThemeStore();
   const { 
     projectName, 
     setProjectName, 
@@ -143,7 +145,9 @@ const Header: React.FC = () => {
       <div className="flex items-center">
         <div className="flex items-center">
           <Link to="/">
-            <div className="w-8 h-8 rounded-md bg-[#1E2836] flex items-center justify-center text-white mr-2 cursor-pointer">
+            <div className={`w-8 h-8 rounded-md flex items-center justify-center mr-2 cursor-pointer ${
+              isDarkMode ? 'bg-[#1E2836] text-white' : 'bg-white text-gray-800'
+            }`}>
               <img src={homeLogo} alt="Home Logo" className="w-8 h-8 object-contain" />
             </div>
           </Link>

@@ -13,6 +13,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import { useFlowStore } from '../store/flowStore';
+import { useThemeStore } from '../store/themeStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import { nodeTypes } from './nodes/nodeTypes';
@@ -26,6 +27,7 @@ const edgeTypes = {
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
+  const { isDarkMode } = useThemeStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
@@ -222,7 +224,7 @@ const FlowBuilder: React.FC = () => {
             onKeyDown={onKeyDown}
         >
           <Background 
-            color={document.documentElement.classList.contains('dark') ? '#374151' : '#888'} 
+            color={isDarkMode ? '#374151' : '#e5e7eb'} 
             gap={15} 
             variant={BackgroundVariant.Lines} 
           />
