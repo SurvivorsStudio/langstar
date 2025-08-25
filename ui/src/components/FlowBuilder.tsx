@@ -85,6 +85,8 @@ const FlowBuilder: React.FC = () => {
   }, [reactFlowInstance, viewport, projectName]);
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
+    console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
+    console.log(`[FlowBuilder] Node data:`, node.data);
     setSelectedNode(node.id);
     setShowInspector(true);
     setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)

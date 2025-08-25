@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2 } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
@@ -29,6 +29,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
   const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
+  const [isNodeChanging, setIsNodeChanging] = useState<boolean>(false);
+  const lastSavedCodeRef = useRef<string>('');
   
   const [incomingEdges, setIncomingEdges] = useState<Edge[]>([]);
   const [mergedInputData, setMergedInputData] = useState<Record<string, VariableValue>>({});
@@ -81,11 +83,22 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
     };
   }, [isResizing]);
 
+
+
   useEffect(() => {
+    console.log(`[NodeInspector] useEffect triggered - nodeId: ${nodeId}, nodes count: ${nodes.length}`);
     const node = nodes.find((n: any) => n.id === nodeId);
     if (node) {
+      console.log(`[NodeInspector] Found node: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
+      console.log(`[NodeInspector] Current node data:`, node.data);
+      setIsNodeChanging(true);
       setCurrentNode(node as any);
-      setCode(node.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state');
+      // 코드 상태를 즉시 업데이트 - 노드의 실제 코드 데이터 사용
+      const nodeCode = node.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state';
+      console.log(`[NodeInspector] Setting code for node ${node.id}:`, nodeCode.substring(0, 100) + '...');
+      setCode(nodeCode);
+      // 마지막 저장된 코드 초기화
+      lastSavedCodeRef.current = nodeCode;
       setNodeName(node.data.label || 'Untitled Node');
 
       const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
@@ -194,8 +207,47 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       if (!currentTabIsValid) {
         setActiveTab(newDefaultTab);
       }
+      
+      // 노드 변경 완료 후 플래그 해제
+      setTimeout(() => {
+        console.log(`[NodeInspector] Node change completed, setting isNodeChanging to false`);
+        setIsNodeChanging(false);
+      }, 100);
     }
-  }, [nodeId, nodes, edges, activeTab, manuallySelectedEdges]);
+  }, [nodeId, edges, activeTab, manuallySelectedEdges]);
+
+  // 현재 노드의 데이터가 변경될 때만 코드 동기화 (임시로 비활성화)
+  // useEffect(() => {
+  //   console.log(`[NodeInspector] Code sync useEffect triggered - currentNode: ${currentNode?.id}`);
+  //   
+  //   // 노드가 없으면 동기화 건너뛰기
+  //   if (!currentNode) {
+  //     console.log(`[NodeInspector] Code sync skipped - no currentNode`);
+  //     return;
+  //   }
+  //   
+  //   const nodeCode = currentNode.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state';
+  //   
+  //   // 마지막으로 저장된 코드와 현재 노드 코드가 같으면 동기화하지 않음
+  //   if (lastSavedCodeRef.current === nodeCode) {
+  //     console.log(`[NodeInspector] Code sync skipped - same as last saved code`);
+  //     return;
+  //   }
+  //   
+  //   console.log(`[NodeInspector] Current code: ${code?.substring(0, 50)}...`);
+  //   console.log(`[NodeInspector] Node code: ${nodeCode?.substring(0, 50)}...`);
+  //   console.log(`[NodeInspector] Last saved code: ${lastSavedCodeRef.current?.substring(0, 50)}...`);
+  //   
+  //   // 외부에서 온 변경사항인지 확인 (코드가 실제로 다르고, 빈 코드가 아닐 때만)
+  //   if (code !== nodeCode && nodeCode && nodeCode.trim() !== '') {
+  //     console.log(`[NodeInspector] Syncing code for node ${currentNode.id} from external changes:`, nodeCode.substring(0, 100) + '...');
+  //     setCode(nodeCode);
+  //     // 외부에서 온 변경사항이므로 마지막 저장된 코드도 업데이트
+  //     lastSavedCodeRef.current = nodeCode;
+  //   } else {
+  //     console.log(`[NodeInspector] Code is already in sync or empty, no update needed`);
+  //   }
+  // }, [currentNode?.data.code, currentNode?.id]);
 
   // 노드 이름 유효성 검사 함수
   const validateNodeName = (name: string): boolean => {
@@ -218,15 +270,23 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
     }
   };
 
-  const handleCodeChange = (newCode: string) => {
+  const handleCodeChange = useCallback((newCode: string) => {
+    console.log(`[NodeInspector] handleCodeChange called - nodeId: ${nodeId}, new code length: ${newCode?.length}`);
+    console.log(`[NodeInspector] New code preview: ${newCode?.substring(0, 100)}...`);
+    
+    // 로컬 코드 상태 업데이트
     setCode(newCode);
-    if (currentNode) {
-      updateNodeData(currentNode.id, {
-        ...currentNode.data,
-        code: newCode
-      });
-    }
-  };
+    
+    // 마지막 저장된 코드 업데이트
+    lastSavedCodeRef.current = newCode;
+    
+    console.log(`[NodeInspector] Updating node data with new code for nodeId: ${nodeId}`);
+    updateNodeData(nodeId, {
+      code: newCode
+    });
+  }, [nodeId, updateNodeData]);
+
+
 
   // input data 클릭 핸들러
   const handleInputDataClick = async (edgeId: string, sourceNodeId: string, inputData: Record<string, VariableValue>) => {
@@ -391,7 +451,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
                 }`}
-                onClick={() => setActiveTab('code')}
+                onClick={() => {
+                  // 코드 탭을 클릭할 때 현재 노드의 코드를 다시 로드
+                  if (currentNode) {
+                    const nodeCode = currentNode.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state';
+                    console.log(`[NodeInspector] Code tab clicked for node ${nodeId}:`, nodeCode.substring(0, 100) + '...');
+                    // 코드 상태를 완전히 리셋 후 다시 설정
+                    setCode('');
+                    setTimeout(() => {
+                      setCode(nodeCode);
+                    }, 0);
+                  }
+                  setActiveTab('code');
+                }}
               >
                 <Code size={16} className="mr-1" /> Code
               </button>
@@ -402,7 +474,18 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
                 }`}
-                onClick={() => setActiveTab('code')}
+                onClick={() => {
+                  console.log(`[NodeInspector] Code tab clicked for node ${currentNode?.id}`);
+                  // 코드 탭을 클릭할 때 현재 노드의 코드를 다시 로드
+                  if (currentNode) {
+                    const nodeCode = currentNode.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state';
+                    console.log(`[NodeInspector] Code tab clicked for node ${currentNode.id}, setting code:`, nodeCode.substring(0, 100) + '...');
+                    console.log(`[NodeInspector] Current code before setting: ${code?.substring(0, 50)}...`);
+                    setCode(nodeCode);
+                    console.log(`[NodeInspector] Code set, new code should be: ${nodeCode.substring(0, 50)}...`);
+                  }
+                  setActiveTab('code');
+                }}
               >
                 <Code size={16} className="mr-1" /> Code
               </button>
@@ -597,6 +680,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                     value={code}
                     onChange={handleCodeChange}
                     language="python"
+                    readOnly={isUserNode}
                   />
                 </div>
               </div>
@@ -638,6 +722,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         edgeData={mergedInputData}
         sourceNode={selectedEdgeInfo ? nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId) : null}
         availableVariables={Object.keys(mergedInputData)}
+        readOnly={isUserNode}
       />
     </div>
   );
