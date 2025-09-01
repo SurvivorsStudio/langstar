@@ -23,10 +23,10 @@ const CustomEdge = ({
   targetPosition,
   data,
   source,
-  style = {},
+  
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
-  const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode, updateEdgeData } = useFlowStore();
+  const { nodes, removeEdge, focusedElement, setFocusedElement, updateEdgeData } = useFlowStore();
   const { isDarkMode } = useThemeStore();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -40,13 +40,12 @@ const CustomEdge = ({
     data?.edgeNodePosition || null
   );
 
-  const [clickPoint, setClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
   const centerY = (sourceY + targetY) / 2;
-
+  
   // Edge Data 박스 위치 계산 - 드래그 포인트가 아닌 고정된 연결점 기준
   const dataBoxX: number = edgeNodePosition ? edgeNodePosition.x : centerX;
   const dataBoxY: number = edgeNodePosition ? edgeNodePosition.y : centerY;
@@ -92,7 +91,7 @@ const CustomEdge = ({
   }, [sourceX, sourceY, targetX, targetY]);
 
   // Handle 위치 계산 - 워크플로우 방향성에 따라 동적 조정
-  const handleOffset = 6; // Handle의 offset 값
+  const handleOffset = 0; // Handle의 offset 값 (간격 최소화)
   
   // 워크플로우 방향성에 따른 Handle 설정
   const getHandleConfiguration = useCallback(() => {
@@ -102,13 +101,13 @@ const CustomEdge = ({
       // 역방향 연결: Handle 방향 전환
       return {
         inputHandle: {
-          x: dataBoxCenterX + 40 + handleOffset, // 우측에 위치
+          x: dataBoxCenterX + 30 + handleOffset, // 우측에 위치
           y: dataBoxCenterY,
           type: 'target',
           position: Position.Right
         },
         outputHandle: {
-          x: dataBoxCenterX - 40 - handleOffset, // 좌측에 위치
+          x: dataBoxCenterX - 30 - handleOffset, // 좌측에 위치
           y: dataBoxCenterY,
           type: 'source',
           position: Position.Left
@@ -118,13 +117,13 @@ const CustomEdge = ({
       // 정방향 연결: 기본 Handle 설정
       return {
         inputHandle: {
-          x: dataBoxCenterX - 40 - handleOffset, // 좌측에 위치
+          x: dataBoxCenterX - 30 - handleOffset, // 좌측에 위치
           y: dataBoxCenterY,
           type: 'target',
           position: Position.Left
         },
         outputHandle: {
-          x: dataBoxCenterX + 40 + handleOffset, // 우측에 위치
+          x: dataBoxCenterX + 30 + handleOffset, // 우측에 위치
           y: dataBoxCenterY,
           type: 'source',
           position: Position.Right
@@ -139,22 +138,9 @@ const CustomEdge = ({
   const outputHandleX = outputHandle.x;
   const outputHandleY = outputHandle.y;
 
-  // 연결선 교차 감지 함수
-  const detectLineIntersection = useCallback((line1: any, line2: any) => {
-    // 두 선분이 교차하는지 확인하는 수학적 계산
-    const { x1: x1, y1: y1, x2: x2, y2: y2 } = line1;
-    const { x1: x3, y1: y3, x2: x4, y2: y4 } = line2;
-    
-    const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (denominator === 0) return false; // 평행한 선
-    
-    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
-    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
-    
-    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
-  }, []);
 
-  // 스마트 경로 생성 - 워크플로우 방향성 기반 교차 방지
+
+  // 스마트 경로 생성 - 워크플로우 방향성 기반 교차 방지 + 간격 최소화
   const createSmartPaths = useCallback(() => {
     const connectionInfo = determineConnectionDirection();
     
@@ -177,59 +163,58 @@ const CustomEdge = ({
       targetPosition,
     })[0];
 
-    // 워크플로우 방향성에 따른 스마트 경로 생성
+    // 워크플로우 방향성에 따른 스마트 경로 생성 + 간격 최소화
     const createDirectionalPath = () => {
       if (connectionInfo.needsCrossingPrevention) {
         // 역방향 연결 + 교차 방지 필요: 제어점 조정으로 자연스러운 곡선
         if (connectionInfo.isReverseConnection) {
-          // 역방향: 베지어 곡선의 제어점을 조정하여 교차 방지
+          // 역방향: 베지어 곡선의 제어점을 조정하여 교차 방지 + 간격 최소화
           const dx = targetX - outputHandleX;
           const dy = targetY - outputHandleY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
-          // 더 자연스러운 제어점 계산 - 거리에 비례하여 조정
-          const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300)); // 20%~40% 범위
+          // 더 자연스러운 제어점 계산 - 거리에 비례하여 조정 + 곡선형 강화
+          const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300)); // 20%~40% 범위로 조정하여 더 곡선형으로
           const controlOffsetX = dx * controlRatio;
-          const controlOffsetY = dy * controlRatio;
           
-          // 첫 번째 제어점: 엣지 노드에서 자연스럽게 우측으로
-          const cp1x = outputHandleX + Math.max(controlOffsetX, 30);
-          const cp1y = outputHandleY + (dy * 0.1); // 약간의 수직 변화
+          // 첫 번째 제어점: 엣지 노드에서 자연스럽게 우측으로 (곡선형 강화)
+          const cp1x = outputHandleX + Math.max(controlOffsetX, 25); // 3 → 25로 조정하여 더 곡선형으로
+          const cp1y = outputHandleY + (dy * 0.15); // 0.005 → 0.15로 수직 변화 증가하여 곡선형 강화
           
-          // 두 번째 제어점: 목표점 근처에서 자연스럽게
-          const cp2x = targetX - Math.max(controlOffsetX, 30);
-          const cp2y = targetY - (dy * 0.1); // 약간의 수직 변화
+          // 두 번째 제어점: 목표점 근처에서 자연스럽게 (곡선형 강화)
+          const cp2x = targetX - Math.max(controlOffsetX, 25); // 3 → 25로 조정하여 더 곡선형으로
+          const cp2y = targetY - (dy * 0.15); // 0.005 → 0.15로 수직 변화 증가하여 곡선형 강화
           
-          // 부드러운 베지어 곡선 경로
+          // 부드러운 베지어 곡선 경로 (간격 최소화)
           return `M ${outputHandleX} ${outputHandleY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`;
         }
       }
       
-      // 정방향 연결이거나 교차 방지가 불필요한 경우: 기본 경로
+      // 정방향 연결이거나 교차 방지가 불필요한 경우: 기본 경로 + 간격 최소화
       return outputPath;
     };
 
-    // 좌측 연결선도 우측과 동일한 교차 방지 로직 적용 (완벽한 대칭)
+    // 좌측 연결선도 우측과 동일한 교차 방지 로직 적용 + 간격 최소화
     const createUnifiedInputPath = () => {
       if (connectionInfo.needsCrossingPrevention && connectionInfo.isReverseConnection) {
-        // 좌측 연결선도 우측과 동일한 방식으로 교차 방지
+        // 좌측 연결선도 우측과 동일한 방식으로 교차 방지 + 간격 최소화
         const dx = inputHandleX - sourceX;
         const dy = inputHandleY - sourceY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // 우측 연결선과 동일한 제어점 계산 방식으로 완벽한 대칭
-        const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300));
+        // 우측 연결선과 동일한 제어점 계산 방식으로 완벽한 대칭 + 곡선형 강화
+        const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300)); // 20%~40% 범위로 조정하여 더 곡선형으로
         const controlOffsetX = dx * controlRatio;
         
-        // 첫 번째 제어점: source에서 자연스럽게 (우측 연결선과 대칭)
-        const cp1x = sourceX + Math.max(controlOffsetX, 30);
-        const cp1y = sourceY + (dy * 0.1);
+        // 첫 번째 제어점: source에서 자연스럽게 (우측 연결선과 대칭 + 곡선형 강화)
+        const cp1x = sourceX + Math.max(controlOffsetX, 25); // 3 → 25로 조정하여 더 곡선형으로
+        const cp1y = sourceY + (dy * 0.15); // 0.005 → 0.15로 수직 변화 증가하여 곡선형 강화
         
-        // 두 번째 제어점: 엣지 노드 근처에서 자연스럽게 (우측 연결선과 대칭)
-        const cp2x = inputHandleX - Math.max(controlOffsetX, 30);
-        const cp2y = inputHandleY - (dy * 0.1);
+        // 두 번째 제어점: 엣지 노드 근처에서 자연스럽게 (우측 연결선과 대칭 + 곡선형 강화)
+        const cp2x = inputHandleX - Math.max(controlOffsetX, 25); // 3 → 25로 조정하여 더 곡선형으로
+        const cp2y = inputHandleY - (dy * 0.15); // 0.005 → 0.15로 수직 변화 증가하여 곡선형 강화
         
-        // 부드러운 베지어 곡선 경로 (우측과 동일한 품질)
+        // 부드러운 베지어 곡선 경로 (우측과 동일한 품질 + 간격 최소화)
         return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${inputHandleX} ${inputHandleY}`;
       }
       
@@ -255,7 +240,7 @@ const CustomEdge = ({
     };
   }, [createSmartPaths, centerX, centerY]);
 
-  const { inputPath, outputPath, controlPoint } = createCustomPaths();
+  const { inputPath, outputPath } = createCustomPaths();
 
   const conditionDescription = data?.conditionDescription;
   const isConditionEdge = sourceNode?.type === 'conditionNode';
@@ -270,11 +255,9 @@ const CustomEdge = ({
 
   // 키보드 이벤트 핸들러
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    console.log('Key pressed:', e.key); // 디버깅용
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Deleting edge node...'); // 디버깅용
       handleDelete();
     }
   }, [handleDelete]);
@@ -286,7 +269,6 @@ const CustomEdge = ({
       if (isEdgeTextFocused && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Global key handler: Deleting edge node...'); // 디버깅용
         handleDelete();
       }
     };
@@ -308,14 +290,12 @@ const CustomEdge = ({
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    console.log('Edge node clicked, setting focus...'); // 디버깅용
     setFocusedElement('edge', id);
     
     // 클릭 후 즉시 포커스 설정
     const target = e.currentTarget as HTMLElement;
     if (target) {
       target.focus();
-      console.log('Focus set on edge node'); // 디버깅용
     }
   }, [id, setFocusedElement]);
 
@@ -326,10 +306,9 @@ const CustomEdge = ({
     setIsDragging(true);
     setFocusedElement('edge', id);
     
-    // 클릭한 시점의 위치를 클릭 포인트로 설정
+    // 클릭한 시점의 위치를 엣지 노드 위치로 설정
     const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
     if (coordinates) {
-      setClickPoint(coordinates);
       setEdgeNodePosition(coordinates); // 초기 위치 설정
     }
   }, [id, setFocusedElement, getReactFlowCoordinates]);
@@ -342,7 +321,6 @@ const CustomEdge = ({
         if (coordinates) {
           // 실시간으로 엣지 노드 위치 업데이트 (드래그 중에도 즉시 반영)
           setEdgeNodePosition(coordinates);
-          setClickPoint(coordinates);
           setLastMousePosition(coordinates);
         }
       };
@@ -354,7 +332,6 @@ const CustomEdge = ({
         if (lastMousePosition) {
           updateEdgeData(id, { edgeNodePosition: lastMousePosition });
         }
-        setClickPoint(null);
         setLastMousePosition(null);
       };
 
@@ -495,9 +472,9 @@ const CustomEdge = ({
 
           {/* 액션 버튼들 - 제거됨 */}
 
-                      {/* Input Handle - 워크플로우 방향성에 따라 동적 조정 */}
+                      {/* Input Handle - 워크플로우 방향성에 따라 동적 조정 (화면상 보이지 않음) */}
             <div
-              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors"
+              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors opacity-0"
               style={{ 
                 left: inputHandle.position === Position.Left ? '-6px' : 'auto',
                 right: inputHandle.position === Position.Right ? '-6px' : 'auto',
@@ -511,9 +488,9 @@ const CustomEdge = ({
               title={`${inputHandle.type === 'target' ? 'Input' : 'Output'} Handle`}
             />
 
-                      {/* Output Handle - 워크플로우 방향성에 따라 동적 조정 */}
+                      {/* Output Handle - 워크플로우 방향성에 따라 동적 조정 (화면상 보이지 않음) */}
             <div
-              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors"
+              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors opacity-0"
               style={{ 
                 left: outputHandle.position === Position.Left ? '-6px' : 'auto',
                 right: outputHandle.position === Position.Right ? '-6px' : 'auto',
