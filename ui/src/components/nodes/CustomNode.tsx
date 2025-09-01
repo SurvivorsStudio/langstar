@@ -658,7 +658,13 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               {/* 노드 우측 상단 상태 표시 원 */}
               <div 
                 className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow-sm"
-                style={{ backgroundColor: '#10b981' }}
+                style={{ 
+                  backgroundColor: isExecuting 
+                    ? '#3b82f6'  // 파란색: 실행 중
+                    : data.output !== null && data.output !== undefined
+                      ? '#10b981'  // 초록색: 실행 성공
+                      : '#6b7280'  // 회색: 대기 중
+                }}
               />
               
               {/* 노드 우측 상단 버튼들 */}
