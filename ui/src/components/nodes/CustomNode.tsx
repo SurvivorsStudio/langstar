@@ -71,9 +71,9 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     return descriptions[type] || 'A workflow node';
   };
 
-  // 노드 더블클릭 핸들러
+  // 노드 더블클릭 핸들러 - 툴팁 토글
   const handleNodeDoubleClick = () => {
-    setShowTooltip(true);
+    setShowTooltip(!showTooltip);
   };
 
   // 툴팁 닫기 핸들러
