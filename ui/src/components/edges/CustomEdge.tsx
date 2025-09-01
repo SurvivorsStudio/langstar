@@ -437,10 +437,10 @@ const CustomEdge = ({
 
       {/* 중앙 데이터베이스 노드 - 이미지와 같은 스타일 */}
       <foreignObject
-        width={80}
-        height={80}
-        x={dataBoxCenterX - 40}
-        y={dataBoxCenterY - 40}
+        width={64}
+        height={64}
+        x={dataBoxCenterX - 32}
+        y={dataBoxCenterY - 32}
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
@@ -465,7 +465,7 @@ const CustomEdge = ({
           }}
         >
           {/* 이미지와 같은 원형 데이터베이스 노드 */}
-          <div className="relative w-20 h-20">
+          <div className="relative w-16 h-16">
             {/* 외부 링 - 다크 모드에 따라 동적 변경 */}
             <div 
               className="absolute inset-0 rounded-full shadow-lg border-2"
@@ -479,7 +479,7 @@ const CustomEdge = ({
             {/* 보라색 중심 원 */}
             <div className="absolute inset-4 bg-purple-600 rounded-full flex items-center justify-center">
               {/* 데이터베이스 아이콘 */}
-              <Database size={24} className="text-white" />
+              <Database size={20} className="text-white" />
             </div>
             
             {/* 드래그 중일 때 시각적 피드백 */}
@@ -534,7 +534,7 @@ const CustomEdge = ({
         <circle
           cx={dataBoxCenterX}
           cy={dataBoxCenterY}
-          r={25}
+          r={20}
           fill={isDarkMode ? "rgba(59, 130, 246, 0.2)" : "rgba(59, 130, 246, 0.1)"}
           stroke={isDarkMode ? "rgba(59, 130, 246, 0.5)" : "rgba(59, 130, 246, 0.3)"}
           strokeWidth={2}
