@@ -21,7 +21,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [nodeName, setNodeName] = useState(data.label);
   // 재생 버튼 hover 상태 관리
   const [isPlayHovered, setIsPlayHovered] = useState(false);
-  // 연결점 hover 상태 관리
+  // 연결점 hover 상태 관리 (Tools & Memory 노드 제외)
   const [isLeftHandleHovered, setIsLeftHandleHovered] = useState(false);
   const [isRightHandleHovered, setIsRightHandleHovered] = useState(false);
   // 툴팁 표시 상태
@@ -447,92 +447,127 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     const selectedGroupId = data.selectedGroupId;
     
     return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between mb-2">
-          <span 
-            className="font-medium"
-            style={{ color: nodeStyle.textColor }}
-          >
-            {type === 'memory' ? 'Memory' : 'Tools'}
-          </span>
-        </div>
-        {groups.map((group) => {
-          // 현재 그룹이 선택되었는지 확인
-          const isSelected = selectedGroupId === group.id;
-          
-          return (
+      <div className="space-y-3">
+        {/* 섹션 헤더 */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
             <div 
-              key={group.id} 
-              className="rounded p-2 text-sm cursor-pointer transition-colors relative group"
-              style={{
-                backgroundColor: isSelected 
-                  ? (isDarkMode ? '#374151' : '#e5e7eb')
-                  : (isDarkMode ? '#374151' : '#f9fafb'),
-                border: isSelected ? '2px solid #3b82f6' : 'none'
+              className="w-3 h-3 rounded-full"
+              style={{ 
+                backgroundColor: type === 'memory' ? '#8b5cf6' : '#10b981'
               }}
-              // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
-              onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
+            ></div>
+            <span 
+              className="font-semibold text-sm"
+              style={{ color: nodeStyle.textColor }}
             >
-              <div className="flex items-center justify-between">
-                <span 
-                  className="font-medium"
-                  style={{ 
-                    color: isSelected 
-                      ? '#3b82f6' 
-                      : nodeStyle.textColor 
-                  }}
-                >
-                  {group.name}
-                </span>
-                <div className="flex items-center">
-                  <button
-                    onClick={(e) => handleDeleteGroup(e, group.id)}
-                    // 마우스 호버 시에만 삭제 버튼 표시
-                    className="opacity-0 group-hover:opacity-100 mr-2 p-1 transition-opacity hover:text-red-500"
-                    style={{ 
-                      color: isDarkMode ? '#9ca3af' : '#6b7280'
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <ChevronRight 
-                    size={14} 
-                    style={{ 
-                      color: isSelected 
-                        ? '#3b82f6' 
-                        : (isDarkMode ? '#9ca3af' : '#6b7280')
-                    }} 
-                  />
+              {type === 'memory' ? 'Memory Groups' : 'Tools Groups'}
+            </span>
+            <span 
+              className="px-2 py-0.5 text-xs rounded-full"
+              style={{
+                backgroundColor: isDarkMode ? '#374151' : '#e5e7eb',
+                color: nodeStyle.textColor
+              }}
+            >
+              {groups.length}
+            </span>
+          </div>
+        </div>
+        
+        {/* 그룹 목록 */}
+        <div className="space-y-2">
+          {groups.map((group) => {
+            // 현재 그룹이 선택되었는지 확인
+            const isSelected = selectedGroupId === group.id;
+            
+            return (
+              <div 
+                key={group.id} 
+                className="rounded-lg p-3 cursor-pointer transition-all duration-200 relative group border"
+                style={{
+                  backgroundColor: isSelected 
+                    ? (isDarkMode ? '#1e40af' : '#dbeafe')
+                    : (isDarkMode ? '#374151' : '#f9fafb'),
+                  borderColor: isSelected 
+                    ? '#3b82f6' 
+                    : (isDarkMode ? '#4b5563' : '#e5e7eb'),
+                  borderWidth: isSelected ? '2px' : '1px'
+                }}
+                // 그룹 클릭 시, 해당 그룹을 선택된 그룹으로 설정 (우측 패널에 상세 정보 표시용)
+                onClick={() => updateNodeData(id, { ...data, selectedGroupId: group.id })}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <span 
+                        className="font-medium text-sm truncate"
+                        style={{ 
+                          color: isSelected 
+                            ? '#3b82f6' 
+                            : nodeStyle.textColor 
+                        }}
+                      >
+                        {group.name}
+                      </span>
+
+                    </div>
+                    {group.description && (
+                      <p 
+                        className="text-xs mt-1 overflow-hidden text-gray-500 dark:text-gray-400"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {group.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2 ml-3">
+                    <button
+                      onClick={(e) => handleDeleteGroup(e, group.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900"
+                      style={{ 
+                        color: '#ef4444'
+                      }}
+                      title="Delete group"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <div 
+                      className="p-1 rounded"
+                      style={{
+                        backgroundColor: isSelected 
+                          ? '#3b82f6' 
+                          : (isDarkMode ? '#6b7280' : '#9ca3af')
+                      }}
+                    >
+                      <ChevronRight 
+                        size={12} 
+                        style={{ color: '#ffffff' }} 
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-              {group.description && (
-                <p 
-                  className="text-xs mt-1 overflow-hidden"
-                  style={{
-                    color: isSelected 
-                      ? '#3b82f6' 
-                      : (isDarkMode ? '#9ca3af' : '#6b7280'),
-                    display: '-webkit-box',
-                    WebkitLineClamp: 10,
-                    WebkitBoxOrient: 'vertical',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {group.description}
-                </p>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        
+        {/* 그룹 추가 버튼 */}
         <button
           onClick={() => handleAddGroup(type)}
-          className="w-full flex items-center justify-center px-3 py-1.5 text-sm rounded transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
+          className="w-full flex items-center justify-center px-4 py-2.5 text-sm rounded-lg transition-all duration-200 hover:scale-105 border-2 border-dashed"
           style={{
-            color: '#3b82f6',
-            backgroundColor: isDarkMode ? '#1e3a8a' : '#dbeafe'
+            color: nodeStyle.iconColor,
+            borderColor: nodeStyle.iconColor,
+            backgroundColor: 'transparent'
           }}
         >
-          <Plus size={14} className="mr-1" />
+          <Plus size={16} className="mr-2" />
           Add {type === 'memory' ? 'Memory' : 'Tools'} Group
         </button>
       </div>
@@ -551,224 +586,241 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
         filter: isNodeFocused ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))' : 'none'
       }}
     >
-
-      
-      {/* 메인 노드 컨테이너 */}
-      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <div
-          className="rounded-lg shadow-lg relative overflow-visible cursor-pointer"
-          style={{
-            backgroundColor: nodeStyle.backgroundColor,
-            borderColor: nodeStyle.borderColor,
-            borderWidth: '2px',
-            borderStyle: 'solid'
-          }}
-          onDoubleClick={handleNodeDoubleClick}
-        >
-          {/* 노드 우측 상단 상태 표시 원 */}
-          <div 
-            className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow-sm"
-            style={{ backgroundColor: '#10b981' }}
-          />
-          
-          {/* 노드 우측 상단 버튼들 */}
-          <div className="absolute -top-2 -right-2 flex gap-2">
-            {/* 기존 버튼들 (재생 버튼 제외) */}
-          </div>
-          
-          {/* 노드 내용 영역 - 아이콘만 표시 */}
-          <div className="p-2 flex flex-col items-center justify-center text-center h-full">
-            {/* 노드 아이콘 - 라운딩이 살짝 있는 정사각형, 적은 padding */}
-            <div 
-              className="w-16 h-16 rounded-md flex items-center justify-center shadow-sm"
-              style={{ 
-                backgroundColor: nodeStyle.iconColor,
-                border: `2px solid ${nodeStyle.iconColor}`
-              }}
-            >
-              <div style={{ color: '#ffffff' }}>
-                {data.icon}
-              </div>
-            </div>
-          </div>
-          
-          {/* Start Node가 아닌 경우 좌측 핸들 (입력) - 노드 아이콘과 같은 높이에 배치 */}
-          {!isStartNode && (
-            <Handle
-              type="target"
-              position={Position.Left}
-              isConnectable={isConnectable}
-              className={getHandleStyle()}
-              style={getHandleHoverStyle(isLeftHandleHovered, nodeStyle.iconColor)}
-              onMouseEnter={() => setIsLeftHandleHovered(true)}
-              onMouseLeave={() => setIsLeftHandleHovered(false)}
-            />
-          )}
-          
-          {/* ToolsMemoryNode의 경우 좌측 핸들 (입력) 추가 */}
-          {isToolsMemoryNode && (
-            <Handle
-              type="target"
-              position={Position.Left}
-              isConnectable={isConnectable}
-              className={getHandleStyle()}
-              style={getHandleHoverStyle(isLeftHandleHovered, nodeStyle.iconColor)}
-              onMouseEnter={() => setIsLeftHandleHovered(true)}
-              onMouseLeave={() => setIsLeftHandleHovered(false)}
-            />
-          )}
-          
-          {/* End Node가 아닌 경우 우측 핸들 (출력) - 노드 아이콘과 같은 높이에 배치 */}
-          {!isEndNode && (
-            <Handle
-              type="source"
-              position={Position.Right}
-              isConnectable={isConnectable}
-              className={getHandleStyle()}
-              style={getHandleHoverStyle(isRightHandleHovered, nodeStyle.iconColor)}
-              onMouseEnter={() => setIsRightHandleHovered(true)}
-              onMouseLeave={() => setIsRightHandleHovered(false)}
-            />
-          )}
-          
-          {/* ToolsMemoryNode의 경우 우측 핸들 (출력) 추가 */}
-          {isToolsMemoryNode && (
-            <Handle
-              type="source"
-              position={Position.Right}
-              isConnectable={isConnectable}
-              className={getHandleStyle()}
-              style={getHandleHoverStyle(isRightHandleHovered, nodeStyle.iconColor)}
-              onMouseEnter={() => setIsRightHandleHovered(true)}
-              onMouseLeave={() => setIsRightHandleHovered(false)}
-            />
-          )}
-        </div>
-        
-        {/* 노드 설명 툴팁 */}
-        {showTooltip && (
-          <div className="absolute z-50 top-0 left-1/2 transform -translate-x-1/2 -translate-y-full -mt-2">
-            {/* 툴팁 내용 */}
-            <div 
-              className="border rounded-lg shadow-lg px-4 py-3 min-w-48"
-              style={{
-                backgroundColor: nodeStyle.backgroundColor,
-                borderColor: nodeStyle.borderColor
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-bold text-sm mb-1" style={{ color: nodeStyle.iconColor }}>
-                    {data.label}
-                  </h3>
-                  <p className="text-xs" style={{ color: nodeStyle.textColor }}>
-                    {getNodeDescription()}
-                  </p>
-                </div>
-                <button
-                  onClick={handleCloseTooltip}
-                  className="ml-2 transition-colors"
-                  style={{ color: nodeStyle.textColor }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-            {/* 툴팁 화살표 (아래쪽을 가리킴) */}
-            <div 
-              className="w-0 h-0 mx-auto border-l-4 border-r-4 border-t-4 border-transparent"
-              style={{ borderTopColor: nodeStyle.borderColor }}
-            ></div>
-          </div>
-        )}
-      </div>
-      
-      {/* 노드 이름 - 메인 컨테이너 밖으로 분리 */}
-      <div 
-        className="mt-2 px-6 py-1.5 rounded-lg shadow-md border relative"
-        style={{ 
-          minWidth: 'fit-content',
-          textAlign: 'center',
-          backgroundColor: nodeStyle.backgroundColor,
-          borderColor: nodeStyle.borderColor
-        }}
-      >
-        {/* 재생 버튼 - 노드 이름 왼쪽 테두리 중앙에 배치 */}
-        {!isToolsMemoryNode && !isEndNode && (
-          <div
-            className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10"
-            onMouseEnter={() => setIsPlayHovered(true)}
-            onMouseLeave={() => setIsPlayHovered(false)}
-          >
-            <button
-              onClick={handleExecute}
-              disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
-              className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
-                ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
-                  ? 'bg-gray-300 hover:bg-gray-400 text-white' 
-                  : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
-              title={
-                !hasConnection
-                  ? '노드를 연결해주세요'
-                  : hasValidationError
-                    ? 'Fix validation errors before executing'
-                    : 'Execute Node'
-              }
-            >
-              {isExecuting ? (
-                <Loader className="w-4 h-4 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4 text-white" />
-              )}
-            </button>
-            {/* 비활성화 & hover 시 툴팁 */}
-            {!hasConnection && isPlayHovered && (
-              <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
-                Please connect the nodes
-              </div>
-            )}
-          </div>
-        )}
-        
-        {isEditing ? (
-          // 이름 편집 모드
-          <input
-            type="text"
-            value={nodeName}
-            onChange={handleNameChange}
-            onBlur={handleNameSubmit}
-            onKeyDown={handleKeyPress}
-            placeholder="영문자, 숫자, _만 사용"
-            className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-center"
-            autoFocus
-          />
-        ) : (
-          // 이름 표시 모드
-          <div className="flex items-center justify-center w-full">
-            <div 
-              className="font-medium text-sm truncate cursor-pointer hover:opacity-80 transition-opacity"
-              style={{ color: nodeStyle.textColor }}
-              onClick={() => setIsEditing(true)}
-              title="Click to rename"
-            >
-              {data.label}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ToolsMemoryNode일 경우 메모리 및 도구 그룹 렌더링 */}
-      {isToolsMemoryNode && (
+      {/* Tools & Memory 노드일 경우 통합된 디자인 */}
+      {isToolsMemoryNode ? (
         <div 
-          className="mt-4 space-y-4 rounded-lg p-4 shadow-md border"
+          className="rounded-xl shadow-xl border-2 overflow-hidden cursor-pointer"
           style={{
             backgroundColor: nodeStyle.backgroundColor,
             borderColor: nodeStyle.borderColor
           }}
+          onDoubleClick={handleNodeDoubleClick}
         >
-          {renderGroups(memoryGroups, 'memory')}
-          {renderGroups(toolsGroups, 'tools')}
+          {/* 통합된 헤더 - 아이콘과 제목을 한 줄에 배치 */}
+          <div 
+            className="px-4 py-3 border-b-2 flex items-center justify-between"
+            style={{
+              backgroundColor: isDarkMode ? '#374151' : '#f3f4f6',
+              borderColor: nodeStyle.borderColor
+            }}
+          >
+            <div className="flex items-center space-x-3">
+              {/* 노드 아이콘 - 헤더에 통합 */}
+              <div 
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm"
+                style={{ 
+                  backgroundColor: nodeStyle.iconColor,
+                  border: `2px solid ${nodeStyle.iconColor}`
+                }}
+              >
+                <div style={{ color: '#ffffff' }}>
+                  {data.icon}
+                </div>
+              </div>
+              <div>
+                <h3 
+                  className="font-semibold text-sm"
+                  style={{ color: nodeStyle.textColor }}
+                >
+                  {data.label}
+                </h3>
+                <p 
+                  className="text-xs"
+                  style={{ color: nodeStyle.textColor }}
+                >
+                  Tools & Memory Configuration
+                </p>
+              </div>
+            </div>
+
+          </div>
+          
+          {/* 그룹 컨테이너 */}
+          <div className="p-4 space-y-6">
+            {renderGroups(memoryGroups, 'memory')}
+            {renderGroups(toolsGroups, 'tools')}
+          </div>
         </div>
+      ) : (
+        <>
+          {/* 일반 노드들 - 기존 디자인 유지 */}
+          <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+            <div
+              className="rounded-lg shadow-lg relative overflow-visible cursor-pointer"
+              style={{
+                backgroundColor: nodeStyle.backgroundColor,
+                borderColor: nodeStyle.borderColor,
+                borderWidth: '2px',
+                borderStyle: 'solid'
+              }}
+              onDoubleClick={handleNodeDoubleClick}
+            >
+              {/* 노드 우측 상단 상태 표시 원 */}
+              <div 
+                className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow-sm"
+                style={{ backgroundColor: '#10b981' }}
+              />
+              
+              {/* 노드 우측 상단 버튼들 */}
+              <div className="absolute -top-2 -right-2 flex gap-2">
+                {/* 기존 버튼들 (재생 버튼 제외) */}
+              </div>
+              
+              {/* 노드 내용 영역 - 아이콘만 표시 */}
+              <div className="p-2 flex flex-col items-center justify-center text-center h-full">
+                {/* 노드 아이콘 - 라운딩이 살짝 있는 정사각형, 적은 padding */}
+                <div 
+                  className="w-16 h-16 rounded-md flex items-center justify-center shadow-sm"
+                  style={{ 
+                    backgroundColor: nodeStyle.iconColor,
+                    border: `2px solid ${nodeStyle.iconColor}`
+                  }}
+                >
+                  <div style={{ color: '#ffffff' }}>
+                    {data.icon}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Start Node가 아닌 경우 좌측 핸들 (입력) - 노드 아이콘과 같은 높이에 배치 */}
+              {!isStartNode && (
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  isConnectable={isConnectable}
+                  className={getHandleStyle()}
+                  style={getHandleHoverStyle(isLeftHandleHovered, nodeStyle.iconColor)}
+                  onMouseEnter={() => setIsLeftHandleHovered(true)}
+                  onMouseLeave={() => setIsLeftHandleHovered(false)}
+                />
+              )}
+              
+              {/* End Node가 아닌 경우 우측 핸들 (출력) - 노드 아이콘과 같은 높이에 배치 */}
+              {!isEndNode && (
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  isConnectable={isConnectable}
+                  className={getHandleStyle()}
+                  style={getHandleHoverStyle(isRightHandleHovered, nodeStyle.iconColor)}
+                  onMouseEnter={() => setIsRightHandleHovered(true)}
+                  onMouseLeave={() => setIsRightHandleHovered(false)}
+                />
+              )}
+            </div>
+            
+            {/* 노드 설명 툴팁 */}
+            {showTooltip && (
+              <div className="absolute z-50 top-0 left-1/2 transform -translate-x-1/2 -translate-y-full -mt-2">
+                {/* 툴팁 내용 */}
+                <div 
+                  className="border rounded-lg shadow-lg px-4 py-3 min-w-48"
+                  style={{
+                    backgroundColor: nodeStyle.backgroundColor,
+                    borderColor: nodeStyle.borderColor
+                  }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-sm mb-1" style={{ color: nodeStyle.iconColor }}>
+                        {data.label}
+                      </h3>
+                      <p className="text-xs" style={{ color: nodeStyle.textColor }}>
+                        {getNodeDescription()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleCloseTooltip}
+                      className="ml-2 transition-colors"
+                      style={{ color: nodeStyle.textColor }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+                {/* 툴팁 화살표 (아래쪽을 가리킴) */}
+                <div 
+                  className="w-0 h-0 mx-auto border-l-4 border-r-4 border-t-4 border-transparent"
+                  style={{ borderTopColor: nodeStyle.borderColor }}
+                ></div>
+              </div>
+            )}
+          </div>
+          
+          {/* 노드 이름 - 메인 컨테이너 밖으로 분리 */}
+          <div 
+            className="mt-2 px-6 py-1.5 rounded-lg shadow-md border relative"
+            style={{ 
+              minWidth: 'fit-content',
+              textAlign: 'center',
+              backgroundColor: nodeStyle.backgroundColor,
+              borderColor: nodeStyle.borderColor
+            }}
+          >
+            {/* 재생 버튼 - 노드 이름 왼쪽 테두리 중앙에 배치 */}
+            {!isEndNode && (
+              <div
+                className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10"
+                onMouseEnter={() => setIsPlayHovered(true)}
+                onMouseLeave={() => setIsPlayHovered(false)}
+              >
+                <button
+                  onClick={handleExecute}
+                  disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
+                  className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
+                    ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
+                      ? 'bg-gray-300 hover:bg-gray-400 text-white' 
+                      : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
+                  title={
+                    !hasConnection
+                      ? '노드를 연결해주세요'
+                      : hasValidationError
+                        ? 'Fix validation errors before executing'
+                        : 'Execute Node'
+                  }
+                >
+                  {isExecuting ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4 text-white" />
+                  )}
+                </button>
+                {/* 비활성화 & hover 시 툴팁 */}
+                {!hasConnection && isPlayHovered && (
+                  <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
+                    Please connect the nodes
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {isEditing ? (
+              // 이름 편집 모드
+              <input
+                type="text"
+                value={nodeName}
+                onChange={handleNameChange}
+                onBlur={handleNameSubmit}
+                onKeyDown={handleKeyPress}
+                placeholder="영문자, 숫자, _만 사용"
+                className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-center"
+                autoFocus
+              />
+            ) : (
+              // 이름 표시 모드
+              <div className="flex items-center justify-center w-full">
+                <div 
+                  className="font-medium text-sm truncate cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ color: nodeStyle.textColor }}
+                  onClick={() => setIsEditing(true)}
+                  title="Click to rename"
+                >
+                  {data.label}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* 조건 노드이고 유효성 에러가 있는 경우 에러 메시지 표시 */}
@@ -784,8 +836,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
           Invalid condition format
         </div>
       )}
-      
-
     </div>
   );
 });
