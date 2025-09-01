@@ -23,10 +23,10 @@ const CustomEdge = ({
   targetPosition,
   data,
   source,
-  
+  target,
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
-  const { nodes, removeEdge, focusedElement, setFocusedElement, updateEdgeData } = useFlowStore();
+  const { nodes, removeEdge, focusedElement, setFocusedElement, updateEdgeData, setSelectedNode } = useFlowStore();
   const { isDarkMode } = useThemeStore();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -41,6 +41,7 @@ const CustomEdge = ({
   );
 
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
+  const [dragStartTimeout, setDragStartTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
@@ -286,24 +287,48 @@ const CustomEdge = ({
     return { x: flowPosition.x, y: flowPosition.y };
   }, [screenToFlowPosition]);
 
-  // 클릭 핸들러 - 엣지 노드 포커스
+  // 클릭 핸들러 - 엣지 노드 포커스 및 NodeInspector 활성화
   const handleClick = useCallback((e: React.MouseEvent) => {
+    console.log('handleClickhandleClickhandleClickhandleClickhandleClickhandleClickhandleClick');
     e.stopPropagation();
-    e.preventDefault();
+    
+    // 드래그 시작 타이머가 있다면 취소 (클릭으로 인식)
+    if (dragStartTimeout) {
+      clearTimeout(dragStartTimeout);
+      setDragStartTimeout(null);
+    }
+    
     setFocusedElement('edge', id);
     
+    // 직접 FlowBuilder의 상태 업데이트
+    const edgeElement = {
+      id,
+      source,
+      target,
+      data
+    };
+    
+    console.log('[CustomEdge] Direct state update - setting selectedNode to:', target);
+    console.log('[CustomEdge] Direct state update - edge element:', edgeElement);
+    
+    setSelectedNode(target);
+    
+    // NodeInspector 활성화를 위한 전역 이벤트 발생
+    const showInspectorEvent = new CustomEvent('show-node-inspector', {
+      detail: { nodeId: target, edge: edgeElement }
+    });
+    window.dispatchEvent(showInspectorEvent);
+    
     // 클릭 후 즉시 포커스 설정
-    const target = e.currentTarget as HTMLElement;
-    if (target) {
-      target.focus();
+    const targetElement = e.currentTarget as HTMLElement;
+    if (targetElement) {
+      targetElement.focus();
     }
-  }, [id, setFocusedElement]);
+  }, [id, source, target, data, setFocusedElement, dragStartTimeout, setSelectedNode]);
 
-  // 드래그 핸들러 - 엣지 노드만 드래그
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
+  // 드래그 핸들러 - 엣지 노드만 드래그 (지연된 드래그 시작)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    e.preventDefault();
-    setIsDragging(true);
     setFocusedElement('edge', id);
     
     // 클릭한 시점의 위치를 엣지 노드 위치로 설정
@@ -311,6 +336,13 @@ const CustomEdge = ({
     if (coordinates) {
       setEdgeNodePosition(coordinates); // 초기 위치 설정
     }
+    
+    // 150ms 후에 드래그 시작 (클릭과 구분)
+    const timeout = setTimeout(() => {
+      setIsDragging(true);
+    }, 150);
+    
+    setDragStartTimeout(timeout);
   }, [id, setFocusedElement, getReactFlowCoordinates]);
 
   // 마우스 이벤트 리스너 추가 - 실시간 드래그 업데이트
@@ -430,7 +462,7 @@ const CustomEdge = ({
                 : 'scale-100'
           }`}
           onClick={handleClick}
-          onMouseDown={handleDragStart}
+          onMouseDown={handleMouseDown}
           onKeyDown={handleKeyDown}
           tabIndex={0}
           style={{ 
