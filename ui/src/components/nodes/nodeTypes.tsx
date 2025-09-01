@@ -4,12 +4,13 @@ import {
   Database, Cpu, Code
 } from 'lucide-react';
 import { CustomNode } from './CustomNode';
+
 const AgentNode = (props: any) => (
   <CustomNode 
     {...props}
     data={{
       ...props.data,
-      icon: <Bot size={16} />,
+      icon: <Bot size={20} />,
       nodeType: 'agentNode',
       description: 'Agent that can execute tools'
     }}
@@ -21,7 +22,7 @@ const ConditionNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Split size={16} />,
+      icon: <Split size={20} />,
       nodeType: 'conditionNode',
       description: 'Conditional function to determine which route to take next'
     }}
@@ -33,9 +34,9 @@ const FunctionNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <FileCode size={16} />,
+      icon: <Database size={20} />,
       nodeType: 'functionNode',
-      description: 'Execute custom Python function'
+      description: 'Data processing and storage node'
     }}
   />
 );
@@ -45,7 +46,7 @@ const StartNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Play size={16} />,
+      icon: <Play size={20} />,
       nodeType: 'startNode',
       description: 'Starting point of the workflow'
     }}
@@ -57,7 +58,7 @@ const EndNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Square size={16} />,
+      icon: <Square size={20} />,
       nodeType: 'endNode',
       description: 'End of workflow'
     }}
@@ -69,7 +70,7 @@ const PromptNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <MessageSquare size={16} />,
+      icon: <MessageSquare size={20} />,
       nodeType: 'promptNode',
       description: 'Define a prompt template for LLM interaction'
     }}
@@ -81,7 +82,7 @@ const SystemPromptNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Settings size={16} />,
+      icon: <Settings size={20} />,
       nodeType: 'systemPromptNode',
       description: 'Define system and user prompts for LLM interaction'
     }}
@@ -93,7 +94,7 @@ const ToolsMemoryNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Group size={16} />,
+      icon: <Group size={20} />,
       nodeType: 'toolsMemoryNode',
       description: 'Tools and Memory groups management'
     }}
@@ -105,7 +106,7 @@ const EmbeddingNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Cpu size={16} />,
+      icon: <Database size={20} />,
       nodeType: 'embeddingNode',
       description: 'Generate embeddings from text using configured models'
     }}
@@ -117,7 +118,7 @@ const RAGNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Database size={16} />,
+      icon: <Database size={20} />,
       nodeType: 'ragNode',
       description: 'Retrieval-Augmented Generation using vector store'
     }}
@@ -129,9 +130,9 @@ const MergeNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <GitMerge size={16} />, // nodeCategories.tsx와 아이콘 일치, 크기 조정
+      icon: <GitMerge size={20} />,
       nodeType: 'mergeNode',
-      description: 'Merge inputs from multiple nodes' // nodeCategories.tsx와 설명 일치
+      description: 'Merge inputs from multiple nodes'
     }}
   />
 );
@@ -141,7 +142,7 @@ const UserNode = (props: any) => (
     {...props}
     data={{
       ...props.data,
-      icon: <Code size={16} />,
+      icon: <Database size={20} />,
       nodeType: 'userNode',
       description: 'User-defined custom node'
     }}
@@ -159,6 +160,6 @@ export const nodeTypes = {
   toolsMemoryNode: ToolsMemoryNode,
   embeddingNode: EmbeddingNode,
   ragNode: RAGNode,
-  mergeNode: MergeNode, // MergeNode 추가
-  userNode: UserNode, // UserNode 추가
+  mergeNode: MergeNode,
+  userNode: UserNode,
 };

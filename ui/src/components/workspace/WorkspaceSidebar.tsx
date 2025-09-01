@@ -1,7 +1,6 @@
 import React from 'react';
-import { ChevronRight, Database, Key, Sun, Moon, Plus, Workflow, Rocket, CircleDot, Square, Settings, Hammer, PenTool } from 'lucide-react';
+import { ChevronRight, Database, Key, Plus, Workflow, Rocket, CircleDot, Square, Settings, Hammer, PenTool } from 'lucide-react';
 import langstarLogo from '../../assets/common/langstar_logo.png';
-import { useThemeStore } from '../../store/themeStore';
 
 interface AdminSidebarProps {
   activeMenu: string;
@@ -18,7 +17,6 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
   toggleMenu,
   setSelectedAIType,
 }) => {
-  const { isDarkMode, toggleDarkMode } = useThemeStore();
   return(
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col justify-between">
       <div>
@@ -74,17 +72,6 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
       </div>
     </nav>
     </div>
-    {/* 다크모드 토글 버튼 */}
-    <div 
-        className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-800 dark:bg-gray-100 hover:bg-gray-700 dark:hover:bg-gray-200 cursor-pointer transition-colors"
-        onClick={toggleDarkMode}
-        title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        <div className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-100 dark:text-gray-800">
-          <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          {isDarkMode ? <Sun className="h-5 w-5 text-red-500" /> : <Moon className="h-5 w-5 text-yellow-500" />}
-        </div>
-      </div>
   </div>
 )};
 

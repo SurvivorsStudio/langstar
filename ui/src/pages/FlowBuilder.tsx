@@ -3,6 +3,7 @@ import { ReactFlowProvider } from 'reactflow';
 import FlowBuilderComponent from '../components/FlowBuilder';
 import Header from '../components/Header';
 import ChatBot from '../components/ChatBot';
+import Footer from '../components/Footer';
 import 'reactflow/dist/style.css';
 
 function FlowBuilder() {
@@ -15,6 +16,7 @@ function FlowBuilder() {
         </ReactFlowProvider>
       </div>
       <ChatBot />
+      <Footer />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import React, { memo, useState, useCallback } from 'react';
 
-import { EdgeProps, getBezierPath, EdgeLabelRenderer, useReactFlow } from 'reactflow';
-import { X, Trash2, Move } from 'lucide-react';
+import { EdgeProps, getBezierPath, EdgeLabelRenderer, useReactFlow, Position } from 'reactflow';
+import { Database } from 'lucide-react';
 
 import OutputInspector from '../OutputInspector';
 import { useFlowStore } from '../../store/flowStore';
+import { useThemeStore } from '../../store/themeStore';
 
 export function handleEdgeDelete(edgeId: string, removeEdge: (id: string) => void): void {
   if (window.confirm('Are you sure you want to remove this connection?')) {
@@ -26,6 +27,7 @@ const CustomEdge = ({
 }: EdgeProps) => {
   const [showInspector, setShowInspector] = useState(false);
   const { nodes, removeEdge, setEdgeOutput, focusedElement, setFocusedElement, setSelectedNode, updateEdgeData } = useFlowStore();
+  const { isDarkMode } = useThemeStore();
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -34,88 +36,290 @@ const CustomEdge = ({
 
   // 드래그 가능한 중간점 상태
   const [isDragging, setIsDragging] = useState(false);
-  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(
-    data?.dragPoint || null
+  const [edgeNodePosition, setEdgeNodePosition] = useState<{ x: number; y: number } | null>(
+    data?.edgeNodePosition || null
   );
 
   const [clickPoint, setClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
 
-
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
   const centerY = (sourceY + targetY) / 2;
 
+  // Edge Data 박스 위치 계산 - 드래그 포인트가 아닌 고정된 연결점 기준
+  const dataBoxX: number = edgeNodePosition ? edgeNodePosition.x : centerX;
+  const dataBoxY: number = edgeNodePosition ? edgeNodePosition.y : centerY;
 
-  // Edge Data 박스 위치 계산 (박스의 왼쪽 상단 모서리)
-  // 드래그 중일 때는 클릭 포인트를 사용, 아니면 저장된 드래그 포인트 또는 기본 중간점 사용
-  const dataBoxX: number = isDragging && clickPoint ? clickPoint.x : (dragPoint ? dragPoint.x : centerX);
-  const dataBoxY: number = isDragging && clickPoint ? clickPoint.y : (dragPoint ? dragPoint.y : centerY);
-
-  // Edge Data 박스의 중심점 계산 (박스 크기: 220x120)
+  // Edge Data 박스의 중심점 계산 (박스 크기: 80x80)
   const dataBoxCenterX: number = dataBoxX;
   const dataBoxCenterY: number = dataBoxY;
 
-  // 드래그 중일 때는 클릭 포인트를 사용, 아니면 Edge Data 박스 중심 사용
-  const controlPointX: number = isDragging && clickPoint ? clickPoint.x : dataBoxCenterX;
-  const controlPointY: number = isDragging && clickPoint ? clickPoint.y : dataBoxCenterY;
+  // 워크플로우 방향성 분석 및 연결 방향 결정
+  const determineConnectionDirection = useCallback(() => {
+    // source와 target의 상대적 위치 분석
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 워크플로우 방향성 판단
+    // dx > 0: 오른쪽으로 연결 (정방향)
+    // dx < 0: 왼쪽으로 연결 (역방향)
+    // dy: 수직 거리
+    
+    // 역방향 연결 감지 (뒤쪽 노드에서 앞쪽 노드로)
+    const isReverseConnection = dx < 0;
+    
+    // 수직 거리가 가까우면 교차 가능성 높음 (거리에 따른 동적 기준)
+    const verticalThreshold = Math.max(60, distance * 0.15); // 거리에 비례한 임계값
+    const isCloseVertically = Math.abs(dy) < verticalThreshold;
+    
+    // 수평 거리가 충분히 클 때만 교차 방지 적용 (너무 가까운 노드는 제외)
+    const horizontalThreshold = Math.max(40, distance * 0.1);
+    const isFarHorizontally = Math.abs(dx) > horizontalThreshold;
+    
+    // 교차 방지가 필요한 경우 (더 정확한 판단)
+    const needsCrossingPrevention = isReverseConnection && isCloseVertically && isFarHorizontally;
+    
+    return {
+      isReverseConnection,
+      needsCrossingPrevention,
+      direction: needsCrossingPrevention ? 'reverse' : 'normal',
+      distance,
+      verticalThreshold,
+      horizontalThreshold
+    };
+  }, [sourceX, sourceY, targetX, targetY]);
 
-  // 커스텀 베지어 경로 생성
-  const createCustomPath = useCallback(() => {
-    // 드래그 중이거나 저장된 드래그 포인트가 있으면 커스텀 경로 사용
-    if (isDragging && clickPoint || dragPoint) {
-      // 드래그 중일 때는 클릭 포인트를 사용, 아니면 저장된 드래그 포인트 사용
-      const currentControlPointX = isDragging && clickPoint ? clickPoint.x : (dragPoint ? dragPoint.x : centerX);
-      const currentControlPointY = isDragging && clickPoint ? clickPoint.y : (dragPoint ? dragPoint.y : centerY);
-      
-      // 드래그 중이거나 저장된 드래그 포인트가 있으면 step 스타일 사용
-      if (isDragging && clickPoint || dragPoint) {
-        // Step 스타일 경로 생성 (직선과 수직선 조합)
-        // source -> controlPoint -> target 경로를 step 형태로
-        const path = `M ${sourceX} ${sourceY} L ${currentControlPointX} ${sourceY} L ${currentControlPointX} ${currentControlPointY} L ${targetX} ${currentControlPointY} L ${targetX} ${targetY}`;
-        return [path, String(currentControlPointX), String(currentControlPointY)];
-      }
+  // Handle 위치 계산 - 워크플로우 방향성에 따라 동적 조정
+  const handleOffset = 6; // Handle의 offset 값
+  
+  // 워크플로우 방향성에 따른 Handle 설정
+  const getHandleConfiguration = useCallback(() => {
+    const connectionInfo = determineConnectionDirection();
+    
+    if (connectionInfo.needsCrossingPrevention) {
+      // 역방향 연결: Handle 방향 전환
+      return {
+        inputHandle: {
+          x: dataBoxCenterX + 40 + handleOffset, // 우측에 위치
+          y: dataBoxCenterY,
+          type: 'target',
+          position: Position.Right
+        },
+        outputHandle: {
+          x: dataBoxCenterX - 40 - handleOffset, // 좌측에 위치
+          y: dataBoxCenterY,
+          type: 'source',
+          position: Position.Left
+        }
+      };
+    } else {
+      // 정방향 연결: 기본 Handle 설정
+      return {
+        inputHandle: {
+          x: dataBoxCenterX - 40 - handleOffset, // 좌측에 위치
+          y: dataBoxCenterY,
+          type: 'target',
+          position: Position.Left
+        },
+        outputHandle: {
+          x: dataBoxCenterX + 40 + handleOffset, // 우측에 위치
+          y: dataBoxCenterY,
+          type: 'source',
+          position: Position.Right
+        }
+      };
     }
+  }, [dataBoxCenterX, dataBoxCenterY, handleOffset, determineConnectionDirection]);
 
-    // 기본 베지어 경로 사용
-    return getBezierPath({
+  const { inputHandle, outputHandle } = getHandleConfiguration();
+  const inputHandleX = inputHandle.x;
+  const inputHandleY = inputHandle.y;
+  const outputHandleX = outputHandle.x;
+  const outputHandleY = outputHandle.y;
+
+  // 연결선 교차 감지 함수
+  const detectLineIntersection = useCallback((line1: any, line2: any) => {
+    // 두 선분이 교차하는지 확인하는 수학적 계산
+    const { x1: x1, y1: y1, x2: x2, y2: y2 } = line1;
+    const { x1: x3, y1: y3, x2: x4, y2: y4 } = line2;
+    
+    const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (denominator === 0) return false; // 평행한 선
+    
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
+    
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  }, []);
+
+  // 스마트 경로 생성 - 워크플로우 방향성 기반 교차 방지
+  const createSmartPaths = useCallback(() => {
+    const connectionInfo = determineConnectionDirection();
+    
+    // 기본 베지어 경로 생성 - 좌우 모두 동일한 품질
+    const inputPath = getBezierPath({
       sourceX,
       sourceY,
       sourcePosition,
+      targetX: inputHandleX,
+      targetY: inputHandleY,
+      targetPosition: inputHandle.position,
+    })[0];
+
+    const outputPath = getBezierPath({
+      sourceX: outputHandleX,
+      sourceY: outputHandleY,
+      sourcePosition: outputHandle.position,
       targetX,
       targetY,
       targetPosition,
-    });
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, centerX, centerY, isDragging, clickPoint, dragPoint]);
+    })[0];
 
+    // 워크플로우 방향성에 따른 스마트 경로 생성
+    const createDirectionalPath = () => {
+      if (connectionInfo.needsCrossingPrevention) {
+        // 역방향 연결 + 교차 방지 필요: 제어점 조정으로 자연스러운 곡선
+        if (connectionInfo.isReverseConnection) {
+          // 역방향: 베지어 곡선의 제어점을 조정하여 교차 방지
+          const dx = targetX - outputHandleX;
+          const dy = targetY - outputHandleY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // 더 자연스러운 제어점 계산 - 거리에 비례하여 조정
+          const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300)); // 20%~40% 범위
+          const controlOffsetX = dx * controlRatio;
+          const controlOffsetY = dy * controlRatio;
+          
+          // 첫 번째 제어점: 엣지 노드에서 자연스럽게 우측으로
+          const cp1x = outputHandleX + Math.max(controlOffsetX, 30);
+          const cp1y = outputHandleY + (dy * 0.1); // 약간의 수직 변화
+          
+          // 두 번째 제어점: 목표점 근처에서 자연스럽게
+          const cp2x = targetX - Math.max(controlOffsetX, 30);
+          const cp2y = targetY - (dy * 0.1); // 약간의 수직 변화
+          
+          // 부드러운 베지어 곡선 경로
+          return `M ${outputHandleX} ${outputHandleY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`;
+        }
+      }
+      
+      // 정방향 연결이거나 교차 방지가 불필요한 경우: 기본 경로
+      return outputPath;
+    };
 
-  const [edgePath, labelX, labelY] = createCustomPath();
+    // 좌측 연결선도 우측과 동일한 교차 방지 로직 적용 (완벽한 대칭)
+    const createUnifiedInputPath = () => {
+      if (connectionInfo.needsCrossingPrevention && connectionInfo.isReverseConnection) {
+        // 좌측 연결선도 우측과 동일한 방식으로 교차 방지
+        const dx = inputHandleX - sourceX;
+        const dy = inputHandleY - sourceY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // 우측 연결선과 동일한 제어점 계산 방식으로 완벽한 대칭
+        const controlRatio = Math.min(0.4, Math.max(0.2, distance / 300));
+        const controlOffsetX = dx * controlRatio;
+        
+        // 첫 번째 제어점: source에서 자연스럽게 (우측 연결선과 대칭)
+        const cp1x = sourceX + Math.max(controlOffsetX, 30);
+        const cp1y = sourceY + (dy * 0.1);
+        
+        // 두 번째 제어점: 엣지 노드 근처에서 자연스럽게 (우측 연결선과 대칭)
+        const cp2x = inputHandleX - Math.max(controlOffsetX, 30);
+        const cp2y = inputHandleY - (dy * 0.1);
+        
+        // 부드러운 베지어 곡선 경로 (우측과 동일한 품질)
+        return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${inputHandleX} ${inputHandleY}`;
+      }
+      
+      // 교차 방지가 불필요한 경우: 기본 베지어 곡선 사용
+      return inputPath;
+    };
+
+    return {
+      inputPath: createUnifiedInputPath(),
+      outputPath: createDirectionalPath()
+    };
+  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, inputHandleX, inputHandleY, outputHandleX, outputHandleY, inputHandle, outputHandle, determineConnectionDirection]);
+
+  // 커스텀 베지어 경로 생성 - 고정된 연결점 기준으로 두 개의 연결선 생성
+  const createCustomPaths = useCallback(() => {
+    // 스마트 경로 생성 (교차 방지)
+    const { inputPath, outputPath } = createSmartPaths();
+
+    return {
+      inputPath,
+      outputPath,
+      controlPoint: { x: centerX, y: centerY }
+    };
+  }, [createSmartPaths, centerX, centerY]);
+
+  const { inputPath, outputPath, controlPoint } = createCustomPaths();
 
   const conditionDescription = data?.conditionDescription;
   const isConditionEdge = sourceNode?.type === 'conditionNode';
 
   const output = data?.output || 'No output yet';
-  const outputPreview = typeof output === 'object' ? JSON.stringify(output, null, 2) : String(output);
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
+
+  // 엣지 노드 삭제 함수
+  const handleDelete = useCallback(() => {
     handleEdgeDelete(id, removeEdge);
-  };
+  }, [id, removeEdge]);
 
-  const handleClearOutput = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEdgeOutput(id, null);
-  };
+  // 키보드 이벤트 핸들러
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    console.log('Key pressed:', e.key); // 디버깅용
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Deleting edge node...'); // 디버깅용
+      handleDelete();
+    }
+  }, [handleDelete]);
 
+  // 전역 키보드 이벤트 리스너 추가
+  React.useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // 엣지 노드가 포커스된 상태에서만 삭제 키 처리
+      if (isEdgeTextFocused && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Global key handler: Deleting edge node...'); // 디버깅용
+        handleDelete();
+      }
+    };
 
-  // 마우스 위치를 React Flow 좌표로 변환하는 함수
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [isEdgeTextFocused, handleDelete]);
+
+  // 마우스 위치를 React Flow 좌표로 변환하는 함수 - 최적화
   const getReactFlowCoordinates = useCallback((clientX: number, clientY: number) => {
     // React Flow의 screenToFlowPosition을 사용하여 정확한 좌표 계산
     const flowPosition = screenToFlowPosition({ x: clientX, y: clientY });
     return { x: flowPosition.x, y: flowPosition.y };
   }, [screenToFlowPosition]);
 
-  // 드래그 핸들러
+  // 클릭 핸들러 - 엣지 노드 포커스
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    console.log('Edge node clicked, setting focus...'); // 디버깅용
+    setFocusedElement('edge', id);
+    
+    // 클릭 후 즉시 포커스 설정
+    const target = e.currentTarget as HTMLElement;
+    if (target) {
+      target.focus();
+      console.log('Focus set on edge node'); // 디버깅용
+    }
+  }, [id, setFocusedElement]);
+
+  // 드래그 핸들러 - 엣지 노드만 드래그
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -126,62 +330,32 @@ const CustomEdge = ({
     const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
     if (coordinates) {
       setClickPoint(coordinates);
+      setEdgeNodePosition(coordinates); // 초기 위치 설정
     }
   }, [id, setFocusedElement, getReactFlowCoordinates]);
 
-
-  const handleDrag = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.stopPropagation();
-
-    e.preventDefault();
-    
-    // 마우스 위치를 React Flow 좌표로 변환
-    const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
-    if (coordinates) {
-      setClickPoint(coordinates);
-    }
-  }, [isDragging, getReactFlowCoordinates]);
-
-
-  const handleDragEnd = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-
-      // 클릭 포인트를 드래그 포인트로 저장
-      if (clickPoint) {
-        setDragPoint(clickPoint);
-        updateEdgeData(id, { dragPoint: clickPoint });
-      }
-      setClickPoint(null);
-    }
-  }, [isDragging, clickPoint, id, updateEdgeData]);
-
-
-  // 마우스 이벤트 리스너 추가
+  // 마우스 이벤트 리스너 추가 - 실시간 드래그 업데이트
   React.useEffect(() => {
     if (isDragging) {
       const handleMouseMove = (e: MouseEvent) => {
-
         const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
         if (coordinates) {
+          // 실시간으로 엣지 노드 위치 업데이트 (드래그 중에도 즉시 반영)
+          setEdgeNodePosition(coordinates);
           setClickPoint(coordinates);
           setLastMousePosition(coordinates);
         }
-
       };
 
       const handleMouseUp = () => {
         setIsDragging(false);
 
-        // 마지막 마우스 위치를 드래그 포인트로 저장
+        // 마지막 마우스 위치를 엣지 노드 위치로 저장 (이미 실시간으로 업데이트됨)
         if (lastMousePosition) {
-          setDragPoint(lastMousePosition);
-          updateEdgeData(id, { dragPoint: lastMousePosition });
+          updateEdgeData(id, { edgeNodePosition: lastMousePosition });
         }
         setClickPoint(null);
         setLastMousePosition(null);
-
       };
 
       document.addEventListener('mousemove', handleMouseMove);
@@ -192,13 +366,12 @@ const CustomEdge = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-
   }, [isDragging, lastMousePosition, id, updateEdgeData, getReactFlowCoordinates]);
-
 
   return (
     <>
       <defs>
+        {/* 이미지와 같은 파란색 화살표 마커 */}
         <marker
           id="arrow"
           viewBox="0 0 10 10"
@@ -208,119 +381,151 @@ const CustomEdge = ({
           markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill={isDarkMode ? "#60a5fa" : "#3b82f6"} />
         </marker>
       </defs>
       
-      {/* 메인 edge 경로 */}
+      {/* 메인 edge 경로 - 두 개의 연결선으로 분리 */}
+      {/* 첫 번째 연결선: source -> inputHandle (우측과 완벽하게 대칭) */}
       <path
-        id={id}
-        style={style}
-        className={`react-flow__edge-path stroke-slate-400 stroke-[2px] transition-all duration-200 ${
-          isDragging ? 'stroke-slate-500 stroke-[3px]' : ''
+        id={`${id}-input`}
+        className={`react-flow__edge-path transition-all duration-150 ${
+          isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
         }`}
-        d={edgePath}
+        d={inputPath}
+        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        strokeDasharray="5,5"
+        fill="none"
+        style={{ 
+          strokeWidth: isDragging ? 3 : 2,
+          // 부드러운 곡선을 위한 선 스타일
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          // 베지어 곡선의 자연스러움 강조
+          filter: isDarkMode 
+            ? 'drop-shadow(0 1px 2px rgba(96, 165, 250, 0.2))'
+            : 'drop-shadow(0 1px 2px rgba(59, 130, 246, 0.1))',
+          // 좌측 연결선도 우측과 완벽하게 동일한 품질
+          opacity: inputPath.includes('C') ? 1 : 0.95
+        }}
+      />
+      
+      {/* 두 번째 연결선: outputHandle -> target (좌측과 완벽하게 대칭) */}
+      <path
+        id={`${id}-output`}
+        className={`react-flow__edge-path transition-all duration-150 ${
+          isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
+        }`}
+        d={outputPath}
         markerEnd="url(#arrow)"
+        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        strokeDasharray="5,5"
+        fill="none"
+        style={{ 
+          strokeWidth: isDragging ? 3 : 2,
+          // 부드러운 곡선을 위한 선 스타일
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          // 베지어 곡선의 자연스러움 강조
+          filter: isDarkMode 
+            ? 'drop-shadow(0 1px 2px rgba(96, 165, 250, 0.2))'
+            : 'drop-shadow(0 1px 2px rgba(59, 130, 246, 0.1))',
+          // 우측 연결선도 좌측과 완벽하게 동일한 품질
+          opacity: outputPath.includes('C') ? 1 : 0.95
+        }}
       />
 
-
-      {/* 통합된 데이터 표시 및 드래그 영역 */}
+      {/* 중앙 데이터베이스 노드 - 이미지와 같은 스타일 */}
       <foreignObject
-        width={200}
+        width={80}
         height={80}
-        x={dataBoxCenterX - 100}
+        x={dataBoxCenterX - 40}
         y={dataBoxCenterY - 40}
-
         className="overflow-visible"
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
         <div 
-          className={`relative bg-white dark:bg-gray-800 shadow-md rounded-lg border h-20 overflow-hidden transition-all duration-200 ${
+          className={`relative transition-all duration-100 ${
             isDragging 
-              ? 'border-blue-500 shadow-lg scale-105' 
+              ? 'scale-110' 
               : isEdgeTextFocused 
-                ? 'border-blue-300 dark:border-blue-700 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800 ring-opacity-50' 
-                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                ? 'scale-105' 
+                : 'scale-100'
           }`}
+          onClick={handleClick}
           onMouseDown={handleDragStart}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
           style={{ 
             cursor: isDragging ? 'grabbing' : 'grab',
             pointerEvents: 'all',
             userSelect: 'none',
-            transform: isDragging ? 'scale(1.05)' : 'scale(1)',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.1s ease',
+            outline: isEdgeTextFocused ? '2px solid #3b82f6' : 'none'
           }}
         >
-          {/* 드래그 중일 때 시각적 피드백 */}
-          {isDragging && (
-            <div className="absolute inset-0 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-              <div className="flex items-center justify-center w-6 h-6">
-                <div className="w-4 h-4 border-2 border-blue-600 rounded-full flex items-center justify-center">
-                  <div className="w-1 h-1 bg-blue-600 rounded-full"></div>
-                </div>
-              </div>
+          {/* 이미지와 같은 원형 데이터베이스 노드 */}
+          <div className="relative w-20 h-20">
+            {/* 외부 링 - 다크 모드에 따라 동적 변경 */}
+            <div 
+              className="absolute inset-0 rounded-full shadow-lg border-2"
+              style={{
+                backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+                borderColor: isDarkMode ? '#6b7280' : '#e5e7eb'
+              }}
+            ></div>
+            {/* 보라색 내부 링 */}
+            <div className="absolute inset-2 bg-purple-500 rounded-full"></div>
+            {/* 보라색 중심 원 */}
+            <div className="absolute inset-4 bg-purple-600 rounded-full flex items-center justify-center">
+              {/* 데이터베이스 아이콘 */}
+              <Database size={24} className="text-white" />
             </div>
-          )}
-
-          {/* 중심점 표시 (+ 모양) */}
-          {!isDragging && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 opacity-30">
-              <div className="w-full h-0.5 bg-gray-400 absolute top-1/2 transform -translate-y-1/2"></div>
-              <div className="w-0.5 h-full bg-gray-400 absolute left-1/2 transform -translate-x-1/2"></div>
-            </div>
-          )}
-
-          {/* 액션 버튼들 */}
-          <div className="absolute top-1 right-1 flex gap-1 z-10">
-            <button
-              onClick={handleClearOutput}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 bg-gray-500 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-full shadow-sm transition-colors"
-              title="Clear Output"
-            >
-              <Trash2 size={12} />
-            </button>
-            <button
-              onClick={handleDelete}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white rounded-full shadow-sm transition-colors"
-              title="Remove Connection"
-            >
-              <X size={12} />
-            </button>
+            
+            {/* 드래그 중일 때 시각적 피드백 */}
+            {isDragging && (
+              <div 
+                className="absolute inset-0 rounded-full opacity-50 animate-pulse"
+                style={{
+                  backgroundColor: isDarkMode ? '#1e40af' : '#dbeafe'
+                }}
+              ></div>
+            )}
           </div>
 
-          {/* 데이터 내용 */}
-          <div 
-            className="p-2 text-xs"
-            onClick={e => { 
-              e.stopPropagation(); 
-              setFocusedElement('edge', id);
-              setSelectedNode(null);
-              setShowInspector(true); 
-            }}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Edge Data
-              </span>
-              {isDragging && (
-                <span className="text-xs text-blue-600 font-medium">
-                  Dragging...
-                </span>
-              )}
-            </div>
-            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words text-xs leading-tight line-clamp-2">
-              {outputPreview.length > 100 ? outputPreview.slice(0, 100) + '...' : outputPreview}
-            </pre>
-          </div>
+          {/* 액션 버튼들 - 제거됨 */}
 
-          {/* 드래그 안내 텍스트 */}
-          {!isDragging && (
-            <div className="absolute bottom-1 right-2 text-xs text-gray-400 dark:text-gray-500 opacity-60">
-              Drag to bend
-            </div>
-          )}
+                      {/* Input Handle - 워크플로우 방향성에 따라 동적 조정 */}
+            <div
+              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors"
+              style={{ 
+                left: inputHandle.position === Position.Left ? '-6px' : 'auto',
+                right: inputHandle.position === Position.Right ? '-6px' : 'auto',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                backgroundColor: inputHandle.type === 'target' 
+                  ? (isDarkMode ? '#60a5fa' : '#3b82f6')
+                  : (isDarkMode ? '#34d399' : '#10b981')
+              }}
+              title={`${inputHandle.type === 'target' ? 'Input' : 'Output'} Handle`}
+            />
+
+                      {/* Output Handle - 워크플로우 방향성에 따라 동적 조정 */}
+            <div
+              className="absolute w-3 h-3 border-2 border-white shadow-md rounded-full transition-colors"
+              style={{ 
+                left: outputHandle.position === Position.Left ? '-6px' : 'auto',
+                right: outputHandle.position === Position.Right ? '-6px' : 'auto',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                backgroundColor: outputHandle.type === 'source' 
+                  ? (isDarkMode ? '#34d399' : '#10b981')
+                  : (isDarkMode ? '#60a5fa' : '#3b82f6')
+              }}
+              title={`${outputHandle.type === 'source' ? 'Output' : 'Input'} Handle`}
+            />
         </div>
       </foreignObject>
 
@@ -329,46 +534,40 @@ const CustomEdge = ({
         <circle
           cx={dataBoxCenterX}
           cy={dataBoxCenterY}
-          r={20}
-          fill="rgba(59, 130, 246, 0.1)"
-          stroke="rgba(59, 130, 246, 0.3)"
+          r={25}
+          fill={isDarkMode ? "rgba(59, 130, 246, 0.2)" : "rgba(59, 130, 246, 0.1)"}
+          stroke={isDarkMode ? "rgba(59, 130, 246, 0.5)" : "rgba(59, 130, 246, 0.3)"}
           strokeWidth={2}
           style={{ pointerEvents: 'none' }}
         />
       )}
 
-      {/* 드래그 포인트가 있을 때만 중간점 표시 (Edge Data 박스 중심에) */}
-      {dragPoint && !isDragging && (
-        <circle
-          cx={dataBoxCenterX}
-          cy={dataBoxCenterY}
-          r={4}
-          fill="#3b82f6"
-          stroke="#1d4ed8"
-          strokeWidth={1}
-          style={{ pointerEvents: 'none' }}
-        />
-      )}
+      {/* 엣지 노드 위치가 변경되었을 때만 중간점 표시 - 제거됨 */}
 
+      {/* 조건 엣지 라벨 - 엣지 노드 위치에 따라 동적으로 이동 */}
       {isConditionEdge && conditionDescription && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${Number(labelY) - 35}px)`, // Y 위치 조정
+              transform: `translate(-50%, -50%) translate(${dataBoxCenterX}px,${dataBoxCenterY - 35}px)`,
               padding: '3px 8px',
               borderRadius: '12px',
               fontSize: '10px',
-              fontWeight: 600, // semibold
+              fontWeight: 600,
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+              backgroundColor: isDarkMode ? '#1e3a8a' : '#dbeafe',
+              color: isDarkMode ? '#93c5fd' : '#1e40af',
+              border: `1px solid ${isDarkMode ? '#3b82f6' : '#93c5fd'}`
             }}
-            className="nodrag nopan bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50"
+            className="nodrag nopan"
           >
             {conditionDescription}
           </div>
         </EdgeLabelRenderer>
       )}
       
+      {/* Output Inspector */}
       {showInspector && (
         <div className="fixed top-0 right-0 h-full z-50">
           <OutputInspector

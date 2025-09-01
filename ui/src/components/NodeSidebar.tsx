@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, X, Search, Sun, Moon, Code } from 'lucide-react';
+import { ChevronDown, ChevronUp, X, Search, Code } from 'lucide-react';
 import { nodeCategories } from '../data/nodeCategories';
-import { useThemeStore } from '../store/themeStore';
 import { useFlowStore } from '../store/flowStore';
 
 interface NodeSidebarProps {
@@ -9,7 +8,6 @@ interface NodeSidebarProps {
 }
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
-  const { isDarkMode, toggleDarkMode } = useThemeStore();
   const { userNodes, fetchUserNodes } = useFlowStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
@@ -101,7 +99,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                     onDragStart={(event) => handleNodeDragStart(event, node.type, node.label)}
                   >
                     <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
-                      {node.icon(isDarkMode ? 'text-white' : 'text-gray-700')}
+                      {node.icon('text-gray-700')}
                     </div>
                     <div className="flex flex-col items-start">
                       <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{node.label}</div>
@@ -142,7 +140,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                     onDragStart={(event) => handleNodeDragStart(event, 'userNode', userNode.name)}
                   >
                     <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
-                      <Code className={`h-6 w-6 ${isDarkMode ? 'text-white' : 'text-gray-700'}`} />
+                      <Code className="h-6 w-6 text-gray-700" />
                     </div>
                     <div className="flex flex-col items-start">
                       <div className="font-medium text-sm text-gray-800 dark:text-gray-200 text-left">{userNode.name}</div>
@@ -156,16 +154,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
         </div>
       </div>
 
-      <div 
-        className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-800 dark:bg-gray-100 hover:bg-gray-700 dark:hover:bg-gray-200 cursor-pointer transition-colors"
-        onClick={toggleDarkMode}
-        title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        <div className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-100 dark:text-gray-800">
-          <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          {isDarkMode ? <Sun className="h-5 w-5 text-red-500" /> : <Moon className="h-5 w-5 text-yellow-500" />}
-        </div>
-      </div>
+
     </div>
   );
 };

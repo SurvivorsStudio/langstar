@@ -222,6 +222,11 @@ const FlowBuilder: React.FC = () => {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onKeyDown={onKeyDown}
+            // 드래그 성능 최적화
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            selectNodesOnDrag={false}
         >
           <Background 
             color={isDarkMode ? '#374151' : '#e5e7eb'} 
