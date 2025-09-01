@@ -573,51 +573,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
           
           {/* 노드 우측 상단 버튼들 */}
           <div className="absolute -top-2 -right-2 flex gap-2">
-            {/* End 노드는 실행(재생) 버튼도 숨김 */}
-            {!isToolsMemoryNode && !isEndNode && (
-              <div
-                className="relative overflow-visible"
-                onMouseEnter={() => setIsPlayHovered(true)}
-                onMouseLeave={() => setIsPlayHovered(false)}
-              >
-                <button
-                  onClick={handleExecute}
-                  disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
-                  className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
-                    ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
-                      ? 'bg-gray-300 hover:bg-gray-400 text-white' 
-                      : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
-                  title={
-                    !hasConnection
-                      ? '노드를 연결해주세요'
-                      : hasValidationError
-                        ? 'Fix validation errors before executing'
-                        : 'Execute Node'
-                  }
-                >
-                  {isExecuting ? (
-                    <Loader className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4 text-white" />
-                  )}
-                </button>
-                {/* 비활성화 & hover 시 툴팁 */}
-                {!hasConnection && isPlayHovered && (
-                  <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
-                    Please connect the nodes
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Start/End 노드는 삭제 버튼 숨김 */}
-            {!(isStartNode || isEndNode) && (
-              <button
-                onClick={handleDelete}
-                className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all duration-200 hover:scale-110"
-              >
-                <X size={14} />
-              </button>
-            )}
+            {/* 기존 버튼들 (재생 버튼 제외) */}
           </div>
           
           {/* 노드 내용 영역 - 아이콘만 표시 */}
@@ -729,7 +685,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       
       {/* 노드 이름 - 메인 컨테이너 밖으로 분리 */}
       <div 
-        className="mt-2 px-3 py-1.5 rounded-lg shadow-md border"
+        className="mt-2 px-6 py-1.5 rounded-lg shadow-md border relative"
         style={{ 
           minWidth: 'fit-content',
           textAlign: 'center',
@@ -737,6 +693,43 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
           borderColor: nodeStyle.borderColor
         }}
       >
+        {/* 재생 버튼 - 노드 이름 왼쪽 테두리 중앙에 배치 */}
+        {!isToolsMemoryNode && !isEndNode && (
+          <div
+            className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10"
+            onMouseEnter={() => setIsPlayHovered(true)}
+            onMouseLeave={() => setIsPlayHovered(false)}
+          >
+            <button
+              onClick={handleExecute}
+              disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
+              className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
+                ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
+                  ? 'bg-gray-300 hover:bg-gray-400 text-white' 
+                  : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
+              title={
+                !hasConnection
+                  ? '노드를 연결해주세요'
+                  : hasValidationError
+                    ? 'Fix validation errors before executing'
+                    : 'Execute Node'
+              }
+            >
+              {isExecuting ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 text-white" />
+              )}
+            </button>
+            {/* 비활성화 & hover 시 툴팁 */}
+            {!hasConnection && isPlayHovered && (
+              <div className="absolute z-50 left-1/2 top-full mt-2 -translate-x-1/2 px-3 py-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs rounded shadow-lg whitespace-nowrap pointer-events-auto">
+                Please connect the nodes
+              </div>
+            )}
+          </div>
+        )}
+        
         {isEditing ? (
           // 이름 편집 모드
           <input
