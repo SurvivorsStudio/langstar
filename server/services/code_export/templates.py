@@ -306,7 +306,14 @@ def init_state_code( config_json ) :
             if '__annotated__' in config_val:
                 code_token = "    {0} :Annotated[dict, operator.or_] = ".format(config_key) + "{}"
             else:
+                if 'node_type' in config_val:
+                    if config_val['node_type'] == 'promptNode':
+                        del config_val['config']['template'] 
+                    elif config_val['node_type'] == 'functionNode':
+                        del config_val['config']['code'] 
+                        
                 code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
+                
             code_lines.append(code_token)
     code_lines = "\n".join(code_lines) + "\n"
 
@@ -396,6 +403,10 @@ def prompt_node_code( node ) :
     node_name = node['data']['label']
     node_id = node['id']
     node_type = node['type']
+
+    prompt_template = node['data']['config']['template']
+
+
     code = f"""
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
@@ -407,10 +418,12 @@ def node_{node_name}(state):
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
     node_config = state_dict[node_config_key]
+
+    prompt_template = '''{prompt_template}'''
     
     # prompt 생성 
     template = PromptTemplate(
-        template=node_config['config']['template'],
+        template=prompt_template,
         input_variables=list(node_input.keys())
     )
 
