@@ -107,13 +107,53 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
     }
   };
 
+  // 경로를 올바른 형태로 변환하는 헬퍼 함수
+  const buildFullPath = (pathArray: string[]): string => {
+    if (pathArray.length === 0) return '';
+    
+    let result = pathArray[0];
+    for (let i = 1; i < pathArray.length; i++) {
+      const segment = pathArray[i];
+      if (segment.startsWith('[') && segment.endsWith(']')) {
+        // 배열 인덱스인 경우 점을 붙이지 않음
+        result += segment;
+      } else {
+        // 일반 객체 키인 경우 점으로 연결
+        result += '.' + segment;
+      }
+    }
+    return result;
+  };
+
   // JSON 데이터를 트리 구조로 변환
   const buildTree = (obj: any, parentPath: string[] = [], level: number = 0): TreeNode[] => {
     if (!obj || typeof obj !== 'object') return [];
 
+    if (Array.isArray(obj)) {
+      // 배열의 경우 인덱스를 키로 사용
+      return obj.map((item, index) => {
+        const key = `[${index}]`;
+        const currentPath = [...parentPath, key];
+        const fullPath = buildFullPath(currentPath);
+        const type = getValueType(item);
+
+        const node: TreeNode = {
+          key,
+          value: item,
+          type,
+          path: currentPath,
+          fullPath,
+          level,
+          children: type !== 'primitive' ? buildTree(item, currentPath, level + 1) : undefined,
+        };
+
+        return node;
+      });
+    }
+
     return Object.entries(obj).map(([key, value]) => {
       const currentPath = [...parentPath, key];
-      const fullPath = currentPath.join('.');
+      const fullPath = buildFullPath(currentPath);
       const type = getValueType(value);
 
       const node: TreeNode = {
@@ -225,10 +265,12 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
     return expandedNodes.has(fullPath) || autoExpandedNodes.has(fullPath);
   };
 
-  const handleNodeClick = (node: TreeNode) => {
-    if (node.type === 'primitive') {
-      // 최종 값 선택
-      onSelect(node.key);
+  const handleNodeClick = (node: TreeNode, isSelectAction: boolean = false) => {
+    // Shift 키를 누르고 클릭하거나 isSelectAction이 true면 선택
+    // 그렇지 않으면 primitive 타입은 바로 선택, 다른 타입은 토글
+    if (isSelectAction || node.type === 'primitive') {
+      // 값 선택 - 전체 경로 반환
+      onSelect(node.fullPath);
       onClose();
     } else {
       // 폴더 토글
@@ -236,10 +278,10 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
     }
   };
 
-  const renderTreeNode = (node: TreeNode, isLastChild: boolean = false, parentPath: string[] = []) => {
+  const renderTreeNode = (node: TreeNode, isLastChild: boolean = false, _parentPath: string[] = []) => {
     const expanded = isExpanded(node.fullPath);
     const hasChildren = node.children && node.children.length > 0;
-    const isSelectable = node.type === 'primitive';
+    const isSelectable = true; // 모든 타입 선택 가능
     const isCurrentSelected = selectedKey === node.key;
 
     return (
@@ -293,7 +335,11 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
                     : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-600'
           }`}
           style={{ paddingLeft: `${node.level * 20 + 12}px`, marginLeft: '0px' }}
-          onClick={() => handleNodeClick(node)}
+          onClick={(e) => {
+            // Shift 키를 누르고 클릭하면 확장/축소가 아닌 선택 동작
+            const isSelectAction = e.shiftKey || node.type === 'primitive';
+            handleNodeClick(node, isSelectAction);
+          }}
         >
           {/* 확장/축소 아이콘 */}
           <div className="w-4 h-4 flex items-center justify-center mt-0.5">
@@ -326,15 +372,24 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
             </div>
           </div>
 
-          {/* 선택 가능 표시 */}
-          {isSelectable && (
-            <div className="flex items-center gap-1 mt-0.5">
+          {/* 선택 가능 표시 및 버튼 */}
+          <div className="flex items-center gap-2 mt-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // 부모 클릭 이벤트 방지
+                handleNodeClick(node, true);
+              }}
+              className="px-3 py-1 text-xs font-medium bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-700 transition-colors"
+            >
+              선택
+            </button>
+            <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
-                선택 가능
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {node.type === 'primitive' ? '또는 클릭' : '또는 Shift+클릭'}
               </span>
             </div>
-          )}
+          </div>
         </div>
 
         {/* 자식 노드들 */}
@@ -435,7 +490,7 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
           <div className="flex items-center justify-between">
             <div className="text-xs text-gray-500 dark:text-gray-400">
               {filteredTree.length > 0 ? (
-                <>💡 녹색 항목을 클릭하면 선택됩니다</>
+                <>💡 값은 클릭, 객체/배열은 Shift+클릭으로 선택</>
               ) : searchTerm ? (
                 <>🔍 검색 결과 없음</>
               ) : (
