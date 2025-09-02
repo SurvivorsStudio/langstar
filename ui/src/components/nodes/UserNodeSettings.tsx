@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle, Pencil, Check } from 'lucide-react';
+import { AlertCircle, Pencil, Check, Search } from 'lucide-react';
 import CustomSelect from '../Common/CustomSelect';
+import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
 
 interface UserNodeSettingsProps {
   nodeId: string;
@@ -16,6 +17,8 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [inputData, setInputData] = useState<Record<string, any>>({});
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
+  const [isKeySelectorOpen, setIsKeySelectorOpen] = useState(false);
+  const [currentSelectingParam, setCurrentSelectingParam] = useState<string | null>(null);
   
   // Input Data에서 사용 가능한 키 값들을 가져오기
   const getAvailableInputKeys = () => {
@@ -38,6 +41,37 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
   };
   
   const availableInputKeys = getAvailableInputKeys();
+
+  // 새로운 트리뷰 팝업을 사용할지 확인
+  const shouldUseTreeView = () => {
+    const incomingEdge = edges.find(edge => edge.target === nodeId);
+    if (!incomingEdge?.data?.output) return false;
+    
+    const output = incomingEdge.data.output;
+    // 데이터가 있으면 항상 새로운 트리뷰 사용 (훨씬 좋은 UX)
+    return Object.keys(output).length > 0;
+  };
+
+  // 전체 input data 가져오기 (계층적 선택을 위해)
+  const getFullInputData = () => {
+    const incomingEdge = edges.find(edge => edge.target === nodeId);
+    return incomingEdge?.data?.output || {};
+  };
+
+  // 계층적 선택기 열기
+  const openKeySelector = (paramName: string) => {
+    setCurrentSelectingParam(paramName);
+    setIsKeySelectorOpen(true);
+  };
+
+  // 계층적 선택기에서 키 선택 처리
+  const handleKeySelect = (key: string) => {
+    if (currentSelectingParam) {
+      handleInputDataChange(currentSelectingParam, key);
+    }
+    setIsKeySelectorOpen(false);
+    setCurrentSelectingParam(null);
+  };
 
   // Get available variables from source node output
   const incomingEdge = edges.find(edge => edge.target === nodeId);
@@ -251,38 +285,64 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   {param.description || 'Input Data에서 사용 가능한 키 값을 선택하세요.'}
                 </p>
-                <select
-                  value={inputData[param.name] || ''}
-                  onChange={(e) => handleInputDataChange(param.name, e.target.value)}
-
-                  disabled={availableInputKeys.length === 0 && !inputData[param.name]}
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                    availableInputKeys.length === 0 && !inputData[param.name]
-
-                      ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                      : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                  }`}
-                >
-                  <option value="">
-
-                    {availableInputKeys.length === 0 ? '키를 선택하세요' : '키를 선택하세요'}
-
-                  </option>
-                  {availableInputKeys.map(key => (
-                    <option key={key} value={key}>
-                      {key}
+                
+                {shouldUseTreeView() ? (
+                  /* 데이터가 있는 경우 - 향상된 트리뷰 선택기 사용 */
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => openKeySelector(param.name)}
+                      disabled={availableInputKeys.length === 0 && !inputData[param.name]}
+                      className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-left flex items-center justify-between ${
+                        availableInputKeys.length === 0 && !inputData[param.name]
+                          ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span>
+                        {inputData[param.name] || '키를 선택하세요'}
+                      </span>
+                      <Search className="w-4 h-4 text-gray-400" />
+                    </button>
+                    
+                    {/* 기존 설정값 표시 */}
+                    {inputData[param.name] && !availableInputKeys.includes(inputData[param.name]) && (
+                      <p className="text-xs text-amber-500 dark:text-amber-400">
+                        선택된 키: {inputData[param.name]} (더 이상 사용할 수 없음)
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* 데이터가 없는 경우 - 기존 select 사용 */
+                  <select
+                    value={inputData[param.name] || ''}
+                    onChange={(e) => handleInputDataChange(param.name, e.target.value)}
+                    disabled={availableInputKeys.length === 0 && !inputData[param.name]}
+                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                      availableInputKeys.length === 0 && !inputData[param.name]
+                        ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                        : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    }`}
+                  >
+                    <option value="">
+                      {availableInputKeys.length === 0 ? '키를 선택하세요' : '키를 선택하세요'}
                     </option>
-                  ))}
+                    {availableInputKeys.map(key => (
+                      <option key={key} value={key}>
+                        {key}
+                      </option>
+                    ))}
 
-                  {/* 기존 설정값이 있지만 현재 사용 가능한 키에 없으면 표시 */}
-                  {inputData[param.name] && !availableInputKeys.includes(inputData[param.name]) && (
-                    <option value={inputData[param.name]} disabled>
-                      {inputData[param.name]}
-                    </option>
-                  )}
-                </select>
+                    {/* 기존 설정값이 있지만 현재 사용 가능한 키에 없으면 표시 */}
+                    {inputData[param.name] && !availableInputKeys.includes(inputData[param.name]) && (
+                      <option value={inputData[param.name]} disabled>
+                        {inputData[param.name]}
+                      </option>
+                    )}
+                  </select>
+                )}
+
                 {availableInputKeys.length === 0 && !inputData[param.name] && (
-
                   <p className="text-xs text-red-500 dark:text-red-400 mt-1">
                     이전 노드에서 데이터가 전달되지 않았습니다.
                   </p>
@@ -316,6 +376,19 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
           </pre>
         </div>
       </div>
+
+      {/* 계층적 키 선택기 팝업 */}
+      <HierarchicalKeySelector
+        isOpen={isKeySelectorOpen}
+        onClose={() => {
+          setIsKeySelectorOpen(false);
+          setCurrentSelectingParam(null);
+        }}
+        data={getFullInputData()}
+        onSelect={handleKeySelect}
+        title={`키 선택 - ${currentSelectingParam || ''}`}
+        selectedKey={currentSelectingParam ? inputData[currentSelectingParam] : undefined}
+      />
     </div>
   );
 };
