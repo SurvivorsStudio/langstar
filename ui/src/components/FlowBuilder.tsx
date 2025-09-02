@@ -27,6 +27,7 @@ const edgeTypes = {
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
+  const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const { isDarkMode } = useThemeStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
@@ -90,12 +91,48 @@ const FlowBuilder: React.FC = () => {
     console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
     console.log(`[FlowBuilder] Node data:`, node.data);
     setSelectedNode(node.id);
+    setSelectedEdge(null); // 엣지 상태 초기화
     setShowInspector(true);
     setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)
   }, [setFocusedElement, setSelectedNode]);
 
+  const onEdgeClick = useCallback((_: unknown, edge: any) => {
+    console.log(`[FlowBuilder] Edge clicked: ${edge.id}, source: ${edge.source}, target: ${edge.target}`);
+    console.log(`[FlowBuilder] Edge data:`, edge.data);
+    setSelectedNode(edge.target); // 엣지의 타겟 노드를 선택된 노드로 설정
+    setSelectedEdge(edge); // 선택된 엣지 정보 저장
+    setShowInspector(true);
+    setFocusedElement('edge', edge.id); // 엣지 포커스 설정
+  }, [setFocusedElement, setSelectedNode]);
+
+  // 전역 이벤트 리스너 - NodeInspector 활성화
+  useEffect(() => {
+    const handleShowInspector = (event: any) => {
+      console.log(`[FlowBuilder] Show inspector event received:`, event.detail);
+      const { nodeId, edge } = event.detail;
+      
+      console.log(`[FlowBuilder] Setting showInspector to: true`);
+      console.log(`[FlowBuilder] NodeId: ${nodeId}, Edge:`, edge);
+      
+      setSelectedEdge(edge);
+      setShowInspector(true);
+      setFocusedElement('edge', edge.id);
+      
+      console.log(`[FlowBuilder] Inspector state updated`);
+    };
+
+    window.addEventListener('show-node-inspector', handleShowInspector);
+    console.log('[FlowBuilder] Global event listener added');
+
+    return () => {
+      window.removeEventListener('show-node-inspector', handleShowInspector);
+      console.log('[FlowBuilder] Global event listener removed');
+    };
+  }, [setFocusedElement]);
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
+    setSelectedEdge(null);
     setShowInspector(false);
     setFocusedElement(null, null); // 패널 클릭 시 모든 포커스 해제
   }, [setFocusedElement, setSelectedNode]);
@@ -110,6 +147,7 @@ const FlowBuilder: React.FC = () => {
       if (focusedElement.type === 'edge' && focusedElement.id) {
         handleEdgeDelete(focusedElement.id, removeEdge);
         setFocusedElement(null, null);
+        setSelectedEdge(null);
         setShowInspector(false);
         return;
       }
@@ -123,6 +161,7 @@ const FlowBuilder: React.FC = () => {
           if (window.confirm('Are you sure you want to delete this node?')) {
             removeNode(selectedNode);
             setSelectedNode(null);
+            setSelectedEdge(null);
             setShowInspector(false);
             setFocusedElement(null, null); // 노드 삭제 시 포커스 해제
           }
@@ -215,6 +254,7 @@ const FlowBuilder: React.FC = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -222,6 +262,11 @@ const FlowBuilder: React.FC = () => {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onKeyDown={onKeyDown}
+            // 드래그 성능 최적화
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            selectNodesOnDrag={false}
         >
           <Background 
             color={isDarkMode ? '#374151' : '#e5e7eb'} 
@@ -244,13 +289,15 @@ const FlowBuilder: React.FC = () => {
 
         </ReactFlow>
       </div>
-      {showInspector && selectedNode && (
+      {showInspector && (selectedNode || selectedEdge) && (
         <NodeInspector
-          nodeId={selectedNode}
+          nodeId={selectedNode || ''}
+          selectedEdge={selectedEdge}
           onClose={() => {
             setShowInspector(false);
             setFocusedElement(null, null); // NodeInspector 닫힐 때 포커스 해제
             setSelectedNode(null);
+            setSelectedEdge(null);
           }}
         />
       )}

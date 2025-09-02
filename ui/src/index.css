@@ -156,21 +156,52 @@ body {
 
 .react-flow__node {
   transition: all 0.1s ease-in-out;
+  /* 드래그 성능 최적화 */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
-/* ReactFlow 노드 선택(파란 네모) 효과 제거 */
+/* React Flow 드래그 성능 최적화 */
+.react-flow__pane {
+  cursor: grab;
+}
+
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+
+/* 노드 드래그 중 스타일 */
+.react-flow__node.dragging {
+  transition: none !important;
+  cursor: grabbing !important;
+  user-select: none;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* 드래그 중 노드 내부 요소들 비활성화 */
+.react-flow__node.dragging * {
+  pointer-events: none;
+}
+
+/* 선택된 노드 스타일 */
 .react-flow__node.selected {
+  z-index: 10;
+  /* ReactFlow 노드 선택(파란 네모) 효과 제거 */
   box-shadow: none !important;
   border: none !important;
   outline: none !important;
-  /* 필요하다면 background도 조정 가능 */
 }
 
+/* React Flow 핸들 스타일 최적화 */
 .react-flow__handle {
   width: 10px;
   height: 10px;
   background-color: #3b82f6;
   border: 2px solid white;
+  /* 드래그 성능 최적화 */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
 .react-flow__edge-path {

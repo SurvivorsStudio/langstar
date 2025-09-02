@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2 } from 'lucide-react';
+import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2, Database } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import CodeEditorPopup from './nodes/CodeEditorPopup';
@@ -19,12 +19,13 @@ import { NodeData, VariableValue } from '../types/node';
 
 interface NodeInspectorProps {
   nodeId: string;
+  selectedEdge?: any;
   onClose: () => void;
 }
 
-const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
+const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onClose }) => {
   const { nodes, edges, updateNodeData, executeNode, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
-  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings'>('input_data');
+  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>('input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
@@ -42,6 +43,27 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
   const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  // 엣지가 선택되었을 때 edge_data 탭으로 자동 전환
+  useEffect(() => {
+    if (selectedEdge) {
+      setActiveTab('edge_data');
+      // 엣지 전용 모드에서는 노드 정보 초기화
+      setCurrentNode(null);
+    } else {
+      setActiveTab('input_data');
+    }
+  }, [selectedEdge]);
+
+  // 노드 정보 로드 (엣지 상태와 분리)
+  useEffect(() => {
+    if (!selectedEdge && nodeId) {
+      const node = nodes.find((n: any) => n.id === nodeId);
+      if (node) {
+        setCurrentNode(node as any);
+      }
+    }
+  }, [nodeId, selectedEdge]); // nodes 의존성 제거
 
   // 크기 조절 이벤트 핸들러
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -159,11 +181,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
 
       // Adjust active tab based on node type and current active tab validity
       const nodeType = node.type;
-      let newDefaultTab: 'input_data' | 'code' | 'settings' = 'input_data';
+      let newDefaultTab: 'input_data' | 'code' | 'settings' | 'edge_data' = 'input_data';
       let currentTabIsValid = true;
 
       // 노드 타입별로 유효한 탭 정의
-      const validTabsByNodeType: Record<string, ('input_data' | 'code' | 'settings')[]> = {
+      const validTabsByNodeType: Record<string, ('input_data' | 'code' | 'settings' | 'edge_data')[]> = {
         'startNode': ['settings'],
         'endNode': ['input_data', 'settings'],
         'promptNode': ['input_data', 'code'],
@@ -214,7 +236,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         setIsNodeChanging(false);
       }, 100);
     }
-  }, [nodeId, edges, activeTab, manuallySelectedEdges]);
+  }, [nodeId, activeTab, manuallySelectedEdges]); // edges 의존성 제거
 
   // 현재 노드의 데이터가 변경될 때만 코드 동기화 (임시로 비활성화)
   // useEffect(() => {
@@ -307,10 +329,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         // 노드 실행을 위해 임시로 edge 데이터 수정
         const originalEdgeData = edges.find(e => e.id === edgeId)?.data;
         
-        // 선택된 input data로 edge 업데이트
+        // 선택된 input data로 edge 업데이트 (타임스탬프는 노드 실행 시에만 설정)
         updateEdgeData(edgeId, {
-          output: inputData,
-          timestamp: Date.now()
+          output: inputData
+          // timestamp는 노드 실행 시에만 설정되도록 제거
         });
         
         // 노드 실행
@@ -399,7 +421,9 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
       </div>
       
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100">
+          {selectedEdge ? 'Edge Inspector' : 'Node Inspector'}
+        </h2>
         <button
           onClick={onClose}
           className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -408,30 +432,45 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
         </button>
       </div>
       
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Node Name
-        </label>
-        <input
-          type="text"
-          value={nodeName}
-          onChange={handleNameChange}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          placeholder="영문자, 숫자, _만 사용"
-        />
-      </div>
+      {!selectedEdge && (
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Node Name
+          </label>
+          <input
+            type="text"
+            value={nodeName}
+            onChange={handleNameChange}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            placeholder="영문자, 숫자, _만 사용"
+          />
+        </div>
+      )}
       
       <div className="flex border-b border-gray-200 dark:border-gray-700">
-        {!isStartNode && (
+        {selectedEdge ? (
+          // 엣지 전용 탭
           <button
             className={`flex-1 py-2 flex justify-center items-center ${
-              activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+              activeTab === 'edge_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
             }`}
-            onClick={() => setActiveTab('input_data')}
+            onClick={() => setActiveTab('edge_data')}
           >
-            <LogIn size={16} className="mr-1" /> Input Data
+            <Database size={16} className="mr-1" /> Edge Data
           </button>
-        )}
+        ) : (
+          // 노드 전용 탭들
+          <>
+            {!isStartNode && (
+              <button
+                className={`flex-1 py-2 flex justify-center items-center ${
+                  activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                }`}
+                onClick={() => setActiveTab('input_data')}
+              >
+                <LogIn size={16} className="mr-1" /> Input Data
+              </button>
+            )}
 
         {(() => {
           if (isPromptNode || isSystemPromptNode) {
@@ -494,15 +533,45 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
           return null;
         })()}
 
-        {!(isPromptNode || isSystemPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode) && (
-          <button
-            className={`flex-1 py-2 flex justify-center items-center ${
-              activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
-            }`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={16} className="mr-1" /> Settings
-          </button>
+            {(() => {
+              if (isPromptNode || isSystemPromptNode) {
+                return (
+                  <button
+                    className={`flex-1 py-2 flex justify-center items-center ${
+                      activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                    onClick={() => setActiveTab('code')}
+                  >
+                    <Settings size={16} className="mr-1" /> Settings
+                  </button>
+                );
+              } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode)) {
+                return (
+                  <button
+                    className={`flex-1 py-2 flex justify-center items-center ${
+                      activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                    onClick={() => setActiveTab('code')}
+                  >
+                    <Code size={16} className="mr-1" /> Code
+                  </button>
+                );
+              } else {
+                return null;
+              }
+            })()}
+
+            {!(isPromptNode || isSystemPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode) && (
+              <button
+                className={`flex-1 py-2 flex justify-center items-center ${
+                  activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                }`}
+                onClick={() => setActiveTab('settings')}
+              >
+                <Settings size={16} className="mr-1" /> Settings
+              </button>
+            )}
+          </>
         )}
       </div>
       
@@ -589,7 +658,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                        </span>
                        <div className="flex items-center space-x-2">
                          <span className="text-xs text-green-600 dark:text-green-400">
-                           {new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()}
+                           {selectedEdgeInfo.timestamp && selectedEdgeInfo.timestamp > 0 
+                             ? new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()
+                             : 'Not executed yet'
+                           }
                          </span>
                          <Play className="w-3 h-3 text-green-600 dark:text-green-400" />
                        </div>
@@ -632,7 +704,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                               </span>
                               <div className="flex items-center space-x-2">
                                 <span className="text-xs text-gray-500 dark:text-gray-500">
-                                  {edge.data.timestamp ? new Date(edge.data.timestamp).toLocaleTimeString() : 'No timestamp'}
+                                  {edge.data.timestamp && edge.data.timestamp > 0 
+                                    ? new Date(edge.data.timestamp).toLocaleTimeString() 
+                                    : 'Not executed yet'
+                                  }
                                 </span>
                                 <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
                               </div>
@@ -682,6 +757,207 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, onClose }) => {
                     language="python"
                     readOnly={isUserNode}
                   />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'edge_data' && selectedEdge && (
+          <div className="p-4">
+            <div className="mb-6">
+              <div className="flex items-center mb-3">
+                <Database size={20} className="text-blue-500 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Edge Data Inspector</h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                이 엣지를 통해 전달되는 데이터를 확인할 수 있습니다.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connection Information</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Edge ID:</span>
+                  <span className="text-xs font-mono text-gray-700 dark:text-gray-300">{selectedEdge.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Source Node:</span>
+                  <span className="text-xs text-gray-700 dark:text-gray-300">{selectedEdge.source}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Target Node:</span>
+                  <span className="text-xs text-gray-700 dark:text-gray-300">{selectedEdge.target}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Transfer</h3>
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                {selectedEdge.data?.output ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <Database size={16} className="text-blue-500 mr-2" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Data from {selectedEdge.source}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        ✓ Available
+                      </span>
+                    </div>
+                    
+                    {/* JSON 데이터를 시각적으로 표시 */}
+                    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">JSON Data</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {typeof selectedEdge.data.output === 'object' 
+                                ? `${Object.keys(selectedEdge.data.output).length} properties`
+                                : '1 value'
+                              }
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(JSON.stringify(selectedEdge.data.output, null, 2));
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 max-h-60 overflow-auto">
+                        {(() => {
+                          const data = selectedEdge.data.output;
+                          if (typeof data === 'object' && data !== null) {
+                            return (
+                              <div className="space-y-2">
+                                {Object.entries(data).map(([key, value]) => (
+                                  <div key={key} className="flex items-start space-x-2">
+                                    <div className="flex-shrink-0 w-20">
+                                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                                        {key}
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      {(() => {
+                                        if (typeof value === 'string') {
+                                          return (
+                                            <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                                              "{value}"
+                                            </span>
+                                          );
+                                        } else if (typeof value === 'number') {
+                                          return (
+                                            <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded font-mono">
+                                              {value}
+                                            </span>
+                                          );
+                                        } else if (typeof value === 'boolean') {
+                                          return (
+                                            <span className={`text-xs px-2 py-1 rounded font-mono ${
+                                              value 
+                                                ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' 
+                                                : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                                            }`}>
+                                              {value.toString()}
+                                            </span>
+                                          );
+                                        } else if (value === null) {
+                                          return (
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                                              null
+                                            </span>
+                                          );
+                                        } else if (Array.isArray(value)) {
+                                          return (
+                                            <div className="text-xs">
+                                              <span className="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded font-mono">
+                                                Array ({value.length} items)
+                                              </span>
+                                              {value.length > 0 && (
+                                                <div className="mt-1 ml-2 space-y-1">
+                                                  {value.slice(0, 3).map((item, index) => (
+                                                    <div key={index} className="text-xs text-gray-600 dark:text-gray-400">
+                                                      [{index}]: {typeof item === 'string' ? `"${item}"` : String(item)}
+                                                    </div>
+                                                  ))}
+                                                  {value.length > 3 && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-500">
+                                                      ... and {value.length - 3} more
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        } else if (typeof value === 'object') {
+                                          return (
+                                            <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded font-mono">
+                                              Object ({Object.keys(value).length} properties)
+                                            </span>
+                                          );
+                                        } else {
+                                          return (
+                                            <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                                              {String(value)}
+                                            </span>
+                                          );
+                                        }
+                                      })()}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          } else {
+                            // 단일 값인 경우
+                            return (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Value:</span>
+                                <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
+                                  {typeof data === 'string' ? `"${data}"` : String(data)}
+                                </span>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Database size={32} className="mx-auto text-gray-400 dark:text-gray-500 mb-3" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No data available</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">
+                      Execute the source node to see data here
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {selectedEdge.data?.label && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Edge Label</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{selectedEdge.data.label}</span>
+                </div>
+              </div>
+            )}
+
+            {selectedEdge.data?.conditionDescription && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Condition</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{selectedEdge.data.conditionDescription}</span>
                 </div>
               </div>
             )}

@@ -1,14 +1,14 @@
 import React from 'react';
 import { 
-  Bot, Split, FileCode, MessageSquare, Settings, Group, GitMerge,
-  Database, Cpu, FolderOpen
+  Bot, Split, MessageSquare, Settings, Group, GitMerge,
+  Database, Cpu
 } from 'lucide-react';
 
 export interface NodeItem {
   type: string;
   label: string;
   description: string;
-  icon: (className?: string) => React.ReactNode;
+  icon: (className?: string, isDarkMode?: boolean) => React.ReactNode;
 }
 
 export interface NodeCategory {
@@ -16,6 +16,21 @@ export interface NodeCategory {
   title: string;
   nodes: NodeItem[];
 }
+
+// 아이콘 색상을 반환하는 함수
+const getIconColor = (nodeType: string, isDarkMode: boolean = false) => {
+  const colors: Record<string, { light: string; dark: string }> = {
+    'promptNode': { light: '#3b82f6', dark: '#60a5fa' },
+    'agentNode': { light: '#3b82f6', dark: '#60a5fa' },
+    'conditionNode': { light: '#f59e0b', dark: '#fbbf24' },
+    'functionNode': { light: '#8b5cf6', dark: '#a78bfa' },
+    'toolsMemoryNode': { light: '#6b7280', dark: '#9ca3af' },
+    'mergeNode': { light: '#8b5cf6', dark: '#a78bfa' }
+  };
+  
+  const color = colors[nodeType];
+  return color ? (isDarkMode ? color.dark : color.light) : '#6b7280';
+};
 
 export const nodeCategories: NodeCategory[] = [
   {
@@ -26,7 +41,9 @@ export const nodeCategories: NodeCategory[] = [
         type: 'promptNode',
         label: 'Prompt',
         description: 'Define a prompt template for LLM interaction',
-        icon: (className = '') => <MessageSquare size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <MessageSquare size={20} className={className} style={{ color: getIconColor('promptNode', isDarkMode) }} />
+        )
       },
       // {
       //   type: 'systemPromptNode',
@@ -38,31 +55,41 @@ export const nodeCategories: NodeCategory[] = [
         type: 'agentNode',
         label: 'Agent',
         description: 'Agent that can execute tools',
-        icon: (className = '') => <Bot size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <Bot size={20} className={className} style={{ color: getIconColor('agentNode', isDarkMode) }} />
+        )
       },
       {
         type: 'conditionNode',
         label: 'Condition',
         description: 'Conditional function to determine which route to take next',
-        icon: (className = '') => <Split size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <Split size={20} className={className} style={{ color: getIconColor('conditionNode', isDarkMode) }} />
+        )
       },
       {
         type: 'functionNode',
         label: 'Custom Python Function',
         description: 'Execute custom Python function',
-        icon: (className = '') => <FileCode size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <Database size={20} className={className} style={{ color: getIconColor('functionNode', isDarkMode) }} />
+        )
       },
       {
         type: 'toolsMemoryNode',
         label: 'Tools&Memory',
         description: 'Tools and Memory groups management',
-        icon: (className = '') => <FolderOpen size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />
+        )
       },
       {
         type: 'mergeNode',
         label: 'Merge',
         description: 'Merge inputs from multiple nodes',
-        icon: (className = '') => <GitMerge size={20} className={className} />
+        icon: (className = '', isDarkMode = false) => (
+          <GitMerge size={20} className={className} style={{ color: getIconColor('mergeNode', isDarkMode) }} />
+        )
       }
     ]
   }
@@ -80,7 +107,7 @@ export const nodeCategories: NodeCategory[] = [
   //       type: 'ragNode',
   //       label: 'RAG',
   //       description: 'Retrieval-Augmented Generation using vector store',
-  //       icon: (className = '') => <Database size={20} className={className} />
+  //       icon: (className = 'className' />
   //     }
   //   ]
   // }
