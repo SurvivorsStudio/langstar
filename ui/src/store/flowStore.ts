@@ -303,11 +303,13 @@ const validateStartNode = (node: Node<NodeData>): string | null => {
 
 const getUniqueNodeName = (nodes: Node<NodeData>[], baseLabel: string): string => {
   const existingNames = nodes.map(node => node.data.label);
-  let newName = baseLabel;
+  // 띄어쓰기를 언더스코어로 변환
+  const sanitizedBaseLabel = baseLabel.replace(/\s+/g, '_');
+  let newName = sanitizedBaseLabel;
   let counter = 1;
 
   while (existingNames.includes(newName)) {
-    newName = `${baseLabel} ${counter}`;
+    newName = `${sanitizedBaseLabel}_${counter}`;
     counter++;
   }
 
