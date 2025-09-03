@@ -16,6 +16,7 @@ import ToolsMemorySettings from './nodes/ToolsMemorySettings';
 import UserNodeSettings from './nodes/UserNodeSettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
+import JsonTreeViewer from './Common/JsonTreeViewer';
 
 interface NodeInspectorProps {
   nodeId: string;
@@ -668,11 +669,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                      </div>
                      
                      <div className="space-y-2">
-                       <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
-                         <pre className="whitespace-pre-wrap break-words">
-                           {JSON.stringify(mergedInputData, null, 2)}
-                         </pre>
-                       </div>
+                       <JsonTreeViewer 
+                         data={mergedInputData}
+                         title="Input Data"
+                         collapsed={false}
+                         showCopyButton={true}
+                         maxHeight="300px"
+                       />
                      </div>
                    </div>
                  )}
@@ -712,10 +715,15 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
                               </div>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded p-1 font-mono text-xs text-gray-700 dark:text-gray-300 opacity-60">
-                              <pre className="whitespace-pre-wrap break-words">
-                                {JSON.stringify(edge.data.output, null, 2)}
-                              </pre>
+                            <div className="mt-2">
+                              <JsonTreeViewer 
+                                data={edge.data.output}
+                                title={`Output from ${sourceNode?.data.label || edge.source}`}
+                                collapsed={true}
+                                showCopyButton={true}
+                                maxHeight="200px"
+                                className="text-xs"
+                              />
                             </div>
                           </div>
                         );
@@ -809,128 +817,15 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                       </span>
                     </div>
                     
-                    {/* JSON 데이터를 시각적으로 표시 */}
-                    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                      <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">JSON Data</span>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {typeof selectedEdge.data.output === 'object' 
-                                ? `${Object.keys(selectedEdge.data.output).length} properties`
-                                : '1 value'
-                              }
-                            </span>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(JSON.stringify(selectedEdge.data.output, null, 2));
-                              }}
-                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="p-3 max-h-60 overflow-auto">
-                        {(() => {
-                          const data = selectedEdge.data.output;
-                          if (typeof data === 'object' && data !== null) {
-                            return (
-                              <div className="space-y-2">
-                                {Object.entries(data).map(([key, value]) => (
-                                  <div key={key} className="flex items-start space-x-2">
-                                    <div className="flex-shrink-0 w-20">
-                                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-                                        {key}
-                                      </span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      {(() => {
-                                        if (typeof value === 'string') {
-                                          return (
-                                            <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                                              "{value}"
-                                            </span>
-                                          );
-                                        } else if (typeof value === 'number') {
-                                          return (
-                                            <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded font-mono">
-                                              {value}
-                                            </span>
-                                          );
-                                        } else if (typeof value === 'boolean') {
-                                          return (
-                                            <span className={`text-xs px-2 py-1 rounded font-mono ${
-                                              value 
-                                                ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' 
-                                                : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
-                                            }`}>
-                                              {value.toString()}
-                                            </span>
-                                          );
-                                        } else if (value === null) {
-                                          return (
-                                            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                                              null
-                                            </span>
-                                          );
-                                        } else if (Array.isArray(value)) {
-                                          return (
-                                            <div className="text-xs">
-                                              <span className="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded font-mono">
-                                                Array ({value.length} items)
-                                              </span>
-                                              {value.length > 0 && (
-                                                <div className="mt-1 ml-2 space-y-1">
-                                                  {value.slice(0, 3).map((item, index) => (
-                                                    <div key={index} className="text-xs text-gray-600 dark:text-gray-400">
-                                                      [{index}]: {typeof item === 'string' ? `"${item}"` : String(item)}
-                                                    </div>
-                                                  ))}
-                                                  {value.length > 3 && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-500">
-                                                      ... and {value.length - 3} more
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
-                                          );
-                                        } else if (typeof value === 'object') {
-                                          return (
-                                            <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded font-mono">
-                                              Object ({Object.keys(value).length} properties)
-                                            </span>
-                                          );
-                                        } else {
-                                          return (
-                                            <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                                              {String(value)}
-                                            </span>
-                                          );
-                                        }
-                                      })()}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          } else {
-                            // 단일 값인 경우
-                            return (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Value:</span>
-                                <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded font-mono">
-                                  {typeof data === 'string' ? `"${data}"` : String(data)}
-                                </span>
-                              </div>
-                            );
-                          }
-                        })()}
-                      </div>
-                    </div>
+                    {/* JSON 데이터를 트리 형태로 표시 */}
+                    <JsonTreeViewer 
+                      data={selectedEdge.data.output}
+                      title={`Data from ${selectedEdge.source}`}
+                      collapsed={false}
+                      showCopyButton={true}
+                      maxHeight="400px"
+                    />
+
                   </div>
                 ) : (
                   <div className="text-center py-6">
