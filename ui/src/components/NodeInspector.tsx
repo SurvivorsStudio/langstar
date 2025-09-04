@@ -16,6 +16,7 @@ import ToolsMemorySettings from './nodes/ToolsMemorySettings';
 import UserNodeSettings from './nodes/UserNodeSettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
+import { getNodeDescription } from '../utils/nodeDescriptions';
 
 interface NodeInspectorProps {
   nodeId: string;
@@ -29,6 +30,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
+  const [nodeDescription, setNodeDescription] = useState<string>('');
+  const [descriptionHeight, setDescriptionHeight] = useState<number>(3); // 기본 3줄
   const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
   const [isNodeChanging, setIsNodeChanging] = useState<boolean>(false);
   const lastSavedCodeRef = useRef<string>('');
@@ -122,6 +125,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       // 마지막 저장된 코드 초기화
       lastSavedCodeRef.current = nodeCode;
       setNodeName(node.data.label || 'Untitled Node');
+      
+      // description이 없으면 기본값 설정
+      const defaultDescription = getNodeDescription(node.type || '');
+      const nodeDescription = node.data.description || defaultDescription;
+      setNodeDescription(nodeDescription);
+      
+      // description이 없으면 노드 데이터에 기본값 설정
+      if (!node.data.description) {
+        updateNodeData(nodeId, {
+          ...node.data,
+          description: nodeDescription
+        });
+      }
 
       const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
       setIncomingEdges(currentIncomingEdges);
@@ -292,6 +308,23 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     }
   };
 
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNodeDescription(value);
+    
+    // 텍스트 길이에 따라 높이 자동 조절 (최소 3줄, 최대 10줄)
+    const lines = value.split('\n').length;
+    const newHeight = Math.max(3, Math.min(10, lines));
+    setDescriptionHeight(newHeight);
+    
+    if (currentNode) {
+      updateNodeData(nodeId, {
+        ...currentNode.data,
+        description: value
+      });
+    }
+  };
+
   const handleCodeChange = useCallback((newCode: string) => {
     console.log(`[NodeInspector] handleCodeChange called - nodeId: ${nodeId}, new code length: ${newCode?.length}`);
     console.log(`[NodeInspector] New code preview: ${newCode?.substring(0, 100)}...`);
@@ -433,17 +466,32 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       </div>
       
       {!selectedEdge && (
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Node Name
-          </label>
-          <input
-            type="text"
-            value={nodeName}
-            onChange={handleNameChange}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            placeholder="영문자, 숫자, _만 사용"
-          />
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Node Name
+            </label>
+            <input
+              type="text"
+              value={nodeName}
+              onChange={handleNameChange}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              placeholder="영문자, 숫자, _만 사용"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea
+              value={nodeDescription}
+              onChange={handleDescriptionChange}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 resize-y"
+              placeholder="Enter a description for the node"
+              rows={descriptionHeight}
+              style={{ minHeight: '72px', maxHeight: '240px' }}
+            />
+          </div>
         </div>
       )}
       
