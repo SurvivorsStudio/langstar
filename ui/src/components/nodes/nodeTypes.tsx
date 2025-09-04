@@ -11,7 +11,8 @@ const AgentNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Bot size={20} />,
-      nodeType: 'agentNode'
+      nodeType: 'agentNode',
+      description: 'Agent that can execute tools'
     }}
   />
 );
@@ -22,7 +23,8 @@ const ConditionNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Split size={20} />,
-      nodeType: 'conditionNode'
+      nodeType: 'conditionNode',
+      description: 'Conditional function to determine which route to take next'
     }}
   />
 );
@@ -33,7 +35,8 @@ const FunctionNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Database size={20} />,
-      nodeType: 'functionNode'
+      nodeType: 'functionNode',
+      description: 'Data processing and storage node'
     }}
   />
 );
@@ -44,7 +47,8 @@ const StartNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Play size={20} />,
-      nodeType: 'startNode'
+      nodeType: 'startNode',
+      description: 'Starting point of the workflow'
     }}
   />
 );
@@ -55,7 +59,8 @@ const EndNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Square size={20} />,
-      nodeType: 'endNode'
+      nodeType: 'endNode',
+      description: 'End of workflow'
     }}
   />
 );
@@ -66,7 +71,8 @@ const PromptNode = (props: any) => (
     data={{
       ...props.data,
       icon: <MessageSquare size={20} />,
-      nodeType: 'promptNode'
+      nodeType: 'promptNode',
+      description: 'Define a prompt template for LLM interaction'
     }}
   />
 );
@@ -77,7 +83,8 @@ const SystemPromptNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Settings size={20} />,
-      nodeType: 'systemPromptNode'
+      nodeType: 'systemPromptNode',
+      description: 'Define system and user prompts for LLM interaction'
     }}
   />
 );
@@ -88,7 +95,8 @@ const ToolsMemoryNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Group size={20} />,
-      nodeType: 'toolsMemoryNode'
+      nodeType: 'toolsMemoryNode',
+      description: 'Tools and Memory groups management'
     }}
   />
 );
@@ -99,7 +107,8 @@ const EmbeddingNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Database size={20} />,
-      nodeType: 'embeddingNode'
+      nodeType: 'embeddingNode',
+      description: 'Generate embeddings from text using configured models'
     }}
   />
 );
@@ -110,7 +119,8 @@ const RAGNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Database size={20} />,
-      nodeType: 'ragNode'
+      nodeType: 'ragNode',
+      description: 'Retrieval-Augmented Generation using vector store'
     }}
   />
 );
@@ -121,7 +131,8 @@ const MergeNode = (props: any) => (
     data={{
       ...props.data,
       icon: <GitMerge size={20} />,
-      nodeType: 'mergeNode'
+      nodeType: 'mergeNode',
+      description: 'Merge inputs from multiple nodes'
     }}
   />
 );
@@ -132,7 +143,8 @@ const UserNode = (props: any) => (
     data={{
       ...props.data,
       icon: <Database size={20} />,
-      nodeType: 'userNode'
+      nodeType: 'userNode',
+      description: 'User-defined custom node'
     }}
   />
 );
