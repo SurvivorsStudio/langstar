@@ -190,7 +190,7 @@ const FlowBuilder: React.FC = () => {
     if (isOverTrashZone) {
       // Start와 End 노드는 삭제 불가
       if (node.type !== 'startNode' && node.type !== 'endNode') {
-        if (window.confirm(`"${node.data.label}" 노드를 삭제하시겠습니까?`)) {
+        if (window.confirm(`Are you sure you want to delete this node?`)) {
           removeNode(node.id);
         }
       } else {
