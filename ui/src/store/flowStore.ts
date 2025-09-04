@@ -580,7 +580,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     } : type === 'loopNode' ? {
       repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
-      template: '# Enter your prompt template here\n\nSystem: You are a helpful AI assistant.\n\nUser: {user_input}\n\nAssistant:',
+      template: 'User: {{user_input}}\n\nAssistant:',
       outputVariable: 'user_input'
     } : type === 'agentNode' ? {
       model: '',

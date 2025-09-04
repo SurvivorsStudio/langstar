@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { AlertCircle, Pencil, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Pencil, Check, Search } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import type { AIConnection } from '../../store/flowStore';
 import CustomSelect from '../Common/CustomSelect';
 import MultiSelect from '../Common/MultiSelect';
+import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
 
 // Define an interface for the group objects for better type safety
 interface GroupData {
@@ -43,6 +44,8 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const [availableInputKeys, setAvailableInputKeys] = useState<string[]>([]);
   const [isSourceConnected, setIsSourceConnected] = useState<boolean>(false);
   const [hasValidSourceOutput, setHasValidSourceOutput] = useState<boolean>(false);
+  const [isKeySelectorOpen, setIsKeySelectorOpen] = useState(false);
+  const [currentSelectingKey, setCurrentSelectingKey] = useState<'system' | 'user' | null>(null);
 
   const DEFAULT_TOP_K = 40;
   const DEFAULT_TOP_P = 1;
@@ -73,6 +76,45 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
       setAvailableInputKeys([]);
     }
   }, [nodes, edges, nodeId, getNodeById]); // getNodeById는 store에서 오므로 직접적인 의존성은 아니지만, nodes/edges 변경 시 재계산 필요
+
+  // 새로운 트리뷰 팝업을 사용할지 확인
+  const shouldUseTreeView = () => {
+    const incomingEdge = edges.find(edge => edge.target === nodeId);
+    if (!incomingEdge) return false;
+    
+    const sourceNode = getNodeById(incomingEdge.source);
+    const output = sourceNode?.data?.output;
+    if (!output) return false;
+    
+    // 데이터가 있으면 항상 새로운 트리뷰 사용 (훨씬 좋은 UX)
+    return Object.keys(output).length > 0;
+  };
+
+  // 전체 input data 가져오기 (계층적 선택을 위해)
+  const getFullInputData = () => {
+    const incomingEdge = edges.find(edge => edge.target === nodeId);
+    if (!incomingEdge) return {};
+    
+    const sourceNode = getNodeById(incomingEdge.source);
+    return sourceNode?.data?.output || {};
+  };
+
+  // 계층적 선택기 열기
+  const openKeySelector = (keyType: 'system' | 'user') => {
+    setCurrentSelectingKey(keyType);
+    setIsKeySelectorOpen(true);
+  };
+
+  // 계층적 선택기에서 키 선택 처리
+  const handleKeySelect = (key: string) => {
+    if (currentSelectingKey === 'system') {
+      handleSystemPromptInputKeyChange(key);
+    } else if (currentSelectingKey === 'user') {
+      handleUserPromptInputKeyChange(key);
+    }
+    setIsKeySelectorOpen(false);
+    setCurrentSelectingKey(null);
+  };
 
   // Get all groups nodes and extract memory and tools groups
   const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
@@ -320,13 +362,35 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             System Prompt (Input Key)
           </label>
-          <CustomSelect
-            value={node?.data.config?.systemPromptInputKey || ''}
-            onChange={handleSystemPromptInputKeyChange}
-            options={availableInputKeys.map(key => ({ value: key, label: key }))}
-            placeholder="Select an input key for system prompt"
-            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
-          />
+          
+          {shouldUseTreeView() ? (
+            /* 데이터가 있는 경우 - 향상된 트리뷰 선택기 사용 */
+            <button
+              type="button"
+              onClick={() => openKeySelector('system')}
+              disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-left flex items-center justify-between ${
+                !isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)
+                  ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                  : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              <span>
+                {node?.data.config?.systemPromptInputKey || 'Select an input key for system prompt'}
+              </span>
+              <Search className="w-4 h-4 text-gray-400" />
+            </button>
+          ) : (
+            /* 데이터가 없는 경우 - 기존 CustomSelect 사용 */
+            <CustomSelect
+              value={node?.data.config?.systemPromptInputKey || ''}
+              onChange={handleSystemPromptInputKeyChange}
+              options={availableInputKeys.map(key => ({ value: key, label: key }))}
+              placeholder="Select an input key for system prompt"
+              disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+            />
+          )}
+          
           {!isSourceConnected && (
             <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
           )}
@@ -339,13 +403,35 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             User Prompt (Input Key)
           </label>
-          <CustomSelect
-            value={node?.data.config?.userPromptInputKey || ''}
-            onChange={handleUserPromptInputKeyChange}
-            options={availableInputKeys.map(key => ({ value: key, label: key }))}
-            placeholder="Select an input key for user prompt"
-            disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
-          />
+          
+          {shouldUseTreeView() ? (
+            /* 데이터가 있는 경우 - 향상된 트리뷰 선택기 사용 */
+            <button
+              type="button"
+              onClick={() => openKeySelector('user')}
+              disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-left flex items-center justify-between ${
+                !isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)
+                  ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                  : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              <span>
+                {node?.data.config?.userPromptInputKey || 'Select an input key for user prompt'}
+              </span>
+              <Search className="w-4 h-4 text-gray-400" />
+            </button>
+          ) : (
+            /* 데이터가 없는 경우 - 기존 CustomSelect 사용 */
+            <CustomSelect
+              value={node?.data.config?.userPromptInputKey || ''}
+              onChange={handleUserPromptInputKeyChange}
+              options={availableInputKeys.map(key => ({ value: key, label: key }))}
+              placeholder="Select an input key for user prompt"
+              disabled={!isSourceConnected || (isSourceConnected && !hasValidSourceOutput && availableInputKeys.length === 0)}
+            />
+          )}
+          
           {!isSourceConnected && (
             <p className="text-xs text-amber-500 mt-1">Connect an input node to see available keys.</p>
           )}
@@ -495,6 +581,19 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 }`}
         </pre>
       </div>
+
+      {/* 계층적 키 선택기 팝업 */}
+      <HierarchicalKeySelector
+        isOpen={isKeySelectorOpen}
+        onClose={() => {
+          setIsKeySelectorOpen(false);
+          setCurrentSelectingKey(null);
+        }}
+        data={getFullInputData()}
+        onSelect={handleKeySelect}
+        title={`키 선택 - ${currentSelectingKey === 'system' ? 'System Prompt' : currentSelectingKey === 'user' ? 'User Prompt' : ''}`}
+        selectedKey={currentSelectingKey === 'system' ? node?.data.config?.systemPromptInputKey : currentSelectingKey === 'user' ? node?.data.config?.userPromptInputKey : undefined}
+      />
     </div>
   );
 };
