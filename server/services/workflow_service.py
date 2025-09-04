@@ -127,17 +127,32 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
 
 class WorkflowService:
     """Workflow Node Processing Service"""
+
+    @staticmethod
+    def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
+        def replacer(match):
+            expr = match.group(1).strip()
+            try:
+                return str(eval(expr, {}, context))
+            except Exception as e:
+                return f"<ERROR: {e}>" if show_error else "{{" + expr + "}}"
+        return re.sub(r"\{\{(.*?)\}\}", replacer, prompt)
     
     @staticmethod
     def process_prompt_node(data) -> Dict[str, Any]:
+
+
         """Process prompt node"""
         try:
             logger.info(f"Processing prompt node with return_key: {data.return_key}")
-            template = PromptTemplate(
-                template=data.prompt,
-                input_variables=list(data.param.keys())
-            )
-            rendered = template.format(**data.param)
+            # template = PromptTemplate(
+            #     template=data.prompt,
+            #     input_variables=list(data.param.keys())
+            # )
+            # rendered = template.format(**data.param)
+
+            rendered = WorkflowService.render_prompt(data.prompt, data.param, False)
+            
             data.param[data.return_key] = rendered
             logger.info(f"Prompt node processed successfully")
             return data.param

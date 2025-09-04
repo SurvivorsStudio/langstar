@@ -76,10 +76,10 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
     const currentPosition = cursorPositionRef.current;
     const beforeCursor = tempValue.substring(0, currentPosition);
     const afterCursor = tempValue.substring(currentPosition);
-    const newValue = beforeCursor + `{${variableName}}` + afterCursor;
+    const newValue = beforeCursor + `{{${variableName}}}` + afterCursor;
     
     // 커서 위치를 삽입된 변수 뒤로 이동
-    const newCursorPosition = currentPosition + variableName.length + 2; // {variableName}의 길이
+    const newCursorPosition = currentPosition + variableName.length + 4; // {{variableName}}의 길이
     
     // 변수 삽입 플래그 설정
     isInsertingVariable.current = true;
@@ -225,7 +225,7 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
               <button
                 onClick={() => insertVariableAtCursor(fullPythonPath)}
                 className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-1 rounded font-mono text-sm font-semibold"
-                title={`클릭하여 {${fullPythonPath}} 삽입`}
+                title={`클릭하여 {{${fullPythonPath}}} 삽입`}
               >
                 {displayKey}
               </button>
@@ -257,7 +257,7 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
               <button
                 onClick={() => insertVariableAtCursor(fullPythonPath)}
                 className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-1 rounded font-mono text-sm font-semibold"
-                title={`클릭하여 {${fullPythonPath}} 삽입`}
+                title={`클릭하여 {{${fullPythonPath}}} 삽입`}
               >
                 {displayKey}
               </button>
@@ -333,7 +333,7 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
                 Prompt Template Editor
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Use {'{variable}'} syntax to insert variables from input
+                Use {`{{variable}}`} syntax to insert variables from input
               </p>
             </div>
           </div>
@@ -436,7 +436,7 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
                               key={variable}
                               className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                               onClick={() => insertVariableAtCursor(variable)}
-                              title={`클릭하여 {${variable}} 삽입`}
+                              title={`클릭하여 {{${variable}}} 삽입`}
                             >
                               <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                                 {variable}
