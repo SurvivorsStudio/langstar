@@ -9,6 +9,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowInstance,
   Node,
+  NodeDragHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -18,7 +19,7 @@ import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 
 const edgeTypes = {
   default: CustomEdge,
@@ -35,8 +36,11 @@ const FlowBuilder: React.FC = () => {
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [synced, setSynced] = useState(false);
-
-
+  
+  // 드래그 앤 드롭 삭제 관련 상태
+  const [showTrashZone, setShowTrashZone] = useState(false);
+  const [isOverTrashZone, setIsOverTrashZone] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // id와 projectName이 다를 때만 setProjectName (동기화 플래그 사용)
   useEffect(() => {
@@ -86,6 +90,37 @@ const FlowBuilder: React.FC = () => {
   // projectName이 바뀔 때(즉, 워크플로우를 처음 불러올 때)만 실행
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reactFlowInstance, viewport, projectName]);
+
+  // 전역 마우스 이벤트로 휴지통 위에 있는지 감지
+  useEffect(() => {
+    if (!isDragging || !showTrashZone) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const trashZoneElement = document.getElementById('trash-zone');
+      if (trashZoneElement) {
+        const trashRect = trashZoneElement.getBoundingClientRect();
+        const isOver = event.clientX >= trashRect.left && 
+                      event.clientX <= trashRect.right && 
+                      event.clientY >= trashRect.top && 
+                      event.clientY <= trashRect.bottom;
+        setIsOverTrashZone(isOver);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setShowTrashZone(false);
+      setIsOverTrashZone(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, showTrashZone]);
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
@@ -137,6 +172,37 @@ const FlowBuilder: React.FC = () => {
     setFocusedElement(null, null); // 패널 클릭 시 모든 포커스 해제
   }, [setFocusedElement, setSelectedNode]);
 
+  // 노드 드래그 이벤트 핸들러
+  const onNodeDragStart: NodeDragHandler = useCallback((_, node) => {
+    setIsDragging(true);
+    // Start와 End 노드는 삭제할 수 없으므로 휴지통을 표시하지 않음
+    if (node.type !== 'startNode' && node.type !== 'endNode') {
+      setShowTrashZone(true);
+    }
+  }, []);
+
+  const onNodeDrag: NodeDragHandler = useCallback((_, node) => {
+    // 드래그 중일 때는 전역 마우스 이벤트가 처리함
+  }, []);
+
+  const onNodeDragStop: NodeDragHandler = useCallback((_, node) => {
+    // 휴지통 영역에 드롭되었는지 확인
+    if (isOverTrashZone) {
+      // Start와 End 노드는 삭제 불가
+      if (node.type !== 'startNode' && node.type !== 'endNode') {
+        if (window.confirm(`Are you sure you want to delete this node?`)) {
+          removeNode(node.id);
+        }
+      } else {
+        alert('Start와 End 노드는 삭제할 수 없습니다.');
+      }
+    }
+    
+    setIsDragging(false);
+    setShowTrashZone(false);
+    setIsOverTrashZone(false);
+  }, [isOverTrashZone, removeNode]);
+
   // backspace 키로 노드 삭제 방지, delete 키로 선택된 노드 삭제
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (event.key === 'Backspace') {
@@ -170,6 +236,7 @@ const FlowBuilder: React.FC = () => {
     }
   }, [selectedNode, nodes, removeNode, setSelectedNode, setFocusedElement, focusedElement, removeEdge]);
 
+  // 드래그 앤 드롭으로 노드 추가
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -262,6 +329,9 @@ const FlowBuilder: React.FC = () => {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onKeyDown={onKeyDown}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
             // 드래그 성능 최적화
             nodesDraggable={true}
             nodesConnectable={true}
@@ -273,6 +343,41 @@ const FlowBuilder: React.FC = () => {
             gap={15} 
             variant={BackgroundVariant.Lines} 
           />
+          
+          {/* 휴지통 영역 */}
+          {showTrashZone && (
+            <div
+              id="trash-zone"
+              className={`fixed bottom-32 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-full shadow-lg transition-all duration-300 border-4 ${
+                isOverTrashZone 
+                  ? 'bg-red-500/40 text-red-600 scale-125 border-red-600 shadow-2xl' 
+                  : 'bg-gray-500/40 text-gray-700 dark:text-gray-200 border-gray-400/40 dark:border-gray-500/40 hover:scale-110 hover:bg-gray-500/50 hover:text-gray-800 dark:hover:text-gray-100'
+              }`}
+              style={{
+                width: '80px',
+                height: '80px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(4px)'
+              }}
+              onMouseEnter={() => setIsOverTrashZone(true)}
+              onMouseLeave={() => setIsOverTrashZone(false)}
+            >
+              <Trash2 
+                size={32} 
+                className={`transition-all duration-200 ${
+                  isOverTrashZone ? 'text-red-600' : 'text-gray-700 dark:text-gray-200'
+                }`}
+              />
+              {isOverTrashZone && (
+                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded text-sm whitespace-nowrap border border-gray-600 shadow-lg backdrop-blur-sm">
+                  Drop to delete
+                </div>
+              )}
+            </div>
+          )}
+          
           <Controls showInteractive={false} />
           <MiniMap nodeStrokeWidth={3} zoomable pannable />
           <Panel position="top-left" className="ml-4 mt-4">
