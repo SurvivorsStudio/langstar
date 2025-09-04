@@ -42,6 +42,63 @@ const FlowBuilder: React.FC = () => {
   const [isOverTrashZone, setIsOverTrashZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const trashZone = document.getElementById('trash-zone');
+        if (trashZone) {
+          const rect = trashZone.getBoundingClientRect();
+          const isOver = e.clientX >= rect.left && 
+                        e.clientX <= rect.right && 
+                        e.clientY >= rect.top && 
+                        e.clientY <= rect.bottom;
+          setIsOverTrashZone(isOver);
+        }
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+    };
+  }, [isDragging]);
+
+  // 엣지 삭제 드래그 이벤트 처리
+  useEffect(() => {
+    const handleEdgeDragStart = (e: CustomEvent) => {
+      setIsDragging(true);
+      setShowTrashZone(true);
+    };
+
+    const handleEdgeDragEnd = (e: CustomEvent) => {
+      const { edgeId, isOverTrashZone: edgeIsOverTrash } = e.detail;
+      
+      // CustomEdge에서 직접 계산된 값 사용
+      if (edgeIsOverTrash) {
+        if (window.confirm(`Are you sure you want to delete this edge?`)) {
+          removeEdge(edgeId);
+        }
+      }
+      
+      // 상태 초기화
+      setIsDragging(false);
+      setShowTrashZone(false);
+      setIsOverTrashZone(false);
+    };
+
+    window.addEventListener('edge-drag-start', handleEdgeDragStart as EventListener);
+    window.addEventListener('edge-drag-end', handleEdgeDragEnd as EventListener);
+
+    return () => {
+      window.removeEventListener('edge-drag-start', handleEdgeDragStart as EventListener);
+      window.removeEventListener('edge-drag-end', handleEdgeDragEnd as EventListener);
+    };
+  }, [isOverTrashZone, removeEdge]);
+
   // id와 projectName이 다를 때만 setProjectName (동기화 플래그 사용)
   useEffect(() => {
     if (id) {
