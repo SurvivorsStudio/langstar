@@ -3,6 +3,7 @@ import {
   Bot, Split, MessageSquare, Settings, Group, GitMerge,
   Database, Cpu
 } from 'lucide-react';
+import { getNodeCategoryDescription } from '../utils/nodeDescriptions';
 
 export interface NodeItem {
   type: string;
@@ -20,12 +21,12 @@ export interface NodeCategory {
 // 아이콘 색상을 반환하는 함수
 const getIconColor = (nodeType: string, isDarkMode: boolean = false) => {
   const colors: Record<string, { light: string; dark: string }> = {
-    'promptNode': { light: '#3b82f6', dark: '#60a5fa' },
+    'promptNode': { light: '#25A18E', dark: '#25A18E' },
     'agentNode': { light: '#3b82f6', dark: '#60a5fa' },
     'conditionNode': { light: '#f59e0b', dark: '#fbbf24' },
-    'functionNode': { light: '#8b5cf6', dark: '#a78bfa' },
+    'functionNode': { light: '#5B5F97', dark: '#5B5F97' },
     'toolsMemoryNode': { light: '#6b7280', dark: '#9ca3af' },
-    'mergeNode': { light: '#8b5cf6', dark: '#a78bfa' }
+    'mergeNode': { light: '#FF6B6C', dark: '#FF6B6C' }
   };
   
   const color = colors[nodeType];
@@ -40,7 +41,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'promptNode',
         label: 'Prompt',
-        description: 'Define a prompt template for LLM interaction',
+        description: getNodeCategoryDescription('promptNode'),
         icon: (className = '', isDarkMode = false) => (
           <MessageSquare size={20} className={className} style={{ color: getIconColor('promptNode', isDarkMode) }} />
         )
@@ -54,7 +55,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'agentNode',
         label: 'Agent',
-        description: 'Agent that can execute tools',
+        description: getNodeCategoryDescription('agentNode'),
         icon: (className = '', isDarkMode = false) => (
           <Bot size={20} className={className} style={{ color: getIconColor('agentNode', isDarkMode) }} />
         )
@@ -62,7 +63,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'conditionNode',
         label: 'Condition',
-        description: 'Conditional function to determine which route to take next',
+        description: getNodeCategoryDescription('conditionNode'),
         icon: (className = '', isDarkMode = false) => (
           <Split size={20} className={className} style={{ color: getIconColor('conditionNode', isDarkMode) }} />
         )
@@ -70,7 +71,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'functionNode',
         label: 'Custom Python Function',
-        description: 'Execute custom Python function',
+        description: getNodeCategoryDescription('functionNode'),
         icon: (className = '', isDarkMode = false) => (
           <Database size={20} className={className} style={{ color: getIconColor('functionNode', isDarkMode) }} />
         )
@@ -78,7 +79,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'toolsMemoryNode',
         label: 'Tools&Memory',
-        description: 'Tools and Memory groups management',
+        description: getNodeCategoryDescription('toolsMemoryNode'),
         icon: (className = '', isDarkMode = false) => (
           <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />
         )
@@ -86,7 +87,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'mergeNode',
         label: 'Merge',
-        description: 'Merge inputs from multiple nodes',
+        description: getNodeCategoryDescription('mergeNode'),
         icon: (className = '', isDarkMode = false) => (
           <GitMerge size={20} className={className} style={{ color: getIconColor('mergeNode', isDarkMode) }} />
         )

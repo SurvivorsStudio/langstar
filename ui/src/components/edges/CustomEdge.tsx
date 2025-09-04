@@ -42,6 +42,7 @@ const CustomEdge = ({
 
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
   const [dragStartTimeout, setDragStartTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [trashZoneRect, setTrashZoneRect] = useState<DOMRect | null>(null);
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
@@ -337,6 +338,20 @@ const CustomEdge = ({
       setEdgeNodePosition(coordinates); // 초기 위치 설정
     }
     
+    // 휴지통 표시를 위한 이벤트 발생
+    window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
+    
+    // 휴지통 위치 저장 (50ms 후 휴지통이 나타나면 저장)
+    setTimeout(() => {
+      const trashZone = document.getElementById('trash-zone');
+      if (trashZone) {
+        const rect = trashZone.getBoundingClientRect();
+        setTrashZoneRect(rect);
+      } else {
+        setTrashZoneRect(null);
+      }
+    }, 50);
+    
     // 150ms 후에 드래그 시작 (클릭과 구분)
     const timeout = setTimeout(() => {
       setIsDragging(true);
@@ -357,10 +372,36 @@ const CustomEdge = ({
         }
       };
 
-      const handleMouseUp = () => {
+      const handleMouseUp = (e: MouseEvent) => {
         setIsDragging(false);
 
-        // 마지막 마우스 위치를 엣지 노드 위치로 저장 (이미 실시간으로 업데이트됨)
+        // 저장된 휴지통 위치로 확인
+        const checkTrashZone = () => {
+          if (trashZoneRect) {
+            // 휴지통 영역을 조금 더 크게 계산 (여백 20px 추가)
+            const margin = 20;
+            const isOverTrash = e.clientX >= (trashZoneRect.left - margin) && 
+                              e.clientX <= (trashZoneRect.right + margin) && 
+                              e.clientY >= (trashZoneRect.top - margin) && 
+                              e.clientY <= (trashZoneRect.bottom + margin);
+            return isOverTrash;
+          }
+          return false;
+        };
+
+        const isOverTrashZone = checkTrashZone();
+
+        // 휴지통 영역 정보와 함께 이벤트 발생
+        window.dispatchEvent(new CustomEvent('edge-drag-end', { 
+          detail: { 
+            edgeId: id,
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            isOverTrashZone
+          } 
+        }));
+        
+        // 마지막 마우스 위치를 엣지 노드 위치로 저장 (휴지통에 드롭되지 않은 경우)
         if (lastMousePosition) {
           updateEdgeData(id, { edgeNodePosition: lastMousePosition });
         }
@@ -390,7 +431,7 @@ const CustomEdge = ({
           markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill={isDarkMode ? "#60a5fa" : "#3b82f6"} />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#97A2B6" />
         </marker>
       </defs>
       
@@ -402,7 +443,7 @@ const CustomEdge = ({
           isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
         }`}
         d={inputPath}
-        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        stroke="#97A2B6"
         strokeDasharray="5,5"
         fill="none"
         style={{ 
@@ -427,7 +468,7 @@ const CustomEdge = ({
         }`}
         d={outputPath}
         markerEnd="url(#arrow)"
-        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        stroke="#97A2B6"
         strokeDasharray="5,5"
         fill="none"
         style={{ 

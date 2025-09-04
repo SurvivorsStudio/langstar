@@ -398,7 +398,6 @@ def node_{node_name}(state):
     return code
 
 
-
 def prompt_node_code( node ) : 
     node_name = node['data']['label']
     node_id = node['id']
