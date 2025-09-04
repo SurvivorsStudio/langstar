@@ -371,7 +371,7 @@ const FlowBuilder: React.FC = () => {
               />
               {isOverTrashZone && (
                 <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded text-sm whitespace-nowrap border-2 border-red-600 shadow-lg">
-                  놓아서 삭제
+                  Drop to delete
                 </div>
               )}
             </div>
