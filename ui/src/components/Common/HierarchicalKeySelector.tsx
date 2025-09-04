@@ -8,6 +8,7 @@ interface HierarchicalKeySelectorProps {
   onSelect: (key: string) => void;
   title?: string;
   selectedKey?: string;
+  pathStyle?: 'dot' | 'python'; // 경로 스타일 옵션
 }
 
 interface TreeNode {
@@ -26,7 +27,8 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
   data,
   onSelect,
   title = "키 선택",
-  selectedKey
+  selectedKey,
+  pathStyle = 'dot'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -111,18 +113,35 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
   const buildFullPath = (pathArray: string[]): string => {
     if (pathArray.length === 0) return '';
     
-    let result = pathArray[0];
-    for (let i = 1; i < pathArray.length; i++) {
-      const segment = pathArray[i];
-      if (segment.startsWith('[') && segment.endsWith(']')) {
-        // 배열 인덱스인 경우 점을 붙이지 않음
-        result += segment;
-      } else {
-        // 일반 객체 키인 경우 점으로 연결
-        result += '.' + segment;
+    if (pathStyle === 'python') {
+      // Python 스타일: mm['api_response']['data']['users'][1]['age']
+      let result = pathArray[0];
+      for (let i = 1; i < pathArray.length; i++) {
+        const segment = pathArray[i];
+        if (segment.startsWith('[') && segment.endsWith(']')) {
+          // 배열 인덱스인 경우: [1]
+          result += segment;
+        } else {
+          // 일반 객체 키인 경우: ['key']
+          result += `['${segment}']`;
+        }
       }
+      return result;
+    } else {
+      // Dot notation 스타일: mm.api_response.data.users[1].age
+      let result = pathArray[0];
+      for (let i = 1; i < pathArray.length; i++) {
+        const segment = pathArray[i];
+        if (segment.startsWith('[') && segment.endsWith(']')) {
+          // 배열 인덱스인 경우 점을 붙이지 않음
+          result += segment;
+        } else {
+          // 일반 객체 키인 경우 점으로 연결
+          result += '.' + segment;
+        }
+      }
+      return result;
     }
-    return result;
   };
 
   // JSON 데이터를 트리 구조로 변환
