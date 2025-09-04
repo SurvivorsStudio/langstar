@@ -3,6 +3,7 @@ import {
   Bot, Split, MessageSquare, Settings, Group, GitMerge,
   Database, Cpu
 } from 'lucide-react';
+import { getNodeCategoryDescription } from '../utils/nodeDescriptions';
 
 export interface NodeItem {
   type: string;
@@ -40,7 +41,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'promptNode',
         label: 'Prompt',
-        description: 'Define a prompt template for LLM interaction',
+        description: getNodeCategoryDescription('promptNode'),
         icon: (className = '', isDarkMode = false) => (
           <MessageSquare size={20} className={className} style={{ color: getIconColor('promptNode', isDarkMode) }} />
         )
@@ -54,7 +55,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'agentNode',
         label: 'Agent',
-        description: 'Agent that can execute tools',
+        description: getNodeCategoryDescription('agentNode'),
         icon: (className = '', isDarkMode = false) => (
           <Bot size={20} className={className} style={{ color: getIconColor('agentNode', isDarkMode) }} />
         )
@@ -62,7 +63,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'conditionNode',
         label: 'Condition',
-        description: 'Conditional function to determine which route to take next',
+        description: getNodeCategoryDescription('conditionNode'),
         icon: (className = '', isDarkMode = false) => (
           <Split size={20} className={className} style={{ color: getIconColor('conditionNode', isDarkMode) }} />
         )
@@ -70,7 +71,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'functionNode',
         label: 'Custom Python Function',
-        description: 'Execute custom Python function',
+        description: getNodeCategoryDescription('functionNode'),
         icon: (className = '', isDarkMode = false) => (
           <Database size={20} className={className} style={{ color: getIconColor('functionNode', isDarkMode) }} />
         )
@@ -78,7 +79,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'toolsMemoryNode',
         label: 'Tools&Memory',
-        description: 'Tools and Memory groups management',
+        description: getNodeCategoryDescription('toolsMemoryNode'),
         icon: (className = '', isDarkMode = false) => (
           <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />
         )
@@ -86,7 +87,7 @@ export const nodeCategories: NodeCategory[] = [
       {
         type: 'mergeNode',
         label: 'Merge',
-        description: 'Merge inputs from multiple nodes',
+        description: getNodeCategoryDescription('mergeNode'),
         icon: (className = '', isDarkMode = false) => (
           <GitMerge size={20} className={className} style={{ color: getIconColor('mergeNode', isDarkMode) }} />
         )

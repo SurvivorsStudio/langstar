@@ -4,6 +4,7 @@ import { ChevronRight, X, Play, Loader, Edit2, AlertCircle, Plus, Trash2, Eye } 
 import { useFlowStore } from '../../store/flowStore';
 import { useThemeStore } from '../../store/themeStore';
 import PromptTemplatePopup from './PromptTemplatePopup';
+import { getNodeDescription } from '../../utils/nodeDescriptions';
 
 /**
  * CustomNode 컴포넌트
@@ -51,25 +52,21 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
   const hasConnection = edges.some(edge => edge.source === id);
 
-  // 노드 설명 텍스트 생성
-  const getNodeDescription = () => {
-    const descriptions: Record<string, string> = {
-      'startNode': 'A start node in the workflow',
-      'promptNode': 'A prompt node for user input and AI responses',
-      'functionNode': 'A function node for executing custom logic',
-      'endNode': 'An end node that terminates the workflow',
-      'agentNode': 'An agent node for AI agent interactions',
-      'conditionNode': 'A condition node for workflow branching',
-      'toolNode': 'A tool node for external tool integration',
-      'toolsMemoryNode': 'A tools and memory management node',
-      'embeddingNode': 'An embedding node for vector operations',
-      'ragNode': 'A RAG node for retrieval-augmented generation',
-      'mergeNode': 'A merge node for combining multiple inputs',
-      'userNode': 'A user interaction node'
-    };
-    
-    return descriptions[type] || 'A workflow node';
+  // 노드 설명 텍스트 생성 (노드 데이터의 description 우선, 없으면 기본값 사용)
+  const getNodeDescriptionText = () => {
+    // 노드 데이터에 description이 있으면 그것을 사용, 없으면 기본값 사용
+    return data.description || getNodeDescription(type);
   };
+
+  // 툴팁용 설명 텍스트 (40자 제한)
+  const getTooltipDescription = () => {
+    const fullDescription = getNodeDescriptionText();
+    if (fullDescription.length <= 40) {
+      return fullDescription;
+    }
+    return fullDescription.substring(0, 40) + '...';
+  };
+
 
   // 노드 더블클릭 핸들러 - 툴팁 토글
   const handleNodeDoubleClick = () => {
@@ -731,8 +728,11 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                       <h3 className="font-bold text-sm mb-1" style={{ color: nodeStyle.iconColor }}>
                         {data.label}
                       </h3>
-                      <p className="text-xs" style={{ color: nodeStyle.textColor }}>
-                        {getNodeDescription()}
+                      <p 
+                        className="text-xs" 
+                        style={{ color: nodeStyle.textColor }}
+                      >
+                        {getTooltipDescription()}
                       </p>
                     </div>
                     <button
