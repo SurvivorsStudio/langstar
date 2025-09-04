@@ -410,7 +410,20 @@ def prompt_node_code( node ) :
     prompt_template = node['data']['config']['template']
 
 
-    code = f"""
+    code = """
+def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
+    def replacer(match):
+        expr = match.group(1).strip()
+        try:
+            return str(eval(expr, {}, context))
+        except Exception as e:
+            return f"<ERROR: {e}>" if show_error else "{{" + expr + "}}"
+
+    return re.sub(r"\{\{(.*?)\}\}", replacer, prompt)
+
+"""
+
+    code += f"""
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     my_name = "{node_name}" 
@@ -425,12 +438,7 @@ def node_{node_name}(state):
     prompt_template = '''{prompt_template}'''
     
     # prompt 생성 
-    template = PromptTemplate(
-        template=prompt_template,
-        input_variables=list(node_input.keys())
-    )
-
-    prompt = template.format(**node_input)
+    prompt = render_prompt(prompt_template, node_input)
     output_value = node_config['outputVariable']
     
     # 다음 노드에 전달하는 값 
