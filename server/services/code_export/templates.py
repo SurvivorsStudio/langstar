@@ -410,6 +410,7 @@ def prompt_node_code( node ) :
     prompt_template = node['data']['config']['template']
 
 
+
     code = """
 def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
     def replacer(match):
@@ -424,6 +425,7 @@ def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
 """
 
     code += f"""
+
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
     my_name = "{node_name}" 
@@ -438,7 +440,9 @@ def node_{node_name}(state):
     prompt_template = '''{prompt_template}'''
     
     # prompt 생성 
+
     prompt = render_prompt(prompt_template, node_input)
+
     output_value = node_config['outputVariable']
     
     # 다음 노드에 전달하는 값 
