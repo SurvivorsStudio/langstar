@@ -154,20 +154,20 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       },
       'promptNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#3b82f6',
-        iconColor: '#3b82f6',
+        borderColor: '#25A18E',
+        iconColor: '#25A18E',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
       'functionNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#8b5cf6',
-        iconColor: '#8b5cf6',
+        borderColor: '#5B5F97',
+        iconColor: '#5B5F97',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
       'endNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#ef4444',
-        iconColor: '#ef4444',
+        borderColor: '#10b981',
+        iconColor: '#10b981',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
       'agentNode': {
@@ -208,8 +208,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       },
       'mergeNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#8b5cf6',
-        iconColor: '#8b5cf6',
+        borderColor: '#FF6B6C',
+        iconColor: '#FF6B6C',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
       'userNode': {

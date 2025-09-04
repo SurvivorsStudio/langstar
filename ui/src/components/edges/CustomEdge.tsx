@@ -390,7 +390,7 @@ const CustomEdge = ({
           markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill={isDarkMode ? "#60a5fa" : "#3b82f6"} />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#97A2B6" />
         </marker>
       </defs>
       
@@ -402,7 +402,7 @@ const CustomEdge = ({
           isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
         }`}
         d={inputPath}
-        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        stroke="#97A2B6"
         strokeDasharray="5,5"
         fill="none"
         style={{ 
@@ -427,7 +427,7 @@ const CustomEdge = ({
         }`}
         d={outputPath}
         markerEnd="url(#arrow)"
-        stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+        stroke="#97A2B6"
         strokeDasharray="5,5"
         fill="none"
         style={{ 
