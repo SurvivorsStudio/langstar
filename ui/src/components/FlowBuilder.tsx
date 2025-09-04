@@ -348,17 +348,18 @@ const FlowBuilder: React.FC = () => {
           {showTrashZone && (
             <div
               id="trash-zone"
-              className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-full shadow-lg transition-all duration-200 border-4 ${
+              className={`fixed bottom-32 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-full shadow-lg transition-all duration-300 border-4 ${
                 isOverTrashZone 
-                  ? 'bg-red-500 text-white scale-110 border-red-600 shadow-xl' 
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-400 dark:border-gray-500'
+                  ? 'bg-transparent text-red-600 scale-125 border-red-600 shadow-2xl' 
+                  : 'bg-transparent text-gray-700 dark:text-gray-200 border-transparent hover:scale-110 hover:text-gray-800 dark:hover:text-gray-100'
               }`}
               style={{
                 width: '80px',
                 height: '80px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                backdropFilter: 'blur(4px)'
               }}
               onMouseEnter={() => setIsOverTrashZone(true)}
               onMouseLeave={() => setIsOverTrashZone(false)}
@@ -366,11 +367,11 @@ const FlowBuilder: React.FC = () => {
               <Trash2 
                 size={32} 
                 className={`transition-all duration-200 ${
-                  isOverTrashZone ? 'text-white' : 'text-gray-500 dark:text-gray-400'
+                  isOverTrashZone ? 'text-red-600' : 'text-gray-700 dark:text-gray-200'
                 }`}
               />
               {isOverTrashZone && (
-                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded text-sm whitespace-nowrap border-2 border-red-600 shadow-lg">
+                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1 rounded text-sm whitespace-nowrap border border-gray-600 shadow-lg backdrop-blur-sm">
                   Drop to delete
                 </div>
               )}
