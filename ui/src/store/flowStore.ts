@@ -808,7 +808,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
-  setNodeExecuting: (nodeId: string, isExecuting: boolean) => {
+  setNodeExecuting: (nodeId: string, isExecuting: boolean, success: boolean = true, nodeName?: string, isWorkflowExecution?: boolean) => {
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === nodeId) {
@@ -820,6 +820,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         return node;
       })
     });
+    
+    // 실행 완료 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
+    if (!isExecuting && !isWorkflowExecution) {
+      window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
+        detail: { nodeId, success, nodeName } 
+      }));
+    }
   },
 
   updateEdgeLabel: (edgeId: string, label: string) => {
@@ -848,8 +855,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const node = get().nodes.find(n => n.id === nodeId);
     if (!node) return;
 
+    // 노드 이름 가져오기
+    const nodeName = node.data?.label || node.type || 'Node';
+
     get().updateNodeData(nodeId, { ...node.data, inputData: null }); // 실행 전 inputData 초기화 (선택적)
-    get().setNodeExecuting(nodeId, true);
+    // Check if workflow is running
+    const isWorkflowRunning = get().isWorkflowRunning;
+    get().setNodeExecuting(nodeId, true, true, nodeName, isWorkflowRunning);
     
     // Node Inspector와 동일한 방식으로 input data 선택
     const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
@@ -1369,11 +1381,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
 
       get().setNodeOutput(nodeId, output);
+      
+      // output에 error가 있으면 실패로 처리
+      const hasError = output && typeof output === 'object' && output.error;
+      get().setNodeExecuting(nodeId, false, !hasError, nodeName, isWorkflowRunning); // error가 있으면 실패
     } catch (error) {
       console.error('Error executing node:', error);
       get().setNodeOutput(nodeId, { error: 'Execution failed' });
-    } finally {
-      get().setNodeExecuting(nodeId, false);
+      get().setNodeExecuting(nodeId, false, false, nodeName, isWorkflowRunning); // 실패로 표시
     }
   },
 
@@ -1410,11 +1425,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       await executeNode(currentNodeId, chatId); // executeNode 호출 시 chatId 전달
 
       const executedNode = getNodeById(currentNodeId); // 실행 후 최신 노드 정보 가져오기
-      console.log(`✅ 노드 ${currentNodeId} (${executedNode?.data.label}) 실행 완료. 출력:`, executedNode?.data.output);
+      
+      // 에러 확인
+      if (executedNode?.data.output?.error) {
+        console.error(`❌ Workflow execution stopped: Error occurred in node ${executedNode.data.label}:`, executedNode.data.output.error);
+        setWorkflowRunning(false);
+        
+        // Workflow failure toast (including failed node information)
+        window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
+          detail: { 
+            nodeId: 'workflow', 
+            success: false, 
+            nodeName: 'Workflow',
+            failedNodeName: executedNode.data.label // Failed node name
+          } 
+        }));
+        
+        return; // Workflow stopped
+      }
+      
+      console.log(`✅ Node ${currentNodeId} (${executedNode?.data.label}) execution completed. Output:`, executedNode?.data.output);
 
       const latestEdges = get().edges; 
       const outgoingEdges = latestEdges.filter(edge => edge.source === currentNodeId);
-      console.log(`  🔎 노드 ${currentNodeId}의 나가는 엣지 ${outgoingEdges.length}개 확인 중...`);
+      console.log(`  🔎 Checking ${outgoingEdges.length} outgoing edges from node ${currentNodeId}...`);
 
       for (const edge of outgoingEdges) {
         if (edge.data?.output !== null && edge.data?.output !== undefined) {
@@ -1434,9 +1468,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
     console.log("\n=========================================");
-    console.log("🏁 워크플로우 실행 완료.");
+    console.log("🏁 Workflow execution completed.");
     console.log("=========================================");
     setWorkflowRunning(false);
+    
+    // Workflow success toast
+    window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
+      detail: { 
+        nodeId: 'workflow', 
+        success: true, 
+        nodeName: 'Workflow' 
+      } 
+    }));
   },
 
   saveWorkflow: async () => {
