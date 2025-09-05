@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
-import { useNodeExecutionEvents } from '../hooks/useNodeExecutionEvents';
-import { useFlowStore } from '../store/flowStore';
 
 interface ToastMessage {
   id: string;
@@ -17,7 +15,6 @@ interface ToastMessage {
  */
 const ExecutionToast: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const nodes = useFlowStore(state => state.nodes);
 
   // 노드 실행 완료 이벤트 감지
   useEffect(() => {
@@ -30,12 +27,12 @@ const ExecutionToast: React.FC = () => {
       // 워크플로우 실패 시 실패한 노드 정보 포함
       let message;
       if (success) {
-        message = `${nodeLabel} node has been executed successfully.`;
+        message = `**${nodeLabel}** node has been executed successfully.`;
       } else {
         if (nodeId === 'workflow' && failedNodeName) {
-          message = `Workflow failed at ${failedNodeName} node. Please check the configuration.`;
+          message = `Workflow failed at **${failedNodeName}** node. Please check the configuration.`;
         } else {
-          message = `${nodeLabel} node execution failed. Please check the configuration.`;
+          message = `**${nodeLabel}** node execution failed. Please check the configuration.`;
         }
       }
       
@@ -44,16 +41,11 @@ const ExecutionToast: React.FC = () => {
         type: success ? 'success' : 'error',
         title: success ? 'Node Execution Completed' : 'Node Execution Failed',
         message,
-        duration: 4000,
+        duration: 3500,
         timestamp: new Date()
       };
 
       setToasts(prev => [...prev, toast]);
-
-      // 자동 제거
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== toast.id));
-      }, 4000);
     };
 
     window.addEventListener('nodeExecutionCompleted', handleToastEvent as EventListener);
@@ -62,32 +54,6 @@ const ExecutionToast: React.FC = () => {
       window.removeEventListener('nodeExecutionCompleted', handleToastEvent as EventListener);
     };
   }, []); // 빈 의존성 배열
-
-  const showCompletionToast = useCallback((nodeId: string) => {
-    const node = nodes.find(n => n.id === nodeId);
-    const nodeLabel = node?.data?.label || node?.type || `Node ${nodeId}`;
-    
-    const toast: ToastMessage = {
-      id: `${nodeId}-${Date.now()}`,
-      type: 'success',
-      title: '노드 실행 완료',
-      message: `${nodeLabel} 노드가 성공적으로 실행되었습니다.`,
-      duration: 4000,
-      timestamp: new Date()
-    };
-
-    console.log('🍞 Toast: Adding toast:', toast);
-    setToasts(prev => {
-      const newToasts = [...prev, toast];
-      console.log('🍞 Toast: Current toasts:', newToasts);
-      return newToasts;
-    });
-
-    // 자동 제거
-    setTimeout(() => {
-      removeToast(toast.id);
-    }, toast.duration);
-  }, [nodes]);
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
@@ -119,16 +85,24 @@ const ToastItem: React.FC<{
   onRemove: () => void; 
 }> = ({ toast, onRemove }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const handleRemove = useCallback(() => {
+    setIsRemoving(true);
+    setTimeout(onRemove, 300); // 애니메이션 후 제거
+  }, [onRemove]);
 
   useEffect(() => {
     // 등장 애니메이션
     setTimeout(() => setIsVisible(true), 100);
-  }, []);
 
-  const handleRemove = () => {
-    setIsVisible(false);
-    setTimeout(onRemove, 300); // 애니메이션 후 제거
-  };
+    // 자동 제거 타이머
+    const timer = setTimeout(() => {
+      handleRemove();
+    }, toast.duration || 3500);
+
+    return () => clearTimeout(timer);
+  }, [toast.duration, handleRemove]);
 
   const getIcon = () => {
     switch (toast.type) {
@@ -152,10 +126,23 @@ const ToastItem: React.FC<{
     }
   };
 
+  // 볼드 텍스트 처리 함수
+  const renderTextWithBold = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const boldText = part.slice(2, -2);
+        return <strong key={index} className="font-bold">{boldText}</strong>;
+      }
+      return part;
+    });
+  };
+
   return (
     <div className={`
       transform transition-all duration-300 ease-in-out
-      ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
+      ${isVisible && !isRemoving ? 'translate-x-0 opacity-100 scale-100' : 
+        isRemoving ? 'translate-x-full opacity-0 scale-95' : 'translate-x-full opacity-0 scale-95'}
       bg-white dark:bg-gray-800 border-l-4 ${getBorderColor()} 
       rounded-lg shadow-lg p-4 min-w-[300px] max-w-[400px]
     `}>
@@ -166,7 +153,7 @@ const ToastItem: React.FC<{
             {toast.title}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-            {toast.message}
+            {renderTextWithBold(toast.message)}
           </p>
           <p className="text-xs text-gray-400 mt-1">
             {toast.timestamp.toLocaleTimeString()}
