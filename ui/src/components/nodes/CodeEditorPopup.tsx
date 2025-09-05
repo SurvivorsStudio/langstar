@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Maximize2, Save, Database, Variable } from 'lucide-react';
+import { X, Maximize2, Save, Database, Variable, Search } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
+import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
 
 interface CodeEditorPopupProps {
   isOpen: boolean;
@@ -27,18 +28,34 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
 }) => {
   const [tempValue, setTempValue] = useState(value);
   const [hasChanges, setHasChanges] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState(0);
+  const [_cursorPosition, _setCursorPosition] = useState(0);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const cursorPositionRef = useRef(0);
   const isInsertingVariable = useRef(false);
+  const [showTreeView, setShowTreeView] = useState(true);
+  const [isHierarchicalSelectorOpen, setIsHierarchicalSelectorOpen] = useState(false);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [allExpanded, setAllExpanded] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
 
   // 팝업이 열릴 때마다 초기값으로 리셋
   useEffect(() => {
     if (isOpen) {
       setTempValue(value);
       setHasChanges(false);
+      
+      // 트리를 기본으로 모두 펼치기
+      if (edgeData && Object.keys(edgeData).length > 0) {
+        const allPaths = getAllPaths(edgeData);
+        setExpandedPaths(new Set(allPaths));
+        setAllExpanded(true);
+      } else {
+        setExpandedPaths(new Set());
+        setAllExpanded(false);
+      }
     }
-  }, [isOpen, value]);
+  }, [isOpen, value, edgeData]);
 
   // value가 외부에서 변경될 때 tempValue 동기화
   useEffect(() => {
@@ -51,6 +68,15 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
   useEffect(() => {
     setHasChanges(tempValue !== value);
   }, [tempValue, value]);
+
+  // expandedPaths가 변경될 때마다 allExpanded 상태 업데이트
+  useEffect(() => {
+    if (edgeData && Object.keys(edgeData).length > 0) {
+      const allPaths = getAllPaths(edgeData);
+      const isAllExpanded = allPaths.length > 0 && allPaths.every(path => expandedPaths.has(path));
+      setAllExpanded(isAllExpanded);
+    }
+  }, [expandedPaths, edgeData]);
 
   const handleSave = () => {
     console.log(`[CodeEditorPopup] Saving code, length: ${tempValue?.length}`);
@@ -66,10 +92,16 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
     const currentPosition = cursorPositionRef.current;
     const beforeCursor = tempValue.substring(0, currentPosition);
     const afterCursor = tempValue.substring(currentPosition);
-    const newValue = beforeCursor + `state['${variableName}']` + afterCursor;
+    
+    // State 스타일 생성
+    const stateExpression = variableName.includes('[') || variableName.includes('.') 
+      ? `state${variableName}`  // 복잡한 경로: state['mm']['api_response']['data']['users'][1]['age']
+      : `state['${variableName}']`; // 단순 키: state['simple_key']
+    
+    const newValue = beforeCursor + stateExpression + afterCursor;
     
     // 커서 위치를 삽입된 변수 뒤로 이동
-    const newCursorPosition = currentPosition + `state['${variableName}']`.length;
+    const newCursorPosition = currentPosition + stateExpression.length;
     
     // 변수 삽입 플래그 설정
     isInsertingVariable.current = true;
@@ -83,10 +115,207 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
         editorInstance.setPosition(position);
         editorInstance.focus();
         cursorPositionRef.current = newCursorPosition;
-        setCursorPosition(newCursorPosition);
+        _setCursorPosition(newCursorPosition);
         isInsertingVariable.current = false;
       }
     }, 10);
+  };
+
+  // 모든 경로를 수집하는 함수
+  const getAllPaths = (obj: any, path: string[] = []): string[] => {
+    if (!obj || typeof obj !== 'object') return [];
+    
+    const paths: string[] = [];
+    const entries = Array.isArray(obj) 
+      ? obj.map((item, index) => [index.toString(), item] as [string, any])
+      : Object.entries(obj);
+    
+    entries.forEach(([key, value]) => {
+      const isArray = Array.isArray(obj);
+      const currentPath = [...path, isArray ? `[${key}]` : key];
+      const pathString = currentPath.join('.');
+      
+      if (value && typeof value === 'object') {
+        paths.push(pathString);
+        paths.push(...getAllPaths(value, currentPath));
+      }
+    });
+    
+    return paths;
+  };
+
+  // 모두 펼치기/접기 토글
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      // 모두 접기
+      setExpandedPaths(new Set());
+      setAllExpanded(false);
+    } else {
+      // 모두 펼치기
+      const allPaths = getAllPaths(edgeData);
+      setExpandedPaths(new Set(allPaths));
+      setAllExpanded(true);
+    }
+  };
+
+  // 사이드바 리사이즈 핸들러
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = Math.max(250, Math.min(600, e.clientX - 20));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  // State 스타일 경로 생성 함수
+  const buildStatePath = (pathArray: string[]): string => {
+    if (pathArray.length === 0) return '';
+    
+    let result = '';
+    for (let i = 0; i < pathArray.length; i++) {
+      const segment = pathArray[i];
+      if (segment.startsWith('[') && segment.endsWith(']')) {
+        // 배열 인덱스인 경우: [1]
+        result += segment;
+      } else {
+        // 일반 객체 키인 경우: ['key']
+        result += `['${segment}']`;
+      }
+    }
+    return result;
+  };
+
+  const handleHierarchicalSelect = (key: string) => {
+    insertVariableAtCursor(key);
+    setIsHierarchicalSelectorOpen(false);
+  };
+
+  // 대화형 트리 렌더링 함수
+  const renderInteractiveTree = (obj: any, path: string[] = [], level: number = 0): JSX.Element[] => {
+    if (!obj || typeof obj !== 'object') return [];
+    
+    const entries = Array.isArray(obj) 
+      ? obj.map((item, index) => [index.toString(), item] as [string, any])
+      : Object.entries(obj);
+    
+    return entries.map(([key, value], _index) => {
+      const isArray = Array.isArray(obj);
+      const currentPath = [...path, isArray ? `[${key}]` : key];
+      const pathString = currentPath.join('.');
+      const isExpanded = expandedPaths.has(pathString);
+      const displayKey = isArray ? `[${key}]` : key;
+      const fullStatePath = buildStatePath(currentPath);
+      
+      if (Array.isArray(value)) {
+        return (
+          <div key={pathString} style={{ marginLeft: `${level * 10}px` }}>
+            <div className="flex items-center py-1">
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedPaths);
+                  if (isExpanded) {
+                    newExpanded.delete(pathString);
+                  } else {
+                    newExpanded.add(pathString);
+                  }
+                  setExpandedPaths(newExpanded);
+                }}
+                className="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+              <button
+                onClick={() => !readOnly && insertVariableAtCursor(fullStatePath)}
+                disabled={readOnly}
+                className={`text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-1 rounded font-mono text-sm font-semibold ${
+                  readOnly ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
+                title={readOnly ? 'Read-only mode' : `클릭하여 state${fullStatePath} 삽입`}
+              >
+                {displayKey}
+              </button>
+              <span className="text-gray-500 dark:text-gray-400 ml-2 text-xs">
+                [{value.length}개 항목]
+              </span>
+            </div>
+            {isExpanded && renderInteractiveTree(value, currentPath, level + 1)}
+          </div>
+        );
+      } else if (value && typeof value === 'object') {
+        return (
+          <div key={pathString} style={{ marginLeft: `${level * 10}px` }}>
+            <div className="flex items-center py-1">
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedPaths);
+                  if (isExpanded) {
+                    newExpanded.delete(pathString);
+                  } else {
+                    newExpanded.add(pathString);
+                  }
+                  setExpandedPaths(newExpanded);
+                }}
+                className="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+              <button
+                onClick={() => !readOnly && insertVariableAtCursor(fullStatePath)}
+                disabled={readOnly}
+                className={`text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-1 rounded font-mono text-sm font-semibold ${
+                  readOnly ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
+                title={readOnly ? 'Read-only mode' : `클릭하여 state${fullStatePath} 삽입`}
+              >
+                {displayKey}
+              </button>
+              <span className="text-gray-500 dark:text-gray-400 ml-2 text-xs">
+                {`{${Object.keys(value).length}개 키}`}
+              </span>
+            </div>
+            {isExpanded && renderInteractiveTree(value, currentPath, level + 1)}
+          </div>
+        );
+      } else {
+        return (
+          <div key={pathString} style={{ marginLeft: `${level * 10}px` }} className="py-1">
+            <button
+              onClick={() => !readOnly && insertVariableAtCursor(fullStatePath)}
+              disabled={readOnly}
+              className={`text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 px-1 rounded font-mono text-sm font-semibold ${
+                readOnly ? 'opacity-60 cursor-not-allowed' : ''
+              }`}
+              title={readOnly ? 'Read-only mode' : `클릭하여 state${fullStatePath} 삽입`}
+            >
+              {displayKey}
+            </button>
+            <span className="text-gray-500 dark:text-gray-400 ml-2 text-xs">
+              : {typeof value === 'string' ? `"${String(value).substring(0, 30)}${String(value).length > 30 ? '...' : ''}"` : String(value)}
+            </span>
+          </div>
+        );
+      }
+    });
   };
 
   const handleClose = () => {
@@ -151,15 +380,15 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
         </div>
 
         <div className="flex-1 p-6 overflow-hidden">
-          <div className={`h-full ${!hideInputVariables ? 'flex gap-6' : ''}`}>
+          <div className={`h-full ${!hideInputVariables ? 'flex gap-2' : ''}`}>
             {/* Edge Data Card - hideInputVariables가 false일 때만 표시 */}
             {!hideInputVariables && (
-              <div className="w-80 flex-shrink-0">
+              <div className="flex-shrink-0 relative" style={{ width: `${sidebarWidth}px` }}>
                 <div className="h-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex flex-col">
                   <div className="flex items-center space-x-2 mb-4">
                     <Database className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      Input Variables
+                      Input Data
                     </h3>
                   </div>
 
@@ -174,51 +403,106 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                     </div>
                   )}
 
-                  {availableVariables.length > 0 ? (
+                  {(edgeData && Object.keys(edgeData).length > 0) ? (
                     <div className="space-y-3 flex-1 flex flex-col">
-                      <div className="flex items-center space-x-2">
-                        <Variable className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Available Variables ({availableVariables.length})
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Variable className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            데이터 구조
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setShowTreeView(true)}
+                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                              showTreeView 
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            트리
+                          </button>
+                          <button
+                            onClick={() => setShowTreeView(false)}
+                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                              !showTreeView 
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            목록
+                          </button>
+
+                          <button
+                            onClick={() => setIsHierarchicalSelectorOpen(true)}
+                            className="px-2 py-1 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors flex items-center"
+                            title="고급 선택기 열기"
+                          >
+                            <Search className="h-3 w-3 mr-1" />
+                            검색
+                          </button>
+                        </div>
                       </div>
                       
-                      <div className="space-y-2 flex-1 overflow-y-auto">
-                        {availableVariables.map((variable) => (
-                          <div
-                            key={variable}
-                            className={`p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md transition-colors ${
-                              readOnly 
-                                ? 'cursor-not-allowed opacity-60' 
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
-                            }`}
-                            onClick={() => !readOnly && insertVariableAtCursor(variable)}
-                            title={readOnly 
-                              ? 'Read-only mode: Cannot insert variables' 
-                              : `Click to insert state['${variable}'] at cursor position`
-                            }
-                          >
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                              {variable}
+                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                        {showTreeView ? (
+                          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md p-3 flex-1 flex flex-col min-h-0">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between flex-shrink-0">
+                              <div className="flex items-center gap-2">
+                                <span>💡 원하는 키를 클릭하면 state 스타일로 삽입됩니다</span>
+                                <button
+                                  onClick={toggleExpandAll}
+                                  className="px-2 py-1 text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                                  title={allExpanded ? "모두 접기" : "모두 펼치기"}
+                                >
+                                  {allExpanded ? '➖' : '➕'}
+                                </button>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {typeof edgeData[variable] === 'object' 
-                                ? JSON.stringify(edgeData[variable]).substring(0, 50) + '...'
-                                : String(edgeData[variable] || 'null')
-                              }
+                            <div className="text-sm overflow-x-auto flex-1 overflow-y-auto min-h-0">
+                              {renderInteractiveTree(edgeData)}
                             </div>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="space-y-2 flex-1 overflow-y-auto">
+                            {availableVariables.map((variable) => (
+                              <div
+                                key={variable}
+                                className={`p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md transition-colors ${
+                                  readOnly 
+                                    ? 'cursor-not-allowed opacity-60' 
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                                }`}
+                                onClick={() => !readOnly && insertVariableAtCursor(variable)}
+                                title={readOnly 
+                                  ? 'Read-only mode: Cannot insert variables' 
+                                  : `Click to insert state['${variable}'] at cursor position`
+                                }
+                              >
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                  {variable}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {typeof edgeData[variable] === 'object' 
+                                    ? JSON.stringify(edgeData[variable]).substring(0, 50) + '...'
+                                    : String(edgeData[variable] || 'null')
+                                  }
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 flex-1 flex flex-col justify-center">
+                    <div className="text-center py-8 flex-1 flex flex-col justify-center min-h-0">
                       <Database className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No input variables available
+                        사용 가능한 입력 데이터가 없습니다
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        Execute the connected node to see variables
+                        연결된 노드를 실행하여 변수를 확인하세요
                       </p>
                     </div>
                   )}
@@ -239,6 +523,20 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                     </div>
                   </div>
                 </div>
+                
+                {/* Resize Handle */}
+                <div
+                  className={`absolute top-0 right-0 w-2 h-full cursor-col-resize transition-all duration-200 
+                    ${isResizing 
+                      ? 'bg-purple-500 dark:bg-purple-400 opacity-100' 
+                      : 'bg-gray-300 dark:bg-gray-600 hover:bg-purple-400 dark:hover:bg-purple-500 opacity-30 hover:opacity-70'
+                    } 
+                    flex items-center justify-center`}
+                  onMouseDown={startResize}
+                  title="드래그하여 크기 조절"
+                >
+                  <div className="w-0.5 h-8 bg-white dark:bg-gray-800 rounded-full opacity-60" />
+                </div>
               </div>
             )}
 
@@ -253,7 +551,7 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
                   // 변수 삽입 중이 아닐 때만 커서 위치 업데이트
                   if (!isInsertingVariable.current) {
                     cursorPositionRef.current = position;
-                    setCursorPosition(position);
+                    _setCursorPosition(position);
                   }
                 }}
                 onMount={(editor) => {
@@ -297,6 +595,16 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Hierarchical Key Selector */}
+      <HierarchicalKeySelector
+        isOpen={isHierarchicalSelectorOpen}
+        onClose={() => setIsHierarchicalSelectorOpen(false)}
+        data={edgeData || {}}
+        onSelect={handleHierarchicalSelect}
+        title="변수 선택기 (State 스타일)"
+        pathStyle="python"
+      />
     </div>
   );
 };

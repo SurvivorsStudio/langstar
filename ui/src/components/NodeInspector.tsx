@@ -581,34 +581,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
           return null;
         })()}
 
-            {(() => {
-              if (isPromptNode || isSystemPromptNode) {
-                return (
-                  <button
-                    className={`flex-1 py-2 flex justify-center items-center ${
-                      activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
-                    }`}
-                    onClick={() => setActiveTab('code')}
-                  >
-                    <Settings size={16} className="mr-1" /> Settings
-                  </button>
-                );
-              } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode)) {
-                return (
-                  <button
-                    className={`flex-1 py-2 flex justify-center items-center ${
-                      activeTab === 'code' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
-                    }`}
-                    onClick={() => setActiveTab('code')}
-                  >
-                    <Code size={16} className="mr-1" /> Code
-                  </button>
-                );
-              } else {
-                return null;
-              }
-            })()}
-
             {!(isPromptNode || isSystemPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isEmbeddingNode || isRAGNode || isMergeNode || isUserNode) && (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
