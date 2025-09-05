@@ -17,6 +17,8 @@ import { useFlowStore } from '../store/flowStore';
 import { useThemeStore } from '../store/themeStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
+import ExecutionStatusIndicator from './ExecutionStatusIndicator';
+import ExecutionToast from './ExecutionToast';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -405,7 +407,7 @@ const FlowBuilder: React.FC = () => {
           {showTrashZone && (
             <div
               id="trash-zone"
-              className={`fixed bottom-32 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-full shadow-lg transition-all duration-300 border-4 ${
+              className={`fixed bottom-16 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-full shadow-lg transition-all duration-300 border-4 ${
                 isOverTrashZone 
                   ? 'bg-red-500/40 text-red-600 scale-125 border-red-600 shadow-2xl' 
                   : 'bg-gray-500/40 text-gray-700 dark:text-gray-200 border-gray-400/40 dark:border-gray-500/40 hover:scale-110 hover:bg-gray-500/50 hover:text-gray-800 dark:hover:text-gray-100'
@@ -463,6 +465,10 @@ const FlowBuilder: React.FC = () => {
           }}
         />
       )}
+      
+      {/* 실행 상태 표시 컴포넌트들 */}
+      <ExecutionStatusIndicator />
+      <ExecutionToast />
     </div>
   );
 };

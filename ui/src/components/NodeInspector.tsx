@@ -666,24 +666,44 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             ) : (
               <div className="space-y-3">
                                  {/* 선택된 데이터 표시 */}
-                 {selectedEdgeInfo && (
+                 {selectedEdgeInfo && (() => {
+                   // 에러 상태 확인
+                   const hasError = mergedInputData && typeof mergedInputData === 'object' && mergedInputData.error;
+                   
+                   return (
                    <div 
-                     className={`border rounded-lg p-3 cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30 ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
+                     className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                       hasError 
+                         ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                         : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
+                     } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
                      onClick={() => handleInputDataClick(selectedEdgeInfo.edgeId, selectedEdgeInfo.sourceNodeId, mergedInputData)}
                      title="Click to execute with this input"
                    >
                      <div className="flex items-center justify-between mb-2">
-                       <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                         ✅ Selected Input (Latest)
+                       <span className={`text-xs font-medium ${
+                         hasError 
+                           ? 'text-red-700 dark:text-red-300' 
+                           : 'text-green-700 dark:text-green-300'
+                       }`}>
+                         {hasError ? '❌ Selected Input (Error)' : '✅ Selected Input (Latest)'}
                        </span>
                        <div className="flex items-center space-x-2">
-                         <span className="text-xs text-green-600 dark:text-green-400">
+                         <span className={`text-xs ${
+                           hasError 
+                             ? 'text-red-600 dark:text-red-400' 
+                             : 'text-green-600 dark:text-green-400'
+                         }`}>
                            {selectedEdgeInfo.timestamp && selectedEdgeInfo.timestamp > 0 
                              ? new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()
                              : 'Not executed yet'
                            }
                          </span>
-                         <Play className="w-3 h-3 text-green-600 dark:text-green-400" />
+                         <Play className={`w-3 h-3 ${
+                           hasError 
+                             ? 'text-red-600 dark:text-red-400' 
+                             : 'text-green-600 dark:text-green-400'
+                         }`} />
                        </div>
                      </div>
                      
@@ -695,7 +715,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                        </div>
                      </div>
                    </div>
-                 )}
+                   );
+                 })()}
                 
                 {/* 다른 input data들 표시 */}
                 {incomingEdges.length > 1 && (
