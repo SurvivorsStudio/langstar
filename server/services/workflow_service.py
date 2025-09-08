@@ -173,7 +173,9 @@ class WorkflowService:
 
             insert_pram = {} 
             for row in param : 
-                tmp_data = real_data[ row['matchData'] ] 
+                # tmp_data = real_data[ row['matchData'] ] 
+                print(row['matchData'] )
+                tmp_data = eval(row['matchData'], {}, real_data)
                 insert_pram[row['funcArgs']] = tmp_data 
 
 
@@ -308,13 +310,39 @@ class WorkflowService:
             raise ValueError(f"코드 실행 실패: {e}")
 
     @staticmethod
+    def process_merge_node(msg: Dict[str, Any]) -> str:
+        try:
+            logger.info("merge node")
+            mapping_info = msg['config']['mergeMappings'] 
+            param_data   = msg.get("data", {})
+
+            print( param_data )
+
+            result = {}
+            for row in mapping_info:
+                output_key = row['outputKey']
+                source_node_name = row['sourceNodeId']
+                source_node_value = row['sourceNodeKey']
+
+                result[output_key] = eval(source_node_value, {}, param_data[source_node_name])
+            
+            return result
+        except Exception as e:
+            error_msg = f"Error in merge node processing: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"error": str(e)}
+
+    @staticmethod
     def process_agent_node(msg: Dict[str, Any]) -> str:
 
         try:
             logger.info("Processing agent node")
             modelName = msg['model']['modelName']
-            system_prompt = msg['system_prompt']
-            user_prompt = msg['user_prompt']
+            data = msg['data']
+            
+            system_prompt = eval(msg['system_prompt'], {}, data)
+            user_prompt   = eval(msg['user_prompt'], {}, data)
+            
             memory_type = msg.get('memory_type', "")
             memory_group_name = msg.get('memory_group_name', "")
             tools = msg.get('tools',[])
@@ -323,6 +351,7 @@ class WorkflowService:
 
             temperature = msg['modelSetting']['temperature']
             max_token = msg['modelSetting']['maxTokens']
+
 
 
             memory = ""

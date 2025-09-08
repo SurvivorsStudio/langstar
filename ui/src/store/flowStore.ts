@@ -117,7 +117,7 @@ export interface FlowState {
   updateEdgeLabel: (edgeId: string, label: string) => void; // 추가
   updateEdgeDescription: (edgeId: string, description: string) => void; // 추가
   updateEdgeData: (edgeId: string, data: Partial<Edge['data']>) => void; // 엣지 데이터 업데이트 통합
-  setNodeExecuting: (nodeId: string, isExecuting: boolean) => void;
+  setNodeExecuting: (nodeId: string, isExecuting: boolean, success?: boolean, nodeName?: string, isWorkflowExecution?: boolean) => void;
   runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
@@ -433,6 +433,49 @@ const evaluateCondition = (conditionBody: string, input: Record<string, any>, ar
     return false;
   }
 };
+
+// 점 표기법을 Python 딕셔너리 접근 방식으로 변환하는 함수
+const convertToPythonNotation = (keyPath: string): string => {
+  if (!keyPath || keyPath.trim() === '') {
+    return keyPath;
+  }
+
+  // 이미 배열 인덱스가 포함된 경우를 고려하여 처리
+  // 예: "mm.api_response.data.users[2].data" -> "mm['api_response']['data']['users'][2]['data']"
+  
+  let result = keyPath;
+  
+  // 점(.)으로 분리하되, 배열 인덱스는 보존
+  const parts = result.split('.');
+  
+  if (parts.length === 1) {
+    // 단일 키인 경우 그대로 반환 (예: "system_prompt")
+    return keyPath;
+  }
+  
+  // 첫 번째 부분은 그대로 두고, 나머지는 ['key'] 형식으로 변환
+  let pythonNotation = parts[0];
+  
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    
+    // 배열 인덱스가 있는지 확인 (예: "users[2]")
+    const arrayMatch = part.match(/^([^[\]]+)(\[.+\])$/);
+    
+    if (arrayMatch) {
+      // 배열 인덱스가 있는 경우: "users[2]" -> "['users'][2]"
+      const keyPart = arrayMatch[1];
+      const indexPart = arrayMatch[2];
+      pythonNotation += `['${keyPart}']${indexPart}`;
+    } else {
+      // 일반 키인 경우: "data" -> "['data']"
+      pythonNotation += `['${part}']`;
+    }
+  }
+  
+  return pythonNotation;
+};
+
 const generateEmbedding = (input: Record<string, any>, config: NodeData['config']): Record<string, any> => {
   if (!config?.inputColumn || !config?.outputColumn) {
     throw new Error('Input and output columns must be specified');
@@ -441,6 +484,31 @@ const generateEmbedding = (input: Record<string, any>, config: NodeData['config'
   const result = { ...input };
   result[config.outputColumn] = [1, 2, 3, 4];
   return result;
+};
+
+// Deep merge 유틸리티 함수 (MergeNode에서 사용)
+const deepMerge = (target: any, source: any): any => {
+  const output = { ...target };
+  
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          Object.assign(output, { [key]: source[key] });
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        Object.assign(output, { [key]: source[key] });
+      }
+    });
+  }
+  
+  return output;
+};
+
+const isObject = (item: any): boolean => {
+  return item && typeof item === 'object' && !Array.isArray(item);
 };
 
 // IndexedDB 설정
@@ -1080,19 +1148,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           console.log(`[AgentNode ${nodeId}] 사용할 System Prompt Key: '${actualSystemPromptKey}' (설정값: '${systemPromptInputKey}')`);
           console.log(`[AgentNode ${nodeId}] 사용할 User Prompt Key: '${actualUserPromptKey}' (설정값: '${userPromptInputKey}')`);
 
-          // 입력으로부터 실제 프롬프트 값을 가져옵니다.
-          // input 객체에 해당 키가 있고, 그 값이 문자열인 경우 해당 값을 사용합니다.
-          // 그렇지 않으면 빈 문자열을 API 전송용 값으로 사용합니다.
+          // 키 경로를 API로 전달하기 위해 실제 키 값을 사용합니다.
+          // 백엔드에서 data를 파싱할 수 있도록 키 경로를 전송합니다.
           const systemPromptRawValue = actualSystemPromptKey && input && input.hasOwnProperty(actualSystemPromptKey) ? input[actualSystemPromptKey] : undefined;
           const userPromptRawValue = actualUserPromptKey && input && input.hasOwnProperty(actualUserPromptKey) ? input[actualUserPromptKey] : undefined;
 
-          const systemPromptForAPI = typeof systemPromptRawValue === 'string' ? systemPromptRawValue : "";
-          const userPromptForAPI = typeof userPromptRawValue === 'string' ? userPromptRawValue : "";
+          // 키 경로를 Python 표기법으로 변환하여 전송 (예: "a['b']" 형식)
+          const systemPromptForAPI = convertToPythonNotation(actualSystemPromptKey || "");
+          const userPromptForAPI = convertToPythonNotation(actualUserPromptKey || "");
 
           console.log(`[AgentNode ${nodeId}] 입력에서 가져온 Raw System Prompt (input['${actualSystemPromptKey}']):`, systemPromptRawValue);
-          console.log(`[AgentNode ${nodeId}] API로 전송될 System Prompt:`, systemPromptForAPI);
+          console.log(`[AgentNode ${nodeId}] 원본 System Prompt Key: "${actualSystemPromptKey}" → Python 표기법: "${systemPromptForAPI}"`);
           console.log(`[AgentNode ${nodeId}] 입력에서 가져온 Raw User Prompt (input['${actualUserPromptKey}']):`, userPromptRawValue);
-          console.log(`[AgentNode ${nodeId}] API로 전송될 User Prompt:`, userPromptForAPI);
+          console.log(`[AgentNode ${nodeId}] 원본 User Prompt Key: "${actualUserPromptKey}" → Python 표기법: "${userPromptForAPI}"`);
 
           let memoryTypeForAPI: string | undefined = undefined;
           let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
@@ -1154,8 +1222,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const payload = {
             model: modelForAPI, // 변환된 모델 객체 사용
             modelSetting, // 모델 설정 추가
-            system_prompt: systemPromptForAPI,
-            user_prompt: userPromptForAPI,
+            system_prompt: systemPromptForAPI, // Python 표기법으로 변환된 키 경로 (예: "a['b']['c']")
+            user_prompt: userPromptForAPI, // Python 표기법으로 변환된 키 경로 (예: "mm['api_response']['data']['users'][2]['data']")
+            data: input, // 백엔드에서 파싱할 수 있도록 원본 데이터 전송
             memory_group: memoryGroup ? memoryGroup : undefined, 
             memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송
@@ -1267,7 +1336,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           break;
         case 'mergeNode': {
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
-          const allInputsFromEdges: Record<string, any> = {};
           
           // 모든 source node가 완료되었는지 확인
           const sourceNodeIds = [...new Set(incomingEdges.map(edge => edge.source))];
@@ -1289,13 +1357,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           
           // 모든 source node가 완료되었으므로 merge 처리
-          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge.`);
+          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge via API.`);
+          
+          // 연결된 노드들의 출력 데이터를 노드별로 그룹화
+          const mergedData: Record<string, any> = {};
           
           incomingEdges.forEach(edge => {
             if (edge.data?.output && typeof edge.data.output === 'object') {
-              // Store all outputs keyed by their source node ID for easy lookup
-              // This helps if multiple edges come from the same source, though less common for merge
-              allInputsFromEdges[edge.source!] = { ...(allInputsFromEdges[edge.source!] || {}), ...edge.data.output };
+              // 소스 노드 정보 가져오기
+              const sourceNode = get().nodes.find(n => n.id === edge.source);
+              const sourceNodeName = sourceNode ? sourceNode.data.label : edge.source;
+              
+              // 노드별로 그룹화하여 저장
+              mergedData[sourceNodeName] = edge.data.output;
             }
           });
 
@@ -1303,27 +1377,64 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const displayInputs = incomingEdges.map(edge => edge.data?.output).filter(o => o);
           get().updateNodeData(nodeId, { ...node.data, inputData: displayInputs });
 
-          const mergedOutput: Record<string, any> = {};
-          const mappings = node.data.config?.mergeMappings;
+          // MERGE 노드 설정 준비
+          const config = {
+            mergeMappings: (node.data.config?.mergeMappings || []).map((m: any) => {
+              // sourceNodeId로 실제 노드를 찾아서 이름(label) 가져오기
+              const sourceNode = get().nodes.find(n => n.id === m.sourceNodeId);
+              const sourceNodeName = sourceNode ? sourceNode.data.label : m.sourceNodeId;
+              
+              return {
+                outputKey: m.outputKey,
+                sourceNodeId: sourceNodeName, // 노드 이름으로 변경
+                sourceNodeKey: m.sourceNodeKey
+              };
+            })
+          };
 
-          if (mappings && Array.isArray(mappings) && mappings.length > 0) {
-            mappings.forEach(mapping => {
-              if (mapping.outputKey && mapping.sourceNodeId && mapping.sourceNodeKey) {
-                const sourceNodeOutput = allInputsFromEdges[mapping.sourceNodeId];
-                if (sourceNodeOutput && sourceNodeOutput.hasOwnProperty(mapping.sourceNodeKey)) {
-                  mergedOutput[mapping.outputKey] = sourceNodeOutput[mapping.sourceNodeKey];
-                } else {
-                  console.warn(`MergeNode (${nodeId}): Could not find key '${mapping.sourceNodeKey}' in output of source node '${mapping.sourceNodeId}' for output key '${mapping.outputKey}'.`);
-                }
-              }
-            });
-          } else {
-            // Fallback or error if no mappings? For now, empty if no valid mappings.
-            console.warn(`MergeNode (${nodeId}): No merge mappings defined or mappings are empty. Output will be empty.`);
+          // 매핑이 없으면 에러
+          if (!config.mergeMappings || config.mergeMappings.length === 0) {
+            console.warn(`[MergeNode ${nodeId}] No merge mappings defined. Output will be empty.`);
+            output = { error: 'No merge mappings configured' };
+            break;
           }
-          
-          console.log(`[MergeNode ${nodeId}] Merge completed successfully:`, mergedOutput);
-          output = mergedOutput;
+
+          // API 요청 페이로드 구성
+          const requestData = {
+            nodeId,
+            nodeType: 'mergeNode',
+            config,
+            data: mergedData  // data 키로 감싸서 병합된 데이터 추가
+          };
+
+          console.log(`[MergeNode ${nodeId}] API 요청 페이로드:`, JSON.stringify(requestData, null, 2));
+
+          try {
+            const response = await fetch('http://localhost:8000/workflow/node/mergenode', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestData),
+            });
+
+            console.log(`[MergeNode ${nodeId}] API 응답 상태: ${response.status}`);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`[MergeNode ${nodeId}] API 요청 실패. 상태: ${response.status}, 메시지: ${errorText}`);
+              throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+
+            const apiResponse = await response.json();
+            console.log(`[MergeNode ${nodeId}] 백엔드 응답:`, apiResponse);
+            
+            // 백엔드 응답을 그대로 전달
+            output = apiResponse;
+          } catch (apiError) {
+            console.error(`[MergeNode ${nodeId}] API 호출 실패:`, apiError);
+            output = { error: 'Failed to connect to merge node API', details: (apiError as Error).message };
+          }
           break;
         }
         case 'userNode': {

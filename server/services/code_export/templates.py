@@ -306,10 +306,6 @@ def init_state_code( config_json ) :
             if '__annotated__' in config_val:
                 code_token = "    {0} :Annotated[dict, operator.or_] = ".format(config_key) + "{}"
             else:
-                ## as-is
-                # code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
-            
-                ## to-be
                 if 'node_type' in config_val:
                     if config_val['node_type'] == 'promptNode':
                         del config_val['config']['template'] 
