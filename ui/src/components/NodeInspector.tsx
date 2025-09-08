@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2, Database } from 'lucide-react';
+import JsonViewer from './Common/JsonViewer';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import CodeEditorPopup from './nodes/CodeEditorPopup';
@@ -708,11 +709,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                      </div>
                      
                      <div className="space-y-2">
-                       <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
-                         <pre className="whitespace-pre-wrap break-words">
-                           {JSON.stringify(mergedInputData, null, 2)}
-                         </pre>
-                       </div>
+                       <JsonViewer 
+                         data={mergedInputData} 
+                         maxHeight="300px"
+                         className="text-xs"
+                       />
                      </div>
                    </div>
                    );
@@ -753,10 +754,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
                               </div>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded p-1 font-mono text-xs text-gray-700 dark:text-gray-300 opacity-60">
-                              <pre className="whitespace-pre-wrap break-words">
-                                {JSON.stringify(edge.data.output, null, 2)}
-                              </pre>
+                            <div className="opacity-60">
+                              <JsonViewer 
+                                data={edge.data.output} 
+                                maxHeight="200px"
+                                className="text-xs"
+                              />
                             </div>
                           </div>
                         );
