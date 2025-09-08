@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, X, Play } from 'lucide-react';
 
 interface ToastMessage {
   id: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'executing';
   title: string;
   message: string;
   duration?: number;
   timestamp: Date;
+  nodeId?: string; // 노드 ID 추가 (실행 중 토스트 식별용)
 }
 
 /**
@@ -16,42 +17,79 @@ interface ToastMessage {
 const ExecutionToast: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // 노드 실행 완료 이벤트 감지
+  // 노드 실행 시작/완료 이벤트 감지
   useEffect(() => {
-    const handleToastEvent = (event: CustomEvent) => {
+    const handleExecutionStartEvent = (event: CustomEvent) => {
+      const { nodeId, nodeName } = event.detail;
+      const nodeLabel = nodeName || 'Node';
+      
+      // 워크플로우 실행과 개별 노드 실행 구분
+      const isWorkflow = nodeId === 'workflow';
+      
+      const executingToast: ToastMessage = {
+        id: `executing-${nodeId}`,
+        nodeId,
+        type: 'executing',
+        title: isWorkflow ? 'Workflow Execution Started' : 'Node Execution Started',
+        message: isWorkflow 
+          ? `**${nodeLabel}** is executing...` 
+          : `**${nodeLabel}** node is executing...`,
+        duration: Infinity, // 무한 지속 (완료될 때까지)
+        timestamp: new Date()
+      };
+
+      setToasts(prev => [...prev, executingToast]);
+    };
+
+    const handleExecutionCompleteEvent = (event: CustomEvent) => {
       const { nodeId, success = true, nodeName, failedNodeName } = event.detail;
+      
+      // 먼저 실행 중 토스트 제거
+      setToasts(prev => prev.filter(toast => toast.id !== `executing-${nodeId}`));
       
       // 실행 시점에 전달받은 노드 이름 사용 (가장 정확함)
       const nodeLabel = nodeName || 'Node';
       
+      // 워크플로우 실행과 개별 노드 실행 구분
+      const isWorkflow = nodeId === 'workflow';
+      
       // 워크플로우 실패 시 실패한 노드 정보 포함
       let message;
       if (success) {
-        message = `**${nodeLabel}** node has been executed successfully.`;
+        message = isWorkflow 
+          ? `**${nodeLabel}** has been executed successfully.`
+          : `**${nodeLabel}** node has been executed successfully.`;
       } else {
         if (nodeId === 'workflow' && failedNodeName) {
           message = `Workflow failed at **${failedNodeName}** node. Please check the configuration.`;
         } else {
-          message = `**${nodeLabel}** node execution failed. Please check the configuration.`;
+          message = `**${nodeLabel}** ${isWorkflow ? '' : 'node '}execution failed. Please check the configuration.`;
         }
       }
       
-      const toast: ToastMessage = {
-        id: `${nodeId}-${Date.now()}`,
+      const completeToast: ToastMessage = {
+        id: `complete-${nodeId}-${Date.now()}`,
         type: success ? 'success' : 'error',
-        title: success ? 'Node Execution Completed' : 'Node Execution Failed',
+        title: isWorkflow 
+          ? (success ? 'Workflow Execution Completed' : 'Workflow Execution Failed')
+          : (success ? 'Node Execution Completed' : 'Node Execution Failed'),
         message,
         duration: 3500,
         timestamp: new Date()
       };
 
-      setToasts(prev => [...prev, toast]);
+      // 약간의 지연 후 완료 토스트 표시 (부드러운 전환)
+      setTimeout(() => {
+        setToasts(prev => [...prev, completeToast]);
+      }, 100);
     };
 
-    window.addEventListener('nodeExecutionCompleted', handleToastEvent as EventListener);
+    window.addEventListener('nodeExecutionStarted', handleExecutionStartEvent as EventListener);
+    window.addEventListener('nodeExecutionCompleted', handleExecutionCompleteEvent as EventListener);
     
     return () => {
-      window.removeEventListener('nodeExecutionCompleted', handleToastEvent as EventListener);
+      window.removeEventListener('nodeExecutionStarted', handleExecutionStartEvent as EventListener);
+      window.removeEventListener('nodeExecutionCompleted', handleExecutionCompleteEvent as EventListener);
     };
   }, []); // 빈 의존성 배열
 
@@ -96,13 +134,15 @@ const ToastItem: React.FC<{
     // 등장 애니메이션
     setTimeout(() => setIsVisible(true), 100);
 
-    // 자동 제거 타이머
-    const timer = setTimeout(() => {
-      handleRemove();
-    }, toast.duration || 3500);
+    // 자동 제거 타이머 (executing 타입은 무한 지속)
+    if (toast.type !== 'executing' && toast.duration !== Infinity) {
+      const timer = setTimeout(() => {
+        handleRemove();
+      }, toast.duration || 3500);
 
-    return () => clearTimeout(timer);
-  }, [toast.duration, handleRemove]);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.duration, toast.type, handleRemove]);
 
   const getIcon = () => {
     switch (toast.type) {
@@ -110,6 +150,8 @@ const ToastItem: React.FC<{
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'executing':
+        return <Play className="w-5 h-5 text-blue-500 animate-pulse" />;
       default:
         return <Clock className="w-5 h-5 text-blue-500" />;
     }
@@ -121,6 +163,8 @@ const ToastItem: React.FC<{
         return 'border-l-green-500';
       case 'error':
         return 'border-l-red-500';
+      case 'executing':
+        return 'border-l-blue-500';
       default:
         return 'border-l-blue-500';
     }

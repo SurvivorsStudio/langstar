@@ -821,6 +821,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       })
     });
     
+    // 실행 시작 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
+    if (isExecuting && !isWorkflowExecution) {
+      window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
+        detail: { nodeId, nodeName }
+      }));
+    }
+
     // 실행 완료 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
     if (!isExecuting && !isWorkflowExecution) {
       window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
@@ -1395,6 +1402,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   runWorkflow: async (chatId?: string) => { 
     const { nodes, edges, getNodeById, executeNode, setWorkflowRunning } = get();
     setWorkflowRunning(true);
+    
+    // 워크플로우 실행 시작 토스트 이벤트 발생
+    window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
+      detail: { nodeId: 'workflow', nodeName: 'Workflow' }
+    }));
     
     console.log("🚀 워크플로우 실행 시작");
     console.log("=========================================");
