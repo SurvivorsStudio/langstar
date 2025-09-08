@@ -117,7 +117,7 @@ export interface FlowState {
   updateEdgeLabel: (edgeId: string, label: string) => void; // 추가
   updateEdgeDescription: (edgeId: string, description: string) => void; // 추가
   updateEdgeData: (edgeId: string, data: Partial<Edge['data']>) => void; // 엣지 데이터 업데이트 통합
-  setNodeExecuting: (nodeId: string, isExecuting: boolean) => void;
+  setNodeExecuting: (nodeId: string, isExecuting: boolean, success?: boolean, nodeName?: string, isWorkflowExecution?: boolean) => void;
   runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
@@ -433,6 +433,49 @@ const evaluateCondition = (conditionBody: string, input: Record<string, any>, ar
     return false;
   }
 };
+
+// 점 표기법을 Python 딕셔너리 접근 방식으로 변환하는 함수
+const convertToPythonNotation = (keyPath: string): string => {
+  if (!keyPath || keyPath.trim() === '') {
+    return keyPath;
+  }
+
+  // 이미 배열 인덱스가 포함된 경우를 고려하여 처리
+  // 예: "mm.api_response.data.users[2].data" -> "mm['api_response']['data']['users'][2]['data']"
+  
+  let result = keyPath;
+  
+  // 점(.)으로 분리하되, 배열 인덱스는 보존
+  const parts = result.split('.');
+  
+  if (parts.length === 1) {
+    // 단일 키인 경우 그대로 반환 (예: "system_prompt")
+    return keyPath;
+  }
+  
+  // 첫 번째 부분은 그대로 두고, 나머지는 ['key'] 형식으로 변환
+  let pythonNotation = parts[0];
+  
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    
+    // 배열 인덱스가 있는지 확인 (예: "users[2]")
+    const arrayMatch = part.match(/^([^[\]]+)(\[.+\])$/);
+    
+    if (arrayMatch) {
+      // 배열 인덱스가 있는 경우: "users[2]" -> "['users'][2]"
+      const keyPart = arrayMatch[1];
+      const indexPart = arrayMatch[2];
+      pythonNotation += `['${keyPart}']${indexPart}`;
+    } else {
+      // 일반 키인 경우: "data" -> "['data']"
+      pythonNotation += `['${part}']`;
+    }
+  }
+  
+  return pythonNotation;
+};
+
 const generateEmbedding = (input: Record<string, any>, config: NodeData['config']): Record<string, any> => {
   if (!config?.inputColumn || !config?.outputColumn) {
     throw new Error('Input and output columns must be specified');
@@ -1080,19 +1123,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           console.log(`[AgentNode ${nodeId}] 사용할 System Prompt Key: '${actualSystemPromptKey}' (설정값: '${systemPromptInputKey}')`);
           console.log(`[AgentNode ${nodeId}] 사용할 User Prompt Key: '${actualUserPromptKey}' (설정값: '${userPromptInputKey}')`);
 
-          // 입력으로부터 실제 프롬프트 값을 가져옵니다.
-          // input 객체에 해당 키가 있고, 그 값이 문자열인 경우 해당 값을 사용합니다.
-          // 그렇지 않으면 빈 문자열을 API 전송용 값으로 사용합니다.
+          // 키 경로를 API로 전달하기 위해 실제 키 값을 사용합니다.
+          // 백엔드에서 data를 파싱할 수 있도록 키 경로를 전송합니다.
           const systemPromptRawValue = actualSystemPromptKey && input && input.hasOwnProperty(actualSystemPromptKey) ? input[actualSystemPromptKey] : undefined;
           const userPromptRawValue = actualUserPromptKey && input && input.hasOwnProperty(actualUserPromptKey) ? input[actualUserPromptKey] : undefined;
 
-          const systemPromptForAPI = typeof systemPromptRawValue === 'string' ? systemPromptRawValue : "";
-          const userPromptForAPI = typeof userPromptRawValue === 'string' ? userPromptRawValue : "";
+          // 키 경로를 Python 표기법으로 변환하여 전송 (예: "a['b']" 형식)
+          const systemPromptForAPI = convertToPythonNotation(actualSystemPromptKey || "");
+          const userPromptForAPI = convertToPythonNotation(actualUserPromptKey || "");
 
           console.log(`[AgentNode ${nodeId}] 입력에서 가져온 Raw System Prompt (input['${actualSystemPromptKey}']):`, systemPromptRawValue);
-          console.log(`[AgentNode ${nodeId}] API로 전송될 System Prompt:`, systemPromptForAPI);
+          console.log(`[AgentNode ${nodeId}] 원본 System Prompt Key: "${actualSystemPromptKey}" → Python 표기법: "${systemPromptForAPI}"`);
           console.log(`[AgentNode ${nodeId}] 입력에서 가져온 Raw User Prompt (input['${actualUserPromptKey}']):`, userPromptRawValue);
-          console.log(`[AgentNode ${nodeId}] API로 전송될 User Prompt:`, userPromptForAPI);
+          console.log(`[AgentNode ${nodeId}] 원본 User Prompt Key: "${actualUserPromptKey}" → Python 표기법: "${userPromptForAPI}"`);
 
           let memoryTypeForAPI: string | undefined = undefined;
           let memoryGroupNameForAPI: string | undefined = undefined; // 메모리 그룹 이름을 저장할 변수
@@ -1154,8 +1197,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const payload = {
             model: modelForAPI, // 변환된 모델 객체 사용
             modelSetting, // 모델 설정 추가
-            system_prompt: systemPromptForAPI,
-            user_prompt: userPromptForAPI,
+            system_prompt: systemPromptForAPI, // Python 표기법으로 변환된 키 경로 (예: "a['b']['c']")
+            user_prompt: userPromptForAPI, // Python 표기법으로 변환된 키 경로 (예: "mm['api_response']['data']['users'][2]['data']")
+            data: input, // 백엔드에서 파싱할 수 있도록 원본 데이터 전송
             memory_group: memoryGroup ? memoryGroup : undefined, 
             memory_group_name: memoryGroupNameForAPI, // 메모리 그룹 이름 추가
             tools: tools_for_api, // 수정된 tools 형식으로 전송

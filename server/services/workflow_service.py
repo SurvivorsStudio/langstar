@@ -313,8 +313,11 @@ class WorkflowService:
         try:
             logger.info("Processing agent node")
             modelName = msg['model']['modelName']
-            system_prompt = msg['system_prompt']
-            user_prompt = msg['user_prompt']
+            data = msg['data']
+
+            system_prompt = eval(msg['system_prompt'], {}, data)
+            user_prompt   = eval(msg['user_prompt'], {}, data)
+            
             memory_type = msg.get('memory_type', "")
             memory_group_name = msg.get('memory_group_name', "")
             tools = msg.get('tools',[])
@@ -323,6 +326,7 @@ class WorkflowService:
 
             temperature = msg['modelSetting']['temperature']
             max_token = msg['modelSetting']['maxTokens']
+
 
 
             memory = ""
