@@ -388,6 +388,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
         onSelect={handleKeySelect}
         title={`키 선택 - ${currentSelectingParam || ''}`}
         selectedKey={currentSelectingParam ? inputData[currentSelectingParam] : undefined}
+        pathStyle='python'
       />
     </div>
   );

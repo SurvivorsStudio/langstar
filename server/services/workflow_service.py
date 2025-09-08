@@ -173,7 +173,9 @@ class WorkflowService:
 
             insert_pram = {} 
             for row in param : 
-                tmp_data = real_data[ row['matchData'] ] 
+                # tmp_data = real_data[ row['matchData'] ] 
+                print(row['matchData'] )
+                tmp_data = eval(row['matchData'], {}, real_data)
                 insert_pram[row['funcArgs']] = tmp_data 
 
 
