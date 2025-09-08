@@ -486,6 +486,31 @@ const generateEmbedding = (input: Record<string, any>, config: NodeData['config'
   return result;
 };
 
+// Deep merge 유틸리티 함수 (MergeNode에서 사용)
+const deepMerge = (target: any, source: any): any => {
+  const output = { ...target };
+  
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          Object.assign(output, { [key]: source[key] });
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        Object.assign(output, { [key]: source[key] });
+      }
+    });
+  }
+  
+  return output;
+};
+
+const isObject = (item: any): boolean => {
+  return item && typeof item === 'object' && !Array.isArray(item);
+};
+
 // IndexedDB 설정
 const DB_NAME = 'WorkflowDatabase';
 const WORKFLOWS_STORE_NAME = 'WorkflowsStore';
@@ -1311,7 +1336,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           break;
         case 'mergeNode': {
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
-          const allInputsFromEdges: Record<string, any> = {};
           
           // 모든 source node가 완료되었는지 확인
           const sourceNodeIds = [...new Set(incomingEdges.map(edge => edge.source))];
@@ -1333,13 +1357,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           
           // 모든 source node가 완료되었으므로 merge 처리
-          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge.`);
+          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge via API.`);
+          
+          // 연결된 노드들의 출력 데이터를 노드별로 그룹화
+          const mergedData: Record<string, any> = {};
           
           incomingEdges.forEach(edge => {
             if (edge.data?.output && typeof edge.data.output === 'object') {
-              // Store all outputs keyed by their source node ID for easy lookup
-              // This helps if multiple edges come from the same source, though less common for merge
-              allInputsFromEdges[edge.source!] = { ...(allInputsFromEdges[edge.source!] || {}), ...edge.data.output };
+              // 소스 노드 정보 가져오기
+              const sourceNode = get().nodes.find(n => n.id === edge.source);
+              const sourceNodeName = sourceNode ? sourceNode.data.label : edge.source;
+              
+              // 노드별로 그룹화하여 저장
+              mergedData[sourceNodeName] = edge.data.output;
             }
           });
 
@@ -1347,27 +1377,64 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const displayInputs = incomingEdges.map(edge => edge.data?.output).filter(o => o);
           get().updateNodeData(nodeId, { ...node.data, inputData: displayInputs });
 
-          const mergedOutput: Record<string, any> = {};
-          const mappings = node.data.config?.mergeMappings;
+          // MERGE 노드 설정 준비
+          const config = {
+            mergeMappings: (node.data.config?.mergeMappings || []).map((m: any) => {
+              // sourceNodeId로 실제 노드를 찾아서 이름(label) 가져오기
+              const sourceNode = get().nodes.find(n => n.id === m.sourceNodeId);
+              const sourceNodeName = sourceNode ? sourceNode.data.label : m.sourceNodeId;
+              
+              return {
+                outputKey: m.outputKey,
+                sourceNodeId: sourceNodeName, // 노드 이름으로 변경
+                sourceNodeKey: m.sourceNodeKey
+              };
+            })
+          };
 
-          if (mappings && Array.isArray(mappings) && mappings.length > 0) {
-            mappings.forEach(mapping => {
-              if (mapping.outputKey && mapping.sourceNodeId && mapping.sourceNodeKey) {
-                const sourceNodeOutput = allInputsFromEdges[mapping.sourceNodeId];
-                if (sourceNodeOutput && sourceNodeOutput.hasOwnProperty(mapping.sourceNodeKey)) {
-                  mergedOutput[mapping.outputKey] = sourceNodeOutput[mapping.sourceNodeKey];
-                } else {
-                  console.warn(`MergeNode (${nodeId}): Could not find key '${mapping.sourceNodeKey}' in output of source node '${mapping.sourceNodeId}' for output key '${mapping.outputKey}'.`);
-                }
-              }
-            });
-          } else {
-            // Fallback or error if no mappings? For now, empty if no valid mappings.
-            console.warn(`MergeNode (${nodeId}): No merge mappings defined or mappings are empty. Output will be empty.`);
+          // 매핑이 없으면 에러
+          if (!config.mergeMappings || config.mergeMappings.length === 0) {
+            console.warn(`[MergeNode ${nodeId}] No merge mappings defined. Output will be empty.`);
+            output = { error: 'No merge mappings configured' };
+            break;
           }
-          
-          console.log(`[MergeNode ${nodeId}] Merge completed successfully:`, mergedOutput);
-          output = mergedOutput;
+
+          // API 요청 페이로드 구성
+          const requestData = {
+            nodeId,
+            nodeType: 'mergeNode',
+            config,
+            data: mergedData  // data 키로 감싸서 병합된 데이터 추가
+          };
+
+          console.log(`[MergeNode ${nodeId}] API 요청 페이로드:`, JSON.stringify(requestData, null, 2));
+
+          try {
+            const response = await fetch('http://localhost:8000/workflow/node/mergenode', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestData),
+            });
+
+            console.log(`[MergeNode ${nodeId}] API 응답 상태: ${response.status}`);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`[MergeNode ${nodeId}] API 요청 실패. 상태: ${response.status}, 메시지: ${errorText}`);
+              throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+
+            const apiResponse = await response.json();
+            console.log(`[MergeNode ${nodeId}] 백엔드 응답:`, apiResponse);
+            
+            // 백엔드 응답을 그대로 전달
+            output = apiResponse;
+          } catch (apiError) {
+            console.error(`[MergeNode ${nodeId}] API 호출 실패:`, apiError);
+            output = { error: 'Failed to connect to merge node API', details: (apiError as Error).message };
+          }
           break;
         }
         case 'userNode': {

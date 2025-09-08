@@ -308,13 +308,36 @@ class WorkflowService:
             raise ValueError(f"코드 실행 실패: {e}")
 
     @staticmethod
+    def process_merge_node(msg: Dict[str, Any]) -> str:
+        try:
+            logger.info("merge node")
+            mapping_info = msg['config']['mergeMappings'] 
+            param_data   = msg.get("data", {})
+
+            print( param_data )
+
+            result = {}
+            for row in mapping_info:
+                output_key = row['outputKey']
+                source_node_name = row['sourceNodeId']
+                source_node_value = row['sourceNodeKey']
+
+                result[output_key] = eval(source_node_value, {}, param_data[source_node_name])
+            
+            return result
+        except Exception as e:
+            error_msg = f"Error in merge node processing: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"error": str(e)}
+
+    @staticmethod
     def process_agent_node(msg: Dict[str, Any]) -> str:
 
         try:
             logger.info("Processing agent node")
             modelName = msg['model']['modelName']
             data = msg['data']
-
+            
             system_prompt = eval(msg['system_prompt'], {}, data)
             user_prompt   = eval(msg['user_prompt'], {}, data)
             
