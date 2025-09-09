@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2, Database } from 'lucide-react';
+import JsonViewer from './Common/JsonViewer';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import CodeEditorPopup from './nodes/CodeEditorPopup';
@@ -151,42 +152,41 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
       
       if (currentIncomingEdges.length > 0) {
-        // 수동으로 선택된 edge가 있으면 그것을 사용, 없으면 가장 최근 것 사용
-        const edgesWithTimestamps = currentIncomingEdges
-          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-          .map(edge => ({
-            edge,
-            timestamp: edge.data?.timestamp || 0,
-            output: edge.data.output
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+        // 1) 수동 선택된 엣지가 있으면 그 엣지를 우선 표시 (출력이 없어도 비어있는 상태로 보여줌)
+        if (storeSelectedEdgeId) {
+          const manualEdge = currentIncomingEdges.find(e => e.id === storeSelectedEdgeId);
+          if (manualEdge) {
+            const out = manualEdge.data?.output;
+            const hasObject = out && typeof out === 'object' && Object.keys(out || {}).length > 0;
+            currentMergedInputData = hasObject ? out : {};
+            selectedEdge = {
+              edgeId: manualEdge.id,
+              sourceNodeId: manualEdge.source as string,
+              timestamp: (manualEdge.data?.timestamp as number) || 0
+            };
+          }
+        }
 
-        console.log(`[NodeInspector] Available edges for node ${nodeId}:`, edgesWithTimestamps.map(e => ({
-          edgeId: e.edge.id,
-          source: e.edge.source,
-          timestamp: e.timestamp,
-          timestampDate: new Date(e.timestamp).toLocaleString()
-        })));
+        // 2) 수동 선택이 없는 경우에만 자동 선택 (수동 선택이 있으면 비어 있어도 자동 대체 금지)
+        if (!selectedEdge) {
+          const edgesWithTimestamps = currentIncomingEdges
+            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+            .map(edge => ({
+              edge,
+              timestamp: edge.data?.timestamp || 0,
+              output: edge.data.output
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp);
 
-        if (edgesWithTimestamps.length > 0) {
-          const targetEdge = storeSelectedEdgeId 
-            ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
-            : edgesWithTimestamps[0];
-          
-          console.log(`[NodeInspector] Selected edge for node ${nodeId}:`, {
-            edgeId: targetEdge.edge.id,
-            source: targetEdge.edge.source,
-            timestamp: targetEdge.timestamp,
-            timestampDate: new Date(targetEdge.timestamp).toLocaleString(),
-            isManuallySelected: !!storeSelectedEdgeId
-          });
-          
-          currentMergedInputData = targetEdge.output;
-          selectedEdge = {
-            edgeId: targetEdge.edge.id,
-            sourceNodeId: targetEdge.edge.source,
-            timestamp: targetEdge.timestamp
-          };
+          if (edgesWithTimestamps.length > 0) {
+            const targetEdge = edgesWithTimestamps[0];
+            currentMergedInputData = targetEdge.output;
+            selectedEdge = {
+              edgeId: targetEdge.edge.id,
+              sourceNodeId: targetEdge.edge.source,
+              timestamp: targetEdge.timestamp
+            };
+          }
         }
       }
       setMergedInputData(currentMergedInputData);
@@ -664,7 +664,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                 Connected node(s) have not produced output or output is empty. Execute preceding nodes.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div
+                className="space-y-3"
+                tabIndex={0}
+                onKeyDownCapture={(e) => {
+                  const target = e.target as HTMLElement;
+                  const tag = target && target.tagName;
+                  const isEditable = (target as any)?.isContentEditable;
+                  if ((e.key === 'Backspace' || e.key === 'Delete') && tag !== 'INPUT' && tag !== 'TEXTAREA' && !isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
+              >
                                  {/* 선택된 데이터 표시 */}
                  {selectedEdgeInfo && (() => {
                    // 에러 상태 확인
@@ -672,13 +684,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                    
                    return (
                    <div 
-                     className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                     className={`border rounded-lg p-3 select-text transition-colors ${
                        hasError 
                          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
                          : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
                      } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
-                     onClick={() => handleInputDataClick(selectedEdgeInfo.edgeId, selectedEdgeInfo.sourceNodeId, mergedInputData)}
-                     title="Click to execute with this input"
+                     title="Read-only preview"
                    >
                      <div className="flex items-center justify-between mb-2">
                        <span className={`text-xs font-medium ${
@@ -708,11 +719,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                      </div>
                      
                      <div className="space-y-2">
-                       <div className="bg-white dark:bg-gray-800 rounded p-2 font-mono text-xs text-gray-900 dark:text-gray-100">
-                         <pre className="whitespace-pre-wrap break-words">
-                           {JSON.stringify(mergedInputData, null, 2)}
-                         </pre>
-                       </div>
+                       <JsonViewer 
+                         data={mergedInputData} 
+                         maxHeight="300px"
+                         className="text-xs"
+                       />
                      </div>
                    </div>
                    );
@@ -731,13 +742,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         return (
                           <div 
                             key={edge.id}
-                            className={`border rounded-lg p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                            className={`border rounded-lg p-2 select-text transition-colors ${
                               isSelected 
                                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 border-2' 
                                 : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
                             }`}
-                            onClick={() => handleInputDataClick(edge.id, edge.source, edge.data.output)}
-                            title="Click to execute with this input"
+                            title="Read-only preview"
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -753,10 +763,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
                               </div>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded p-1 font-mono text-xs text-gray-700 dark:text-gray-300 opacity-60">
-                              <pre className="whitespace-pre-wrap break-words">
-                                {JSON.stringify(edge.data.output, null, 2)}
-                              </pre>
+                            <div className="opacity-60">
+                              <JsonViewer 
+                                data={edge.data.output} 
+                                maxHeight="200px"
+                                className="text-xs"
+                              />
                             </div>
                           </div>
                         );

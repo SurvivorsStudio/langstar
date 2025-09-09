@@ -29,7 +29,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge } = useFlowStore();
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const { isDarkMode } = useThemeStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
@@ -43,6 +43,7 @@ const FlowBuilder: React.FC = () => {
   const [showTrashZone, setShowTrashZone] = useState(false);
   const [isOverTrashZone, setIsOverTrashZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState<{x:number;y:number}|null>(null);
 
   // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
   useEffect(() => {
@@ -184,6 +185,9 @@ const FlowBuilder: React.FC = () => {
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
     console.log(`[FlowBuilder] Node data:`, node.data);
+    // 클릭 시에는 휴지통을 반드시 숨김
+    setShowTrashZone(false);
+    setIsOverTrashZone(false);
     setSelectedNode(node.id);
     setSelectedEdge(null); // 엣지 상태 초기화
     setShowInspector(true);
@@ -193,6 +197,9 @@ const FlowBuilder: React.FC = () => {
   const onEdgeClick = useCallback((_: unknown, edge: any) => {
     console.log(`[FlowBuilder] Edge clicked: ${edge.id}, source: ${edge.source}, target: ${edge.target}`);
     console.log(`[FlowBuilder] Edge data:`, edge.data);
+    // 클릭 시에는 휴지통을 반드시 숨김
+    setShowTrashZone(false);
+    setIsOverTrashZone(false);
     setSelectedNode(edge.target); // 엣지의 타겟 노드를 선택된 노드로 설정
     setSelectedEdge(edge); // 선택된 엣지 정보 저장
     setShowInspector(true);
@@ -208,9 +215,18 @@ const FlowBuilder: React.FC = () => {
       console.log(`[FlowBuilder] Setting showInspector to: true`);
       console.log(`[FlowBuilder] NodeId: ${nodeId}, Edge:`, edge);
       
+      // 인스펙터가 열릴 때도 휴지통을 숨김 (클릭 흐름 방어)
+      setShowTrashZone(false);
+      setIsOverTrashZone(false);
+
       setSelectedEdge(edge);
       setShowInspector(true);
       setFocusedElement('edge', edge.id);
+      // 엣지를 클릭했을 때 해당 타겟 노드의 수동 선택 인풋으로 지정하여
+      // NodeInspector가 새로 연결된 엣지의 인풋(없음)을 정확히 반영하도록 함
+      if (edge?.target && edge?.id) {
+        setManuallySelectedEdge(edge.target, edge.id);
+      }
       
       console.log(`[FlowBuilder] Inspector state updated`);
     };
@@ -234,15 +250,24 @@ const FlowBuilder: React.FC = () => {
   // 노드 드래그 이벤트 핸들러
   const onNodeDragStart: NodeDragHandler = useCallback((_, node) => {
     setIsDragging(true);
-    // Start와 End 노드는 삭제할 수 없으므로 휴지통을 표시하지 않음
-    if (node.type !== 'startNode' && node.type !== 'endNode') {
-      setShowTrashZone(true);
-    }
+    setShowTrashZone(false);
+    setIsOverTrashZone(false);
+    const pos = (node as any).positionAbsolute || node.position;
+    setDragStartPos({ x: pos?.x ?? 0, y: pos?.y ?? 0 });
   }, []);
 
   const onNodeDrag: NodeDragHandler = useCallback((_, node) => {
-    // 드래그 중일 때는 전역 마우스 이벤트가 처리함
-  }, []);
+    if (!dragStartPos) return;
+    const pos = (node as any).positionAbsolute || node.position;
+    const dx = (pos?.x ?? 0) - dragStartPos.x;
+    const dy = (pos?.y ?? 0) - dragStartPos.y;
+    const moved = Math.hypot(dx, dy);
+    if (moved > 8) {
+      if (node.type !== 'startNode' && node.type !== 'endNode') {
+        setShowTrashZone(true);
+      }
+    }
+  }, [dragStartPos]);
 
   const onNodeDragStop: NodeDragHandler = useCallback((_, node) => {
     // 휴지통 영역에 드롭되었는지 확인
@@ -260,6 +285,7 @@ const FlowBuilder: React.FC = () => {
     setIsDragging(false);
     setShowTrashZone(false);
     setIsOverTrashZone(false);
+    setDragStartPos(null);
   }, [isOverTrashZone, removeNode]);
 
   // backspace 키로 노드 삭제 방지, delete 키로 선택된 노드 삭제

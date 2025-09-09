@@ -51,6 +51,21 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
 
   // 재생 버튼 활성화 조건: 모든 노드는 source(출력) 연결 기준
   const hasConnection = edges.some(edge => edge.source === id);
+  const hasNonEmptyInput = (() => {
+    // 이 노드로 들어오는 엣지들의 output 중 유효 데이터가 있는지 체크
+    const incoming = edges.filter(edge => edge.target === id);
+    for (const e of incoming) {
+      const out = e.data?.output;
+      if (Array.isArray(out)) {
+        if (out.length > 0) return true;
+      } else if (out && typeof out === 'object') {
+        if (Object.keys(out).length > 0) return true;
+      } else if (out !== null && out !== undefined && out !== '') {
+        return true;
+      }
+    }
+    return false;
+  })();
 
   // 노드 설명 텍스트 생성 (노드 데이터의 description 우선, 없으면 기본값 사용)
   const getNodeDescriptionText = () => {
@@ -652,17 +667,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               }}
               onDoubleClick={handleNodeDoubleClick}
             >
-              {/* 노드 우측 상단 상태 표시 원 */}
-              <div 
-                className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow-sm"
-                style={{ 
-                  backgroundColor: isExecuting 
-                    ? '#3b82f6'  // 파란색: 실행 중
-                    : data.output !== null && data.output !== undefined
-                      ? '#10b981'  // 초록색: 실행 성공
-                      : '#6b7280'  // 회색: 대기 중
-                }}
-              />
+              {/* 우상단 상태 점 제거 */}
               
               {/* 노드 우측 상단 버튼들 */}
               <div className="absolute -top-2 -right-2 flex gap-2">
@@ -772,17 +777,29 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               >
                 <button
                   onClick={handleExecute}
-                  disabled={isExecuting || (isConditionNode && hasValidationError) || !hasConnection}
+                  disabled={
+                    isExecuting ||
+                    (isConditionNode && hasValidationError) ||
+                    (!hasConnection) ||
+                    (!hasNonEmptyInput && !isStartNode)
+                  }
                   className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
-                    ${(!hasConnection || isExecuting || (isConditionNode && hasValidationError)) 
-                      ? 'bg-gray-300 hover:bg-gray-400 text-white' 
+                    ${(
+                      !hasConnection ||
+                      isExecuting ||
+                      (isConditionNode && hasValidationError) ||
+                      (!hasNonEmptyInput && !isStartNode)
+                    )
+                      ? 'bg-gray-300 hover:bg-gray-400 text-white'
                       : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
                   title={
                     !hasConnection
                       ? '노드를 연결해주세요'
-                      : hasValidationError
-                        ? 'Fix validation errors before executing'
-                        : 'Execute Node'
+                      : (!hasNonEmptyInput && !isStartNode)
+                        ? 'No input data. Execute preceding nodes.'
+                        : hasValidationError
+                          ? 'Fix validation errors before executing'
+                          : 'Execute Node'
                   }
                 >
                   {isExecuting ? (
