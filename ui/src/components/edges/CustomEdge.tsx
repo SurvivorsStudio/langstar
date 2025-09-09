@@ -366,23 +366,21 @@ const CustomEdge = ({
       setEdgeNodePosition(coordinates); // 초기 위치 설정
     }
     
-    // 휴지통 표시를 위한 이벤트 발생
-    window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
-    
-    // 휴지통 위치 저장 (50ms 후 휴지통이 나타나면 저장)
-    setTimeout(() => {
-      const trashZone = document.getElementById('trash-zone');
-      if (trashZone) {
-        const rect = trashZone.getBoundingClientRect();
-        setTrashZoneRect(rect);
-      } else {
-        setTrashZoneRect(null);
-      }
-    }, 50);
-    
     // 150ms 후에 드래그 시작 (클릭과 구분)
     const timeout = setTimeout(() => {
       setIsDragging(true);
+      // 실제 드래그가 시작되었을 때만 휴지통 표시 이벤트 발생
+      window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
+      // 휴지통 위치 저장 (휴지통이 나타난 뒤에 측정)
+      setTimeout(() => {
+        const trashZone = document.getElementById('trash-zone');
+        if (trashZone) {
+          const rect = trashZone.getBoundingClientRect();
+          setTrashZoneRect(rect);
+        } else {
+          setTrashZoneRect(null);
+        }
+      }, 50);
     }, 150);
     
     setDragStartTimeout(timeout);
