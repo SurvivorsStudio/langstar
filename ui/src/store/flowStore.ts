@@ -1659,78 +1659,71 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     console.log(`➡️ 시작 노드 발견: ${startNode.data.label} (ID: ${startNode.id})`);
 
-    const executionQueue: string[] = [startNode.id];
-    let head = 0; // 큐 처리를 위한 포인터
+    // 병렬(레벨 기반) 실행으로 변경: 에러가 발생해도 다른 분기는 계속 진행
+    const visited = new Set<string>();
+    let frontier: string[] = [startNode.id];
+    const errorNodes: string[] = [];
 
-    while(head < executionQueue.length) {
-      const currentNodeId = executionQueue[head++];
-      console.log(`\nProcessing queue item: ${currentNodeId}`);
+    while (frontier.length > 0) {
+      const uniqueFrontier = Array.from(new Set(frontier)).filter(id => !visited.has(id));
+      if (uniqueFrontier.length === 0) break;
 
-      const nodeToExecute = getNodeById(currentNodeId);
-      if (!nodeToExecute) {
-        console.warn(`⚠️ 실행 중 ID ${currentNodeId}를 가진 노드를 찾을 수 없습니다. 이 노드는 건너뜁니다.`);
-        continue;
-      }
-      
-      console.log(`⚙️ 노드 실행 중: ${nodeToExecute.data.label} (ID: ${currentNodeId}, 타입: ${nodeToExecute.type})`);
-      await executeNode(currentNodeId, chatId); // executeNode 호출 시 chatId 전달
+      console.log(`➡️ Parallel executing level:`, uniqueFrontier);
 
-      const executedNode = getNodeById(currentNodeId); // 실행 후 최신 노드 정보 가져오기
-      
-      // 에러 확인
-      if (executedNode?.data.output?.error) {
-        console.error(`❌ Workflow execution stopped: Error occurred in node ${executedNode.data.label}:`, executedNode.data.output.error);
-        setWorkflowRunning(false);
-        
-        // Workflow failure toast (including failed node information)
-        window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
-          detail: { 
-            nodeId: 'workflow', 
-            success: false, 
-            nodeName: 'Workflow',
-            failedNodeName: executedNode.data.label // Failed node name
-          } 
-        }));
-        
-        return; // Workflow stopped
-      }
-      
-      console.log(`✅ Node ${currentNodeId} (${executedNode?.data.label}) execution completed. Output:`, executedNode?.data.output);
+      // 현재 레벨 병렬 실행
+      await Promise.all(uniqueFrontier.map(async (nodeId) => {
+        const nodeToExecute = getNodeById(nodeId);
+        if (!nodeToExecute) {
+          console.warn(`⚠️ 실행 중 ID ${nodeId}를 가진 노드를 찾을 수 없습니다. 건너뜁니다.`);
+          return;
+        }
+        try {
+          await executeNode(nodeId, chatId);
+        } catch (e) {
+          // 내부에서 상태 처리됨
+        }
+      }));
 
-      const latestEdges = get().edges; 
-      const outgoingEdges = latestEdges.filter(edge => edge.source === currentNodeId);
-      console.log(`  🔎 Checking ${outgoingEdges.length} outgoing edges from node ${currentNodeId}...`);
+      // 다음 레벨 수집
+      const next: string[] = [];
+      for (const nodeId of uniqueFrontier) {
+        const executedNode = getNodeById(nodeId);
+        const output = executedNode?.data.output;
+        if (output && typeof output === 'object' && output.error) {
+          errorNodes.push(executedNode?.data.label || nodeId);
+        }
 
-      for (const edge of outgoingEdges) {
-        if (edge.data?.output !== null && edge.data?.output !== undefined) {
-          // 순환 참조 허용: 이미 큐에 있는 노드도 다시 추가 가능
-          executionQueue.push(edge.target);
-          console.log(`    ➕ 다음 실행을 위해 엣지 ${edge.id}의 타겟 노드 ${edge.target}을 큐에 추가합니다.`);
+        const latestEdges = get().edges;
+        const outgoingEdges = latestEdges.filter(edge => edge.source === nodeId);
+        outgoingEdges.forEach(edge => {
+          if (edge.data?.output !== null && edge.data?.output !== undefined) {
+            next.push(edge.target);
+          }
+        });
+
+        // mergeNode가 대기 상태면 동일 노드를 재시도 대상으로 유지
+        const isMergeWaiting = executedNode?.type === 'mergeNode' && output && (output as any).status === 'waiting';
+        if (!isMergeWaiting) {
+          visited.add(nodeId);
         } else {
-          console.log(`    ➖ 엣지 ${edge.id} (타겟: ${edge.target})로 데이터가 전달되지 않았습니다. (조건: ${edge.data?.label || 'N/A'}, 출력: ${edge.data?.output})`);
+          next.push(nodeId);
         }
       }
-      
-      // Merge node가 대기 상태인지 확인하고 재실행
-      const currentExecutedNode = getNodeById(currentNodeId);
-      if (currentExecutedNode?.type === 'mergeNode' && currentExecutedNode.data.output?.status === 'waiting') {
-        console.log(`🔄 Merge node ${currentNodeId} is waiting. Re-adding to queue for retry.`);
-        executionQueue.push(currentNodeId);
-      }
+
+      frontier = next.filter(id => !visited.has(id));
     }
-    console.log("\n=========================================");
-    console.log("🏁 Workflow execution completed.");
-    console.log("=========================================");
+
     setWorkflowRunning(false);
-    
-    // Workflow success toast
-    window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
-      detail: { 
-        nodeId: 'workflow', 
-        success: true, 
-        nodeName: 'Workflow' 
-      } 
-    }));
+    // 완료 토스트
+    if (errorNodes.length > 0) {
+      window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
+        detail: { nodeId: 'workflow', success: false, nodeName: 'Workflow', failedNodeName: errorNodes[0] }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
+        detail: { nodeId: 'workflow', success: true, nodeName: 'Workflow' }
+      }));
+    }
   },
 
   saveWorkflow: async () => {

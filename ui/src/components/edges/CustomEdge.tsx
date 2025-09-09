@@ -527,6 +527,14 @@ const CustomEdge = ({
                   hasFailureAnimation ? "#ef4444" : 
                   hasProgressAnimation ? "#f59e0b" : 
                   "#97A2B6",
+          // 상태별 글로우 효과
+          filter: hasSuccessAnimation
+            ? 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.7))'
+            : hasFailureAnimation
+            ? 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.7))'
+            : hasProgressAnimation
+            ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))'
+            : 'none',
           // 베지어 곡선의 자연스러움 강조
           // 좌측 연결선도 우측과 완벽하게 동일한 품질
           opacity: inputPath.includes('C') ? 1 : 0.95
@@ -561,6 +569,14 @@ const CustomEdge = ({
                   hasFailureAnimation ? "#ef4444" : 
                   hasProgressAnimation ? "#f59e0b" : 
                   "#97A2B6",
+          // 상태별 글로우 효과
+          filter: hasSuccessAnimation
+            ? 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.7))'
+            : hasFailureAnimation
+            ? 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.7))'
+            : hasProgressAnimation
+            ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))'
+            : 'none',
           // 베지어 곡선의 자연스러움 강조
           // 우측 연결선도 좌측과 완벽하게 동일한 품질
           opacity: outputPath.includes('C') ? 1 : 0.95
