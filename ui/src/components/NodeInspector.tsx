@@ -152,7 +152,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
       
       if (currentIncomingEdges.length > 0) {
-        // 수동으로 선택된 edge가 있으면 그것을 사용, 없으면 가장 최근 것 사용
+        // 기존 로직: 수동 선택이 있으면 우선, 없으면 최신 자동 선택
         const edgesWithTimestamps = currentIncomingEdges
           .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
           .map(edge => ({
@@ -160,28 +160,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             timestamp: edge.data?.timestamp || 0,
             output: edge.data.output
           }))
-          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
-
-        console.log(`[NodeInspector] Available edges for node ${nodeId}:`, edgesWithTimestamps.map(e => ({
-          edgeId: e.edge.id,
-          source: e.edge.source,
-          timestamp: e.timestamp,
-          timestampDate: new Date(e.timestamp).toLocaleString()
-        })));
+          .sort((a, b) => b.timestamp - a.timestamp);
 
         if (edgesWithTimestamps.length > 0) {
           const targetEdge = storeSelectedEdgeId 
             ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
             : edgesWithTimestamps[0];
-          
-          console.log(`[NodeInspector] Selected edge for node ${nodeId}:`, {
-            edgeId: targetEdge.edge.id,
-            source: targetEdge.edge.source,
-            timestamp: targetEdge.timestamp,
-            timestampDate: new Date(targetEdge.timestamp).toLocaleString(),
-            isManuallySelected: !!storeSelectedEdgeId
-          });
-          
           currentMergedInputData = targetEdge.output;
           selectedEdge = {
             edgeId: targetEdge.edge.id,
@@ -665,7 +649,19 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                 Connected node(s) have not produced output or output is empty. Execute preceding nodes.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div
+                className="space-y-3"
+                tabIndex={0}
+                onKeyDownCapture={(e) => {
+                  const target = e.target as HTMLElement;
+                  const tag = target && target.tagName;
+                  const isEditable = (target as any)?.isContentEditable;
+                  if ((e.key === 'Backspace' || e.key === 'Delete') && tag !== 'INPUT' && tag !== 'TEXTAREA' && !isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
+              >
                                  {/* 선택된 데이터 표시 */}
                  {selectedEdgeInfo && (() => {
                    // 에러 상태 확인
@@ -673,13 +669,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                    
                    return (
                    <div 
-                     className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                     className={`border rounded-lg p-3 select-text transition-colors ${
                        hasError 
                          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
                          : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
                      } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
-                     onClick={() => handleInputDataClick(selectedEdgeInfo.edgeId, selectedEdgeInfo.sourceNodeId, mergedInputData)}
-                     title="Click to execute with this input"
+                     title="Read-only preview"
                    >
                      <div className="flex items-center justify-between mb-2">
                        <span className={`text-xs font-medium ${
@@ -732,13 +727,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         return (
                           <div 
                             key={edge.id}
-                            className={`border rounded-lg p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                            className={`border rounded-lg p-2 select-text transition-colors ${
                               isSelected 
                                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 border-2' 
                                 : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
                             }`}
-                            onClick={() => handleInputDataClick(edge.id, edge.source, edge.data.output)}
-                            title="Click to execute with this input"
+                            title="Read-only preview"
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
