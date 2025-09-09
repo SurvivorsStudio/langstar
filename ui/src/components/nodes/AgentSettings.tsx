@@ -593,6 +593,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
         onSelect={handleKeySelect}
         title={`키 선택 - ${currentSelectingKey === 'system' ? 'System Prompt' : currentSelectingKey === 'user' ? 'User Prompt' : ''}`}
         selectedKey={currentSelectingKey === 'system' ? node?.data.config?.systemPromptInputKey : currentSelectingKey === 'user' ? node?.data.config?.userPromptInputKey : undefined}
+        pathStyle="python"
       />
     </div>
   );

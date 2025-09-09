@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Search } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import CustomSelect from '../Common/CustomSelect';
+import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
 
 interface MergeMapping {
   id: string;
@@ -16,67 +17,81 @@ interface MergeSettingsProps {
   nodeId: string;
 }
 
-interface SourceOption {
-  value: string; // Format: "nodeId.key"
-  label: string; // Format: "key"
-  nodeId: string;
-  nodeKey: string;
-  nodeLabel: string; // 노드 라벨 추가
-}
-
-interface GroupedSourceOption {
-  groupLabel: string; // 노드명
-  nodeId: string;
-  options: SourceOption[];
-}
 
 const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
   const { nodes, edges, updateNodeData } = useFlowStore();
   const currentNode = nodes.find(n => n.id === nodeId);
 
   const [mappings, setMappings] = useState<MergeMapping[]>(currentNode?.data.config?.mergeMappings || []);
+  const [isKeySelectorOpen, setIsKeySelectorOpen] = useState(false);
+  const [currentSelectingMapping, setCurrentSelectingMapping] = useState<string | null>(null);
 
   useEffect(() => {
     setMappings(currentNode?.data.config?.mergeMappings || []);
   }, [currentNode?.data.config?.mergeMappings]);
 
-  // 노드별로 그룹화된 소스 옵션 생성
-  const groupedSourceOptions = useMemo<GroupedSourceOption[]>(() => {
+  // 사용 가능한 소스 노드들 생성
+  const availableSourceNodes = useMemo(() => {
     const incomingEdges = edges.filter(edge => edge.target === nodeId);
-    const grouped: { [nodeId: string]: GroupedSourceOption } = {};
-
-    incomingEdges.forEach(edge => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      if (sourceNode && sourceNode.data.output && typeof sourceNode.data.output === 'object') {
-        const nodeOptions: SourceOption[] = [];
-        
-        Object.keys(sourceNode.data.output).forEach(key => {
-          nodeOptions.push({
-            value: `${sourceNode.id}.${key}`,
-            label: key,
-            nodeId: sourceNode.id,
-            nodeKey: key,
-            nodeLabel: sourceNode.data.label,
-          });
-        });
-
-        if (nodeOptions.length > 0) {
-          grouped[sourceNode.id] = {
-            groupLabel: sourceNode.data.label,
-            nodeId: sourceNode.id,
-            options: nodeOptions,
-          };
-        }
-      }
-    });
-
-    return Object.values(grouped);
+    return incomingEdges
+      .map(edge => nodes.find(n => n.id === edge.source))
+      .filter(node => node && node.data.output && typeof node.data.output === 'object')
+      .map(node => ({
+        value: node!.id,
+        label: node!.data.label,
+      }));
   }, [nodeId, nodes, edges]);
 
-  // 플랫한 옵션 리스트 (기존 호환성을 위해)
-  const availableSourceOptions = useMemo<SourceOption[]>(() => {
-    return groupedSourceOptions.flatMap(group => group.options);
-  }, [groupedSourceOptions]);
+  // 선택된 노드의 사용 가능한 키들 생성
+  const getAvailableKeysForNode = (nodeId: string) => {
+    const sourceNode = nodes.find(n => n.id === nodeId);
+    if (!sourceNode || !sourceNode.data.output || typeof sourceNode.data.output !== 'object') {
+      return [];
+    }
+    
+    return Object.keys(sourceNode.data.output).map(key => ({
+      value: key,
+      label: key,
+    }));
+  };
+
+  // 트리뷰를 사용할지 결정하는 함수
+  const shouldUseTreeView = (nodeId: string) => {
+    if (!nodeId) return false;
+    
+    const sourceNode = nodes.find(n => n.id === nodeId);
+    const output = sourceNode?.data?.output;
+    if (!output) return false;
+    
+    // 데이터가 있으면 항상 새로운 트리뷰 사용 (훨씬 좋은 UX)
+    return Object.keys(output).length > 0;
+  };
+
+  // 선택된 노드의 전체 데이터 가져오기 (계층적 선택을 위해)
+  const getSelectedNodeData = (nodeId: string) => {
+    if (!nodeId) return {};
+    
+    const sourceNode = nodes.find(n => n.id === nodeId);
+    return sourceNode?.data?.output || {};
+  };
+
+  // 계층적 선택기 열기
+  const openKeySelector = (mappingId: string) => {
+    setCurrentSelectingMapping(mappingId);
+    setIsKeySelectorOpen(true);
+  };
+
+  // 계층적 선택기에서 키 선택 처리
+  const handleKeySelect = (key: string) => {
+    if (currentSelectingMapping) {
+      const mappingIndex = mappings.findIndex(m => m.id === currentSelectingMapping);
+      if (mappingIndex !== -1) {
+        handleMappingChange(mappingIndex, 'sourceNodeKey', key);
+      }
+    }
+    setIsKeySelectorOpen(false);
+    setCurrentSelectingMapping(null);
+  };
 
   const handleAddMapping = () => {
     const newMapping: MergeMapping = {
@@ -96,9 +111,9 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
   const handleMappingChange = (index: number, field: keyof MergeMapping, value: string) => {
     const updatedMappings = mappings.map((m, i) => {
       if (i === index) {
-        if (field === 'sourceNodeId') { // Special handling for dropdown
-          const [nodeIdVal, nodeKeyVal] = value.split('.');
-          return { ...m, sourceNodeId: nodeIdVal, sourceNodeKey: nodeKeyVal };
+        if (field === 'sourceNodeId') {
+          // 노드가 변경되면 sourceNodeKey를 초기화
+          return { ...m, sourceNodeId: value, sourceNodeKey: '' };
         }
         return { ...m, [field]: value };
       }
@@ -120,15 +135,6 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
     });
   };
 
-  // 선택된 값의 표시 라벨 생성
-  const getSelectedLabel = (mapping: MergeMapping) => {
-    if (!mapping.sourceNodeId || !mapping.sourceNodeKey) return '';
-    
-    const sourceNode = nodes.find(n => n.id === mapping.sourceNodeId);
-    if (!sourceNode) return `${mapping.sourceNodeId}.${mapping.sourceNodeKey}`;
-    
-    return `${sourceNode.data.label} → ${mapping.sourceNodeKey}`;
-  };
 
   if (!currentNode) return <div>Loading...</div>;
 
@@ -152,17 +158,47 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
           </div>
+          {/* Source Node 선택 드롭다운 */}
+          <div>
+            <label htmlFor={`source-node-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Source Node</label>
+            <CustomSelect
+              value={mapping.sourceNodeId}
+              onChange={value => handleMappingChange(index, 'sourceNodeId', value)}
+              options={availableSourceNodes}
+              placeholder="Select Source Node"
+            />
+          </div>
           {/* Source Value 선택 드롭다운 */}
           <div>
             <label htmlFor={`source-value-${mapping.id}`} className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-0.5">Source Value</label>
-            <CustomSelect
-              value={mapping.sourceNodeId ? `${mapping.sourceNodeId}.${mapping.sourceNodeKey}` : ''}
-              onChange={value => handleMappingChange(index, 'sourceNodeId', value)}
-              options={availableSourceOptions}
-              placeholder="Select Source Value"
-              groupedOptions={groupedSourceOptions}
-              selectedLabel={getSelectedLabel(mapping)}
-            />
+            
+            {shouldUseTreeView(mapping.sourceNodeId) ? (
+              /* 데이터가 있는 경우 - 향상된 트리뷰 선택기 사용 */
+              <button
+                type="button"
+                onClick={() => openKeySelector(mapping.id)}
+                disabled={!mapping.sourceNodeId}
+                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-left flex items-center justify-between ${
+                  !mapping.sourceNodeId
+                    ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                    : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>
+                  {mapping.sourceNodeKey || 'Select Source Value'}
+                </span>
+                <Search className="w-4 h-4 text-gray-400" />
+              </button>
+            ) : (
+              /* 데이터가 없는 경우 - 기존 CustomSelect 사용 */
+              <CustomSelect
+                value={mapping.sourceNodeKey}
+                onChange={value => handleMappingChange(index, 'sourceNodeKey', value)}
+                options={getAvailableKeysForNode(mapping.sourceNodeId)}
+                placeholder="Select Source Value"
+                disabled={!mapping.sourceNodeId}
+              />
+            )}
           </div>
           {/* 삭제 버튼 */}
           <div className="flex justify-end">
@@ -183,11 +219,25 @@ const MergeSettings: React.FC<MergeSettingsProps> = ({ nodeId }) => {
         <PlusCircle size={16} className="mr-2" />
         Add Mapping
       </button>
-      {availableSourceOptions.length === 0 && mappings.length === 0 && (
+      {availableSourceNodes.length === 0 && mappings.length === 0 && (
         <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-md">
           No input data available from connected nodes. Connect and execute preceding nodes to populate source options.
         </p>
       )}
+
+      {/* 계층적 키 선택기 팝업 */}
+      <HierarchicalKeySelector
+        isOpen={isKeySelectorOpen}
+        onClose={() => {
+          setIsKeySelectorOpen(false);
+          setCurrentSelectingMapping(null);
+        }}
+        data={currentSelectingMapping ? getSelectedNodeData(mappings.find(m => m.id === currentSelectingMapping)?.sourceNodeId || '') : {}}
+        onSelect={handleKeySelect}
+        title="키 선택 - Source Value"
+        selectedKey={currentSelectingMapping ? mappings.find(m => m.id === currentSelectingMapping)?.sourceNodeKey : undefined}
+        pathStyle="python"
+      />
     </div>
   );
 };

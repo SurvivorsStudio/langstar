@@ -74,6 +74,22 @@ def agent_node(msg: dict = Body(...)):
         logger.error(f"Error in agent node endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@router.post('/workflow/node/mergenode')
+def agent_node(msg: dict = Body(...)):
+    try:
+        logger.info("Received merge node request")
+        print( msg )
+        result = WorkflowService.process_merge_node(msg)
+        logger.info("merge node request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in merge node endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @router.post('/workflow/export/python/langgraph')
 def export_langgraph(msg: dict = Body(...)):
     """Export workflow to LangGraph Python code"""
