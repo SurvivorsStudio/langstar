@@ -21,7 +21,7 @@ export interface NodeCategory {
 // 아이콘 색상을 반환하는 함수
 const getIconColor = (nodeType: string, isDarkMode: boolean = false) => {
   const colors: Record<string, { light: string; dark: string }> = {
-    'promptNode': { light: '#25A18E', dark: '#25A18E' },
+    'promptNode': { light: '#F7CB15', dark: '#F7CB15' },
     'agentNode': { light: '#3b82f6', dark: '#60a5fa' },
     'conditionNode': { light: '#f59e0b', dark: '#fbbf24' },
     'functionNode': { light: '#5B5F97', dark: '#5B5F97' },
