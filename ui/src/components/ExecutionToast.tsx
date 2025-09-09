@@ -80,13 +80,15 @@ const ExecutionToast: React.FC = () => {
       // 워크플로우 실행과 개별 노드 실행 구분
       const isWorkflow = nodeId === 'workflow';
       
-      // 실행 시간 포맷팅
+      // 실행 시간 포맷팅 (정밀 표기: mm:ss.mmm)
       const formatExecutionTime = (ms: number) => {
-        if (ms < 1000) return `${ms}ms`;
-        if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
         const minutes = Math.floor(ms / 60000);
-        const seconds = ((ms % 60000) / 1000).toFixed(1);
-        return `${minutes}m ${seconds}s`;
+        const seconds = Math.floor((ms % 60000) / 1000);
+        const millis = Math.floor(ms % 1000);
+        const mm = String(minutes).padStart(2, '0');
+        const ss = String(seconds).padStart(2, '0');
+        const mmm = String(millis).padStart(3, '0');
+        return `${mm}:${ss}.${mmm} s`;
       };
       
       // 워크플로우 실패 시 실패한 노드 정보 포함
@@ -112,7 +114,7 @@ const ExecutionToast: React.FC = () => {
           ? (success ? 'Workflow Execution Completed' : 'Workflow Execution Failed')
           : (success ? 'Node Execution Completed' : 'Node Execution Failed'),
         message,
-        duration: 3500,
+        duration: 3000,
         timestamp: new Date(),
         executionTime: executionTime
       };
@@ -166,6 +168,7 @@ const ToastItem: React.FC<{
   const [isVisible, setIsVisible] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const localStartMsRef = useRef<number | null>(null);
 
   const handleRemove = useCallback(() => {
     setIsRemoving(true);
@@ -188,26 +191,26 @@ const ToastItem: React.FC<{
 
   // 실행 중일 때 실시간 타이머
   useEffect(() => {
-    if (toast.type === 'executing' && toast.nodeId) {
-      const startTime = executionStartTimes.get(toast.nodeId) || toast.startTime;
-      if (startTime) {
-        const interval = setInterval(() => {
-          const elapsed = Date.now() - startTime.getTime();
-          setElapsedTime(elapsed);
-        }, 100); // 100ms마다 업데이트
-
-        return () => clearInterval(interval);
-      }
+    if (toast.type !== 'executing') return;
+    if (!localStartMsRef.current) {
+      const external = toast.nodeId ? (executionStartTimes.get(toast.nodeId) || toast.startTime) : toast.startTime;
+      localStartMsRef.current = external ? external.getTime() : Date.now();
     }
-  }, [toast.type, toast.nodeId, executionStartTimes, toast.startTime]);
+    const interval = setInterval(() => {
+      setElapsedTime(Date.now() - (localStartMsRef.current as number));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [toast.type, toast.id]);
 
   // 실행 시간 포맷팅 함수
   const formatElapsedTime = (ms: number) => {
-    if (ms < 1000) return `${Math.floor(ms / 100) / 10}s`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
     const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return `${minutes}m ${seconds}s`;
+    const seconds = Math.floor((ms % 60000) / 1000);
+    const millis = Math.floor(ms % 1000);
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    const mmm = String(millis).padStart(3, '0');
+    return `${mm}:${ss}.${mmm} s`;
   };
 
   const getIcon = () => {

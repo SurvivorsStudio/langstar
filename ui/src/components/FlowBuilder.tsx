@@ -29,7 +29,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge } = useFlowStore();
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const { isDarkMode } = useThemeStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
@@ -211,6 +211,11 @@ const FlowBuilder: React.FC = () => {
       setSelectedEdge(edge);
       setShowInspector(true);
       setFocusedElement('edge', edge.id);
+      // 엣지를 클릭했을 때 해당 타겟 노드의 수동 선택 인풋으로 지정하여
+      // NodeInspector가 새로 연결된 엣지의 인풋(없음)을 정확히 반영하도록 함
+      if (edge?.target && edge?.id) {
+        setManuallySelectedEdge(edge.target, edge.id);
+      }
       
       console.log(`[FlowBuilder] Inspector state updated`);
     };
