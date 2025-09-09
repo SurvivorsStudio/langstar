@@ -152,26 +152,41 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
       
       if (currentIncomingEdges.length > 0) {
-        // 기존 로직: 수동 선택이 있으면 우선, 없으면 최신 자동 선택
-        const edgesWithTimestamps = currentIncomingEdges
-          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-          .map(edge => ({
-            edge,
-            timestamp: edge.data?.timestamp || 0,
-            output: edge.data.output
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp);
+        // 1) 수동 선택된 엣지가 있으면 그 엣지를 우선 표시 (출력이 없어도 비어있는 상태로 보여줌)
+        if (storeSelectedEdgeId) {
+          const manualEdge = currentIncomingEdges.find(e => e.id === storeSelectedEdgeId);
+          if (manualEdge) {
+            const out = manualEdge.data?.output;
+            const hasObject = out && typeof out === 'object' && Object.keys(out || {}).length > 0;
+            currentMergedInputData = hasObject ? out : {};
+            selectedEdge = {
+              edgeId: manualEdge.id,
+              sourceNodeId: manualEdge.source as string,
+              timestamp: (manualEdge.data?.timestamp as number) || 0
+            };
+          }
+        }
 
-        if (edgesWithTimestamps.length > 0) {
-          const targetEdge = storeSelectedEdgeId 
-            ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
-            : edgesWithTimestamps[0];
-          currentMergedInputData = targetEdge.output;
-          selectedEdge = {
-            edgeId: targetEdge.edge.id,
-            sourceNodeId: targetEdge.edge.source,
-            timestamp: targetEdge.timestamp
-          };
+        // 2) 수동 선택이 없는 경우에만 자동 선택 (수동 선택이 있으면 비어 있어도 자동 대체 금지)
+        if (!selectedEdge) {
+          const edgesWithTimestamps = currentIncomingEdges
+            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+            .map(edge => ({
+              edge,
+              timestamp: edge.data?.timestamp || 0,
+              output: edge.data.output
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp);
+
+          if (edgesWithTimestamps.length > 0) {
+            const targetEdge = edgesWithTimestamps[0];
+            currentMergedInputData = targetEdge.output;
+            selectedEdge = {
+              edgeId: targetEdge.edge.id,
+              sourceNodeId: targetEdge.edge.source,
+              timestamp: targetEdge.timestamp
+            };
+          }
         }
       }
       setMergedInputData(currentMergedInputData);
