@@ -120,6 +120,7 @@ export interface FlowState {
   setEdgeSuccess: (edgeId: string, isSuccess: boolean) => void; // 엣지 성공 상태 설정
   setEdgeFailure: (edgeId: string, isFailure: boolean) => void; // 엣지 실패 상태 설정
   setEdgeExecuting: (edgeId: string, isExecuting: boolean) => void; // 엣지 실행 중 상태 설정
+  resetAllEdgeStatuses: (excludeEdgeIds?: string[]) => void; // 모든 엣지 상태 초기화 (예외 목록 제외)
   setNodeExecuting: (nodeId: string, isExecuting: boolean, success?: boolean, nodeName?: string, isWorkflowExecution?: boolean) => void;
   runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
   isWorkflowRunning: boolean;
@@ -549,7 +550,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || 'data';
 
-    const edgeData: any = { output: null };
+    // 신규 엣지 초기 상태: 데이터/상태 모두 초기화
+    const edgeData: any = { 
+      output: null,
+      isExecuting: false,
+      isSuccess: false,
+      isFailure: false,
+      timestamp: undefined,
+    };
 
     if (isConditionNode) {
       // Count existing outgoing edges from this source before adding the new one
@@ -565,6 +573,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         animated: true,
         data: edgeData
       }, edges), // Use the initially fetched edges
+    });
+  },
+
+  // 모든 엣지 상태 초기화 (예외 edgeId는 유지)
+  resetAllEdgeStatuses: (excludeEdgeIds: string[] = []) => {
+    set({
+      edges: get().edges.map(edge => (
+        excludeEdgeIds.includes(edge.id)
+          ? edge
+          : {
+              ...edge,
+              data: {
+                ...edge.data,
+                isExecuting: false,
+                isSuccess: false,
+                isFailure: false,
+              }
+            }
+      ))
     });
   },
 
@@ -879,13 +906,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         return edge;
       })
     });
-    
-    // 성공 상태 3초 후 자동 해제
-    if (isSuccess) {
-      setTimeout(() => {
-        get().setEdgeSuccess(edgeId, false);
-      }, 3000);
-    }
+    // 색상은 다음 실행까지 유지 (자동 해제 제거)
   },
 
   setEdgeFailure: (edgeId: string, isFailure: boolean) => {
@@ -906,13 +927,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         return edge;
       })
     });
-    
-    // 실패 상태 3초 후 자동 해제
-    if (isFailure) {
-      setTimeout(() => {
-        get().setEdgeFailure(edgeId, false);
-      }, 3000);
-    }
+    // 색상은 다음 실행까지 유지 (자동 해제 제거)
   },
 
   setEdgeExecuting: (edgeId: string, isExecuting: boolean) => {
@@ -947,8 +962,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const isWorkflowRunning = get().isWorkflowRunning;
     get().setNodeExecuting(nodeId, true, true, nodeName, isWorkflowRunning);
     
-    // 실행 시작 시 나가는 엣지들을 실행 중 상태로 설정
+    // 실행 시작 시: 나가는 엣지들을 실행 중으로 설정
+    // 개별 실행일 때만 다른 엣지들 상태를 초기화하고, 전체 실행 중에는 이전 성공 상태를 유지
     const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
+    const outgoingIds = outgoingEdges.map(e => e.id);
+    if (!isWorkflowRunning) {
+      get().resetAllEdgeStatuses(outgoingIds);
+    }
     outgoingEdges.forEach(edge => {
       get().setEdgeExecuting(edge.id, true);
     });
@@ -1506,6 +1526,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   runWorkflow: async (chatId?: string) => { 
     const { nodes, edges, getNodeById, executeNode, setWorkflowRunning } = get();
     setWorkflowRunning(true);
+    // 워크플로 시작 시 전체 엣지 상태 초기화
+    get().resetAllEdgeStatuses([]);
     
     // 워크플로우 실행 시작 토스트 이벤트 발생
     window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {

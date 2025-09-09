@@ -41,6 +41,17 @@ const CustomEdge = ({
   const hasSuccessAnimation = isSuccess;
   const hasFailureAnimation = isFailure;
   const hasProgressAnimation = isExecuting;
+  // 펄스 표시 3초 유지
+  const [showPulse, setShowPulse] = React.useState(false);
+  React.useEffect(() => {
+    const active = !!(hasSuccessAnimation || hasFailureAnimation || hasProgressAnimation);
+    if (active) {
+      setShowPulse(true);
+      const t = setTimeout(() => setShowPulse(false), 3000);
+      return () => clearTimeout(t);
+    }
+    setShowPulse(false);
+  }, [hasSuccessAnimation, hasFailureAnimation, hasProgressAnimation]);
   
   
   
@@ -587,33 +598,41 @@ const CustomEdge = ({
                 borderColor: isDarkMode ? '#6b7280' : '#e5e7eb'
               }}
             ></div>
-            {/* 내부 링 - 성공/실패/진행 상태에 따라 색상 변경 */}
+            {/* 내부 링 - 입력 데이터 유무 및 상태에 따른 색상 (펄스 종료 시 기본색 복귀) */}
             <div className={`absolute inset-2 rounded-full transition-colors duration-300 ${
-              hasSuccessAnimation ? 'bg-teal-500' : 
-              hasFailureAnimation ? 'bg-red-500' : 
-              hasProgressAnimation ? 'bg-orange-500' : 
-              'bg-purple-500'
+              !data?.output || (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
+                ? 'bg-gray-300'
+                : showPulse && hasSuccessAnimation ? 'bg-teal-500' : 
+                  showPulse && hasFailureAnimation ? 'bg-red-500' : 
+                  showPulse && hasProgressAnimation ? 'bg-orange-500' : 
+                  'bg-purple-500'
             }`}></div>
-            {/* 중심 원 - 성공/실패/진행 상태에 따라 색상 변경 */}
+            {/* 중심 원 - 입력 데이터 유무 및 상태에 따른 색상 (펄스 종료 시 기본색 복귀) */}
             <div className={`absolute inset-4 rounded-full flex items-center justify-center transition-colors duration-300 ${
-              hasSuccessAnimation ? 'bg-teal-600' : 
-              hasFailureAnimation ? 'bg-red-600' : 
-              hasProgressAnimation ? 'bg-orange-600' : 
-              'bg-purple-600'
+              !data?.output || (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
+                ? 'bg-gray-400'
+                : showPulse && hasSuccessAnimation ? 'bg-teal-600' : 
+                  showPulse && hasFailureAnimation ? 'bg-red-600' : 
+                  showPulse && hasProgressAnimation ? 'bg-orange-600' : 
+                  'bg-purple-600'
             }`}>
               {/* 데이터베이스 아이콘 */}
               <Database size={20} className="text-white" />
             </div>
             
-            {/* 성공/실패/진행 시 펄스 효과 */}
-            {hasSuccessAnimation && (
-              <div className="absolute inset-0 rounded-full bg-teal-400 opacity-50 animate-ping"></div>
-            )}
-            {hasFailureAnimation && (
-              <div className="absolute inset-0 rounded-full bg-red-400 opacity-50 animate-ping"></div>
-            )}
-            {hasProgressAnimation && (
-              <div className="absolute inset-0 rounded-full bg-orange-400 opacity-50 animate-pulse"></div>
+            {/* 성공/실패/진행 시 펄스 효과 (3초만 유지) */}
+            {showPulse && (
+              <>
+                {hasSuccessAnimation && (
+                  <div className="absolute inset-0 rounded-full bg-teal-400 opacity-50 animate-ping"></div>
+                )}
+                {hasFailureAnimation && (
+                  <div className="absolute inset-0 rounded-full bg-red-400 opacity-50 animate-ping"></div>
+                )}
+                {hasProgressAnimation && (
+                  <div className="absolute inset-0 rounded-full bg-orange-400 opacity-50 animate-pulse"></div>
+                )}
+              </>
             )}
             
             {/* 드래그 중일 때 시각적 피드백 */}
