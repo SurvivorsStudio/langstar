@@ -454,8 +454,9 @@ const CustomEdge = ({
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth="6"
-          markerHeight="6"
+          markerWidth="10"
+          markerHeight="10"
+          markerUnits="userSpaceOnUse"
           orient="auto-start-reverse"
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#97A2B6" />
@@ -468,8 +469,9 @@ const CustomEdge = ({
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth="6"
-          markerHeight="6"
+          markerWidth="10"
+          markerHeight="10"
+          markerUnits="userSpaceOnUse"
           orient="auto-start-reverse"
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
@@ -480,8 +482,9 @@ const CustomEdge = ({
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth="6"
-          markerHeight="6"
+          markerWidth="10"
+          markerHeight="10"
+          markerUnits="userSpaceOnUse"
           orient="auto-start-reverse"
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
@@ -492,8 +495,9 @@ const CustomEdge = ({
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth="6"
-          markerHeight="6"
+          markerWidth="10"
+          markerHeight="10"
+          markerUnits="userSpaceOnUse"
           orient="auto-start-reverse"
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
