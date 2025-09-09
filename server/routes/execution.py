@@ -8,6 +8,7 @@ from server.models.execution import (
 from server.services.execution_service import execution_service
 from server.services.deployment_service import deployment_service
 from server.utils.execution_logger import execution_logger
+from server.utils.response import ok, err
 import logging
 import os
 
@@ -25,15 +26,14 @@ def start_execution(workflow_id: str, request: StartExecutionRequest):
         
         logger.info(f"Successfully started execution: {execution.id}")
         
-        return StartExecutionResponse(
-            success=True,
-            execution=execution,
-            message=f"Execution '{execution.name}' started successfully"
-        )
+        return ok({
+            "execution": execution,
+            "message": f"Execution '{execution.name}' started successfully"
+        })
         
     except Exception as e:
         logger.error(f"Error starting execution: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="START_FAILED", message=str(e), status=500)
 
 @router.get('/workflows/{workflow_id}/executions', response_model=ListExecutionsResponse)
 def list_executions(
@@ -60,16 +60,15 @@ def list_executions(
         
         logger.info(f"Found {len(executions)} executions for workflow {workflow_id}")
         
-        return ListExecutionsResponse(
-            success=True,
-            executions=executions,
-            next_token=None,  # TODO: 실제 페이지네이션 구현
-            message=f"Retrieved {len(executions)} executions"
-        )
+        return ok({
+            "executions": executions,
+            "next_token": None,
+            "message": f"Retrieved {len(executions)} executions"
+        })
         
     except Exception as e:
         logger.error(f"Error listing executions: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="LIST_FAILED", message=str(e), status=500)
 
 @router.get('/executions/{execution_id}', response_model=DescribeExecutionResponse)
 def describe_execution(execution_id: str):
@@ -82,19 +81,18 @@ def describe_execution(execution_id: str):
         
         logger.info(f"Retrieved execution {execution_id} with {len(history)} history entries")
         
-        return DescribeExecutionResponse(
-            success=True,
-            execution=execution,
-            history=history,
-            message=f"Execution '{execution.name}' details retrieved"
-        )
+        return ok({
+            "execution": execution,
+            "history": history,
+            "message": f"Execution '{execution.name}' details retrieved"
+        })
         
     except ValueError as e:
         logger.error(f"Execution not found: {str(e)}")
-        raise HTTPException(status_code=404, detail=str(e))
+        return err(code="NOT_FOUND", message=str(e), status=404)
     except Exception as e:
         logger.error(f"Error describing execution: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="DESCRIBE_FAILED", message=str(e), status=500)
 
 @router.post('/executions/{execution_id}/stop', response_model=StopExecutionResponse)
 def stop_execution(execution_id: str, request: StopExecutionRequest):
@@ -110,18 +108,17 @@ def stop_execution(execution_id: str, request: StopExecutionRequest):
         
         logger.info(f"Successfully stopped execution: {execution_id}")
         
-        return StopExecutionResponse(
-            success=True,
-            execution=execution,
-            message=f"Execution '{execution.name}' stopped successfully"
-        )
+        return ok({
+            "execution": execution,
+            "message": f"Execution '{execution.name}' stopped successfully"
+        })
         
     except ValueError as e:
         logger.error(f"Active execution not found: {str(e)}")
-        raise HTTPException(status_code=404, detail=str(e))
+        return err(code="NOT_FOUND", message=str(e), status=404)
     except Exception as e:
         logger.error(f"Error stopping execution: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="STOP_FAILED", message=str(e), status=500)
 
 @router.delete('/executions/{execution_id}')
 def delete_execution(execution_id: str):
@@ -133,16 +130,13 @@ def delete_execution(execution_id: str):
         
         if success:
             logger.info(f"Successfully deleted execution: {execution_id}")
-            return {
-                "success": True,
-                "message": f"Execution {execution_id} deleted successfully"
-            }
+            return ok({ "message": f"Execution {execution_id} deleted successfully" })
         else:
-            raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+            return err(code="NOT_FOUND", message=f"Execution {execution_id} not found", status=404)
         
     except Exception as e:
         logger.error(f"Error deleting execution: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="DELETE_FAILED", message=str(e), status=500)
 
 @router.get('/executions/{execution_id}/download-logs')
 def download_execution_logs(execution_id: str):
@@ -209,15 +203,14 @@ def get_execution_history(execution_id: str):
         
         logger.info(f"Retrieved {len(history)} history entries for execution {execution_id}")
         
-        return {
-            "success": True,
+        return ok({
             "history": history,
             "message": f"Retrieved {len(history)} history entries"
-        }
+        })
         
     except Exception as e:
         logger.error(f"Error getting execution history: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="HISTORY_FAILED", message=str(e), status=500)
 
 @router.get('/executions/{execution_id}/status')
 def get_execution_status(execution_id: str):
@@ -227,19 +220,18 @@ def get_execution_status(execution_id: str):
         
         execution = execution_service.describe_execution(execution_id)
         
-        return {
-            "success": True,
+        return ok({
             "execution_id": execution_id,
             "status": execution.status,
             "start_time": execution.start_time,
             "end_time": execution.end_time,
             "duration_ms": execution.duration_ms,
             "message": f"Execution status: {execution.status}"
-        }
+        })
         
     except Exception as e:
         logger.error(f"Error getting execution status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return err(code="STATUS_FAILED", message=str(e), status=500)
 
 # 새로운 상세 로그 API 엔드포인트들
 @router.get('/deployments/{deployment_id}/executions/{execution_id}/detailed-logs')

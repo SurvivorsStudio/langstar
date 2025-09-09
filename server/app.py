@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import signal
 import sys
@@ -8,11 +9,17 @@ from contextlib import asynccontextmanager
 # Import structured modules
 from server.utils.logger import setup_logger
 from server.routes import health, workflow, deployment, execution
+from server.utils.response import err
 
 # Setup logger
 logger = setup_logger()
 
 app = FastAPI()
+# 전역 예외 핸들러 (HTTPException 이외의 예외를 ok=false로 정규화)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception: %s", str(exc))
+    return JSONResponse(status_code=500, content=err(code="INTERNAL", message=str(exc), status=500))
 
 # 안전한 종료를 위한 시그널 핸들러
 def signal_handler(signum, frame):

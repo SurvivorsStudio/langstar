@@ -13,7 +13,9 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, isWorkflowRunning } = useFlowStore();
+  // 전역: 하나라도 실행 중인지 여부
+  const isAnyNodeExecuting = useFlowStore(state => state.nodes.some(n => n.data?.isExecuting));
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   // 노드 이름 편집 모드 상태
@@ -678,6 +680,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                   <button
                     onClick={handleExecute}
                     disabled={
+                      isWorkflowRunning ||
+                      isAnyNodeExecuting ||
                       isExecuting ||
                       (isConditionNode && hasValidationError) ||
                       (!hasConnection) ||
@@ -685,6 +689,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                     }
                     className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
                       ${(
+                        isWorkflowRunning ||
+                        isAnyNodeExecuting ||
                         !hasConnection ||
                         isExecuting ||
                         (isConditionNode && hasValidationError) ||
