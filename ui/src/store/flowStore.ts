@@ -851,11 +851,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   setNodeOutput: (nodeId: string, output: any) => {
     set(state => {
+      // 1) 최상위에서 단 한 번만 정규화
+      const normalized = (output && typeof output === 'object' && typeof (output as any).ok === 'boolean')
+        ? output
+        : ((output && typeof output === 'object' && (output as any).error)
+            ? { ok: false, error: (output as any).error, ...(output as any).details ? { details: (output as any).details } : {} }
+            : { ok: true, data: output });
+
       const updatedNodes = state.nodes.map(node => {
         if (node.id === nodeId) {
           return {
             ...node,
-            data: { ...node.data, output }
+            data: { ...node.data, output: normalized }
           };
         }
         return node;
@@ -871,13 +878,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             // Therefore, we return the edge as is.
             return edge;
           }
-          // For other node types, propagate the node's output to the edge's data.output
+          // For other node types, pass-through normalized output (재래핑 금지)
           return {
             ...edge,
             data: { 
               ...edge.data, 
-              output,
-              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+              output: normalized,
+              timestamp: normalized ? Date.now() : 0 // output이 있을 때만 timestamp 저장
             }
           };
         }
@@ -892,12 +899,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set(state => {
       const updatedEdges = state.edges.map(edge => {
         if (edge.id === edgeId) {
+          const normalized = (output && typeof output === 'object' && typeof (output as any).ok === 'boolean')
+            ? output
+            : ((output && typeof output === 'object' && (output as any).error)
+                ? { ok: false, error: (output as any).error, ...(output as any).details ? { details: (output as any).details } : {} }
+                : { ok: true, data: output });
           return {
             ...edge,
             data: { 
               ...edge.data, 
-              output,
-              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+              output: normalized,
+              timestamp: normalized ? Date.now() : 0 // output이 있을 때만 timestamp 저장
             }
           };
         }
@@ -1603,10 +1615,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           output = input;
       }
 
-      get().setNodeOutput(nodeId, output);
+      // 항상 ok 필드 포함하도록 래핑
+      const wrappedOutput = (output && typeof output === 'object' && output.error)
+        ? { ok: false, error: output.error, ...(output.details ? { details: output.details } : {}), data: undefined }
+        : { ok: true, data: output };
+      get().setNodeOutput(nodeId, wrappedOutput);
       
       // output에 error가 있으면 실패로 처리
-      const hasError = output && typeof output === 'object' && output.error;
+      const hasError = !!(wrappedOutput && wrappedOutput.ok === false);
       get().setNodeExecuting(nodeId, false, !hasError, nodeName, isWorkflowRunning); // error가 있으면 실패
       
       // 성공/실패에 따라 나가는 엣지들의 상태 설정
@@ -1625,7 +1641,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error executing node:', error);
-      get().setNodeOutput(nodeId, { error: 'Execution failed' });
+      get().setNodeOutput(nodeId, { ok: false, error: 'Execution failed' });
       get().setNodeExecuting(nodeId, false, false, nodeName, isWorkflowRunning); // 실패로 표시
       
       // 실패한 경우 나가는 엣지들을 실패 상태로 설정
