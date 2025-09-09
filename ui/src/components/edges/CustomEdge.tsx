@@ -33,6 +33,17 @@ const CustomEdge = ({
 
   const sourceNode = nodes.find(n => n.id === source);
   const isEdgeTextFocused = focusedElement.type === 'edge' && focusedElement.id === id;
+  
+  // 성공/실패/진행 상태 확인
+  const isSuccess = data?.isSuccess;
+  const isFailure = data?.isFailure;
+  const isExecuting = data?.isExecuting;
+  const hasSuccessAnimation = isSuccess;
+  const hasFailureAnimation = isFailure;
+  const hasProgressAnimation = isExecuting;
+  
+  
+  
 
   // 드래그 가능한 중간점 상태
   const [isDragging, setIsDragging] = useState(false);
@@ -41,7 +52,7 @@ const CustomEdge = ({
   );
 
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
-  const [dragStartTimeout, setDragStartTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [dragStartTimeout, setDragStartTimeout] = useState<number | null>(null);
   const [trashZoneRect, setTrashZoneRect] = useState<DOMRect | null>(null);
 
   // Calculate the center point between source and target
@@ -421,7 +432,8 @@ const CustomEdge = ({
   return (
     <>
       <defs>
-        {/* 이미지와 같은 파란색 화살표 마커 */}
+        
+        {/* 기본 화살표 마커 */}
         <marker
           id="arrow"
           viewBox="0 0 10 10"
@@ -433,28 +445,70 @@ const CustomEdge = ({
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#97A2B6" />
         </marker>
+        
+        
+        {/* 단색 화살표 마커들 */}
+        <marker
+          id="arrow-success-solid"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
+        </marker>
+        
+        <marker
+          id="arrow-failure-solid"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+        </marker>
+        
+        <marker
+          id="arrow-progress-solid"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+        </marker>
       </defs>
       
       {/* 메인 edge 경로 - 두 개의 연결선으로 분리 */}
       {/* 첫 번째 연결선: source -> inputHandle (우측과 완벽하게 대칭) */}
       <path
         id={`${id}-input`}
-        className={`react-flow__edge-path transition-all duration-150 ${
-          isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
-        }`}
+        className="react-flow__edge-path"
         d={inputPath}
-        stroke="#97A2B6"
-        strokeDasharray="5,5"
+        strokeDasharray={
+          hasSuccessAnimation ? "0" : 
+          hasFailureAnimation ? "0" : 
+          hasProgressAnimation ? "8,4" : 
+          "5,5"
+        }
         fill="none"
         style={{ 
-          strokeWidth: isDragging ? 3 : 2,
+          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation) ? 3 : (isDragging ? 3 : 2),
           // 부드러운 곡선을 위한 선 스타일
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
+          // 색상 강제 적용
+          stroke: hasSuccessAnimation ? "#10b981" : 
+                  hasFailureAnimation ? "#ef4444" : 
+                  hasProgressAnimation ? "#f59e0b" : 
+                  "#97A2B6",
           // 베지어 곡선의 자연스러움 강조
-          filter: isDarkMode 
-            ? 'drop-shadow(0 1px 2px rgba(96, 165, 250, 0.2))'
-            : 'drop-shadow(0 1px 2px rgba(59, 130, 246, 0.1))',
           // 좌측 연결선도 우측과 완벽하게 동일한 품질
           opacity: inputPath.includes('C') ? 1 : 0.95
         }}
@@ -463,23 +517,32 @@ const CustomEdge = ({
       {/* 두 번째 연결선: outputHandle -> target (좌측과 완벽하게 대칭) */}
       <path
         id={`${id}-output`}
-        className={`react-flow__edge-path transition-all duration-150 ${
-          isDragging ? 'stroke-[3px]' : 'stroke-[2px]'
-        }`}
+        className="react-flow__edge-path"
         d={outputPath}
-        markerEnd="url(#arrow)"
-        stroke="#97A2B6"
-        strokeDasharray="5,5"
+        markerEnd={
+          hasSuccessAnimation ? "url(#arrow-success-solid)" : 
+          hasFailureAnimation ? "url(#arrow-failure-solid)" : 
+          hasProgressAnimation ? "url(#arrow-progress-solid)" : 
+          "url(#arrow)"
+        }
+        strokeDasharray={
+          hasSuccessAnimation ? "0" : 
+          hasFailureAnimation ? "0" : 
+          hasProgressAnimation ? "8,4" : 
+          "5,5"
+        }
         fill="none"
         style={{ 
-          strokeWidth: isDragging ? 3 : 2,
+          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation) ? 3 : (isDragging ? 3 : 2),
           // 부드러운 곡선을 위한 선 스타일
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
+          // 색상 강제 적용
+          stroke: hasSuccessAnimation ? "#10b981" : 
+                  hasFailureAnimation ? "#ef4444" : 
+                  hasProgressAnimation ? "#f59e0b" : 
+                  "#97A2B6",
           // 베지어 곡선의 자연스러움 강조
-          filter: isDarkMode 
-            ? 'drop-shadow(0 1px 2px rgba(96, 165, 250, 0.2))'
-            : 'drop-shadow(0 1px 2px rgba(59, 130, 246, 0.1))',
           // 우측 연결선도 좌측과 완벽하게 동일한 품질
           opacity: outputPath.includes('C') ? 1 : 0.95
         }}
@@ -524,13 +587,34 @@ const CustomEdge = ({
                 borderColor: isDarkMode ? '#6b7280' : '#e5e7eb'
               }}
             ></div>
-            {/* 보라색 내부 링 */}
-            <div className="absolute inset-2 bg-purple-500 rounded-full"></div>
-            {/* 보라색 중심 원 */}
-            <div className="absolute inset-4 bg-purple-600 rounded-full flex items-center justify-center">
+            {/* 내부 링 - 성공/실패/진행 상태에 따라 색상 변경 */}
+            <div className={`absolute inset-2 rounded-full transition-colors duration-300 ${
+              hasSuccessAnimation ? 'bg-teal-500' : 
+              hasFailureAnimation ? 'bg-red-500' : 
+              hasProgressAnimation ? 'bg-orange-500' : 
+              'bg-purple-500'
+            }`}></div>
+            {/* 중심 원 - 성공/실패/진행 상태에 따라 색상 변경 */}
+            <div className={`absolute inset-4 rounded-full flex items-center justify-center transition-colors duration-300 ${
+              hasSuccessAnimation ? 'bg-teal-600' : 
+              hasFailureAnimation ? 'bg-red-600' : 
+              hasProgressAnimation ? 'bg-orange-600' : 
+              'bg-purple-600'
+            }`}>
               {/* 데이터베이스 아이콘 */}
               <Database size={20} className="text-white" />
             </div>
+            
+            {/* 성공/실패/진행 시 펄스 효과 */}
+            {hasSuccessAnimation && (
+              <div className="absolute inset-0 rounded-full bg-teal-400 opacity-50 animate-ping"></div>
+            )}
+            {hasFailureAnimation && (
+              <div className="absolute inset-0 rounded-full bg-red-400 opacity-50 animate-ping"></div>
+            )}
+            {hasProgressAnimation && (
+              <div className="absolute inset-0 rounded-full bg-orange-400 opacity-50 animate-pulse"></div>
+            )}
             
             {/* 드래그 중일 때 시각적 피드백 */}
             {isDragging && (
@@ -541,6 +625,8 @@ const CustomEdge = ({
                 }}
               ></div>
             )}
+            
+            
           </div>
 
           {/* 액션 버튼들 - 제거됨 */}
