@@ -166,8 +166,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       },
       'promptNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#25A18E',
-        iconColor: '#25A18E',
+        borderColor: '#F7CB15',
+        iconColor: '#F7CB15',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
       'functionNode': {
