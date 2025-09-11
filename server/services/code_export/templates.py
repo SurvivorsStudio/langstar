@@ -311,6 +311,9 @@ def init_state_code( config_json ) :
                         del config_val['config']['template'] 
                     elif config_val['node_type'] == 'functionNode':
                         del config_val['config']['code'] 
+                    elif config_val['node_type'] == 'userNode':
+                        del config_val['config']['code'] 
+                    #     del config_val['data']['code']
                         
                 code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
                 
@@ -718,7 +721,24 @@ def node_{node_name}(state):
     for row in node_parameters:
         tmp_func_args = row['funcArgs']
         tmp_match_data = row['matchData']
-        func_args[tmp_func_args] = input_param[tmp_match_data]
+        # func_args[tmp_func_args] = input_param[tmp_match_data]
+
+        
+        if row['inputType'] == 'select box':
+            tmp_data = eval(tmp_match_data, {{}}, input_param)
+        elif row['inputType'] == 'text box':
+            tmp_data = row['matchData']
+        elif row['inputType'] == 'checkbox':
+            tmp_data = row['matchData']
+        elif row['inputType'] == 'radio button':
+            tmp_data = row['matchData']
+        else : 
+            tmp_data = ''
+
+        insert_pram[row['funcArgs']] = tmp_data 
+
+
+
 
     user_result = {function_name}( **func_args ) 
 

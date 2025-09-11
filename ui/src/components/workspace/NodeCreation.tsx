@@ -22,7 +22,7 @@ const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
 
   const [parameters, setParameters] = useState([
 
-    { name: 'Menu Name', inputType: 'select box', required: true, funcArgs: 'input_data', matchData: '', description: 'Input Data에서 사용 가능한 키 값을 선택하세요.' }
+    { name: 'Menu Name', inputType: 'select box', required: true, funcArgs: 'input_data', matchData: '', description: 'Input Data에서 사용 가능한 키 값을 선택하세요.', options: [] }
 
   ]);
   const [functionName, setFunctionName] = useState('my_function');
@@ -107,12 +107,13 @@ def my_function(input_data) -> str:
       required: false,
       funcArgs: `input_data${parameters.length + 1}`,
       matchData: '',
-      description: 'Input Data에서 사용 가능한 키 값을 선택하세요.'
+      description: 'Input Data에서 사용 가능한 키 값을 선택하세요.',
+      options: []
     };
     setParameters([...parameters, newParam]);
   };
 
-  const updateParameter = (index: number, field: string, value: string | boolean) => {
+  const updateParameter = (index: number, field: string, value: string | boolean | string[]) => {
     const newParameters = [...parameters];
     newParameters[index] = { ...newParameters[index], [field]: value };
     setParameters(newParameters);
@@ -124,6 +125,31 @@ def my_function(input_data) -> str:
     // description이 변경되면 즉시 상태 업데이트를 위해 강제 리렌더링
     if (field === 'description') {
       setParameters([...newParameters]);
+    }
+  };
+
+  const addOption = (paramIndex: number) => {
+    const newParameters = [...parameters];
+    if (!newParameters[paramIndex].options) {
+      newParameters[paramIndex].options = [];
+    }
+    (newParameters[paramIndex].options as string[]).push(`옵션 ${(newParameters[paramIndex].options as string[]).length + 1}`);
+    setParameters(newParameters);
+  };
+
+  const updateOption = (paramIndex: number, optionIndex: number, value: string) => {
+    const newParameters = [...parameters];
+    if (newParameters[paramIndex].options) {
+      (newParameters[paramIndex].options as string[])[optionIndex] = value;
+      setParameters(newParameters);
+    }
+  };
+
+  const removeOption = (paramIndex: number, optionIndex: number) => {
+    const newParameters = [...parameters];
+    if (newParameters[paramIndex].options) {
+      (newParameters[paramIndex].options as string[]).splice(optionIndex, 1);
+      setParameters(newParameters);
     }
   };
 
@@ -181,6 +207,7 @@ def my_function(input_data) -> str:
     }
   };
 
+
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -200,7 +227,7 @@ def my_function(input_data) -> str:
         >
           <Save className="w-4 h-4 mr-2" />
           Save
-          </button>
+        </button>
         </div>
         
       {/* Content */}
@@ -344,6 +371,8 @@ def my_function(input_data) -> str:
                         >
                           <option value="select box">Select Box</option>
                           <option value="text box">Text Box</option>
+                          <option value="checkbox">Checkbox</option>
+                          <option value="radio button">Radio Button</option>
                         </select>
                         <button
                           onClick={() => removeParameter(index)}
@@ -352,6 +381,47 @@ def my_function(input_data) -> str:
                           <X className="w-4 h-4" />
                         </button>
                       </div>
+                      
+                      {/* Options management for radio button and checkbox */}
+                      {(param.inputType === 'radio button' || param.inputType === 'checkbox') && (
+                        <div className="mt-3 border-t border-gray-200 dark:border-gray-600 pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              옵션 관리
+                            </span>
+                            <button
+                              onClick={() => addOption(index)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
+                            >
+                              + 옵션 추가
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {param.options && param.options.map((option, optionIndex) => (
+                              <div key={optionIndex} className="flex items-center space-x-2">
+                                <input
+                                  type="text"
+                                  value={option}
+                                  onChange={(e) => updateOption(index, optionIndex, e.target.value)}
+                                  placeholder={`옵션 ${optionIndex + 1}`}
+                                  className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                />
+                                <button
+                                  onClick={() => removeOption(index, optionIndex)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {(!param.options || param.options.length === 0) && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                옵션을 추가해주세요.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -445,6 +515,63 @@ def my_function(input_data) -> str:
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                               disabled
                             />
+                          ) : param.inputType === 'checkbox' ? (
+                            <div>
+                              {param.description && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                  {param.description}
+                                </p>
+                              )}
+                              <div className="space-y-2">
+                                {param.options && param.options.length > 0 ? (
+                                  param.options.map((option, optionIndex) => (
+                                    <label key={optionIndex} className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                        disabled
+                                      />
+                                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        {option}
+                                      </span>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-red-500 dark:text-red-400">
+                                    체크박스 옵션이 설정되지 않았습니다.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ) : param.inputType === 'radio button' ? (
+                            <div>
+                              {param.description && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                  {param.description}
+                                </p>
+                              )}
+                              <div className="space-y-2">
+                                {param.options && param.options.length > 0 ? (
+                                  param.options.map((option, optionIndex) => (
+                                    <label key={optionIndex} className="flex items-center space-x-2">
+                                      <input
+                                        type="radio"
+                                        name={`radio_${index}`}
+                                        className="border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                        disabled
+                                      />
+                                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        {option}
+                                      </span>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-red-500 dark:text-red-400">
+                                    라디오 버튼 옵션이 설정되지 않았습니다.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           ) : (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
                               지원하지 않는 입력 타입: {param.inputType}
