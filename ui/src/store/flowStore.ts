@@ -1562,7 +1562,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
           // parameters에 matchData 추가
           const parametersWithMatchData = parameters.map((param: any) => {
-            const matchData = node.data.config?.inputData?.[param.name] || '';
+            let matchData;
+            if (param.inputType === 'select box') {
+              // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
+              matchData = node.data.config?.inputData?.[param.name] || '';
+            } else if (param.inputType === 'text box') {
+              // text box의 경우 settings에서 값을 가져와 문자열로 전달
+              const textValue = node.data.config?.settings?.[param.name] || '';
+              matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+            } else {
+              matchData = '';
+            }
             return {
               ...param,
               matchData: matchData
@@ -2040,7 +2050,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       if (currentNode.type === 'userNode' && finalNodeData.config?.parameters) {
         // parameters에 matchData 추가
         finalNodeData.config.parameters = finalNodeData.config.parameters.map((param: any) => {
-          const matchData = finalNodeData.config?.inputData?.[param.name] || '';
+          let matchData;
+          if (param.inputType === 'select box') {
+            // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
+            matchData = finalNodeData.config?.inputData?.[param.name] || '';
+          } else if (param.inputType === 'text box') {
+            // text box의 경우 settings에서 값을 가져와 문자열로 전달
+            const textValue = finalNodeData.config?.settings?.[param.name] || '';
+            matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+          } else {
+            matchData = '';
+          }
           return {
             ...param,
             matchData: matchData
