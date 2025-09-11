@@ -82,7 +82,11 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
   const handleExportNode = async (nodeId: string, nodeName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await exportUserNodes([nodeId]);
+      // 노드 이름을 포함한 파일명 생성 (날짜도 포함)
+      const today = new Date().toISOString().split('T')[0];
+      const customFileName = `${nodeName}-${today}`;
+      
+      await exportUserNodes([nodeId], customFileName);
       alert(`"${nodeName}" 노드가 성공적으로 Export되었습니다.`);
     } catch (error) {
       console.error('Export 중 오류:', error);

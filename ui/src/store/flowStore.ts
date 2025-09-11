@@ -166,7 +166,7 @@ export interface FlowState {
   addUserNode: (userNode: Omit<UserNode, 'id' | 'lastModified'>) => Promise<UserNode>;
   updateUserNode: (userNodeId: string, updates: Partial<Omit<UserNode, 'id' | 'lastModified'>>) => Promise<UserNode>;
   deleteUserNode: (userNodeId: string) => Promise<void>;
-  exportUserNodes: (nodeIds?: string[]) => Promise<any>;
+  exportUserNodes: (nodeIds?: string[], customFileName?: string) => Promise<any>;
   importUserNodes: (file: File) => Promise<any>;
   
   // 포커스 관리
@@ -2622,7 +2622,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   // Export user nodes to JSON file
-  exportUserNodes: async (nodeIds?: string[]) => {
+  exportUserNodes: async (nodeIds?: string[], customFileName?: string) => {
     try {
       const { userNodes } = get();
       
@@ -2650,6 +2650,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }))
       };
 
+      // 파일명 생성
+      let fileName;
+      if (customFileName) {
+        fileName = `${customFileName}.json`;
+      } else {
+        fileName = `user-nodes-${new Date().toISOString().split('T')[0]}.json`;
+      }
+
       // JSON 파일로 다운로드
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
         type: 'application/json' 
@@ -2657,7 +2665,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `user-nodes-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
