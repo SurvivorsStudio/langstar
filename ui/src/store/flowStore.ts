@@ -1570,11 +1570,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               // text box의 경우 settings에서 값을 가져와 문자열로 전달
               const textValue = node.data.config?.settings?.[param.name] || '';
               matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+            } else if (param.inputType === 'checkbox') {
+              // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
+              matchData = node.data.config?.settings?.[param.name] || [];
+            } else if (param.inputType === 'radio button') {
+              // radio button의 경우 settings에서 선택된 값을 문자열로 전달
+              matchData = node.data.config?.settings?.[param.name] || '';
             } else {
               matchData = '';
             }
+            
+            // options 필드 제거하고 matchData만 포함
+            const { options, ...paramWithoutOptions } = param;
             return {
-              ...param,
+              ...paramWithoutOptions,
               matchData: matchData
             };
           });

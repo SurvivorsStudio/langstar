@@ -728,6 +728,10 @@ def node_{node_name}(state):
             tmp_data = eval(tmp_match_data, {{}}, input_param)
         elif row['inputType'] == 'text box':
             tmp_data = row['matchData']
+        elif row['inputType'] == 'checkbox':
+            tmp_data = row['matchData']
+        elif row['inputType'] == 'radio button':
+            tmp_data = row['matchData']
         else : 
             tmp_data = ''
 

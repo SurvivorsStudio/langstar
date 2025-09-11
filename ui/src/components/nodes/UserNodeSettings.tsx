@@ -95,6 +95,12 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
         } else if (param.inputType === 'text box') {
           // text box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
           initialSettings[param.name] = existingSettings[param.name] || '';
+        } else if (param.inputType === 'checkbox') {
+          // checkbox의 경우 기존 값이 있으면 사용, 없으면 빈 배열
+          initialSettings[param.name] = existingSettings[param.name] || [];
+        } else if (param.inputType === 'radio button') {
+          // radio button의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
+          initialSettings[param.name] = existingSettings[param.name] || '';
         }
       });
       
@@ -169,6 +175,27 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
         outputVariable: value
       }
     });
+  };
+
+  // 체크박스 값 변경 핸들러
+  const handleCheckboxChange = (paramName: string, optionValue: string, checked: boolean) => {
+    const currentValues = settings[paramName] || [];
+    let newValues;
+    
+    if (checked) {
+      // 체크된 경우 배열에 추가
+      newValues = [...currentValues, optionValue];
+    } else {
+      // 체크 해제된 경우 배열에서 제거
+      newValues = currentValues.filter((value: string) => value !== optionValue);
+    }
+    
+    handleSettingChange(paramName, newValues);
+  };
+
+  // 라디오 버튼 값 변경 핸들러
+  const handleRadioChange = (paramName: string, value: string) => {
+    handleSettingChange(paramName, value);
   };
 
   if (!node) {
@@ -357,6 +384,65 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
                 placeholder={`${param.name} 입력`}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
               />
+            ) : param.inputType === 'checkbox' ? (
+              <div>
+                {param.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {param.description}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {param.options && param.options.length > 0 ? (
+                    param.options.map((option: string, optionIndex: number) => (
+                      <label key={optionIndex} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={(settings[param.name] || []).includes(option)}
+                          onChange={(e) => handleCheckboxChange(param.name, option, e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {option}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-xs text-red-500 dark:text-red-400">
+                      체크박스 옵션이 설정되지 않았습니다.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : param.inputType === 'radio button' ? (
+              <div>
+                {param.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {param.description}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {param.options && param.options.length > 0 ? (
+                    param.options.map((option: string, optionIndex: number) => (
+                      <label key={optionIndex} className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name={`radio_${param.name}_${index}`}
+                          checked={settings[param.name] === option}
+                          onChange={() => handleRadioChange(param.name, option)}
+                          className="border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {option}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-xs text-red-500 dark:text-red-400">
+                      라디오 버튼 옵션이 설정되지 않았습니다.
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 지원하지 않는 입력 타입: {param.inputType}
