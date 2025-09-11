@@ -166,6 +166,8 @@ export interface FlowState {
   addUserNode: (userNode: Omit<UserNode, 'id' | 'lastModified'>) => Promise<UserNode>;
   updateUserNode: (userNodeId: string, updates: Partial<Omit<UserNode, 'id' | 'lastModified'>>) => Promise<UserNode>;
   deleteUserNode: (userNodeId: string) => Promise<void>;
+  exportUserNodes: (nodeIds?: string[]) => Promise<any>;
+  importUserNodes: (file: File) => Promise<any>;
   
   // 포커스 관리
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
@@ -1570,20 +1572,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               // text box의 경우 settings에서 값을 가져와 문자열로 전달
               const textValue = node.data.config?.settings?.[param.name] || '';
               matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
-            } else if (param.inputType === 'checkbox') {
-              // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
-              matchData = node.data.config?.settings?.[param.name] || [];
-            } else if (param.inputType === 'radio button') {
-              // radio button의 경우 settings에서 선택된 값을 문자열로 전달
-              matchData = node.data.config?.settings?.[param.name] || '';
             } else {
               matchData = '';
             }
-            
-            // options 필드 제거하고 matchData만 포함
-            const { options, ...paramWithoutOptions } = param;
             return {
-              ...paramWithoutOptions,
+              ...param,
               matchData: matchData
             };
           });
@@ -2624,6 +2617,122 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
       console.error('FlowStore: Failed to initiate delete user node operation:', error);
+      throw error;
+    }
+  },
+
+  // Export user nodes to JSON file
+  exportUserNodes: async (nodeIds?: string[]) => {
+    try {
+      const { userNodes } = get();
+      
+      // 특정 노드들만 export하거나 모든 노드 export
+      const nodesToExport = nodeIds 
+        ? userNodes.filter(node => nodeIds.includes(node.id))
+        : userNodes;
+
+      if (nodesToExport.length === 0) {
+        throw new Error('No nodes to export');
+      }
+
+      // export용 데이터 구성 (id와 lastModified 제외)
+      const exportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        nodes: nodesToExport.map(node => ({
+          name: node.name,
+          type: node.type,
+          code: node.code,
+          parameters: node.parameters,
+          functionName: node.functionName,
+          returnType: node.returnType,
+          functionDescription: node.functionDescription
+        }))
+      };
+
+      // JSON 파일로 다운로드
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+        type: 'application/json' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `user-nodes-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('FlowStore: User nodes exported successfully');
+      return exportData;
+    } catch (error) {
+      console.error('FlowStore: Failed to export user nodes:', error);
+      throw error;
+    }
+  },
+
+  // Import user nodes from JSON file
+  importUserNodes: async (file: File) => {
+    try {
+      const fileContent = await file.text();
+      const importData = JSON.parse(fileContent);
+
+      // 데이터 구조 검증
+      if (!importData.nodes || !Array.isArray(importData.nodes)) {
+        throw new Error('Invalid file format: nodes array not found');
+      }
+
+      const { userNodes, addUserNode } = get();
+      const existingNames = userNodes.map(node => node.name);
+      const importResults = [];
+
+      for (const nodeData of importData.nodes) {
+        // 필수 필드 검증
+        if (!nodeData.name || !nodeData.code || !nodeData.functionName) {
+          console.warn('Skipping invalid node data:', nodeData);
+          continue;
+        }
+
+        // 이름 중복 처리
+        let finalName = nodeData.name;
+        let counter = 1;
+        while (existingNames.includes(finalName)) {
+          finalName = `${nodeData.name}_${counter}`;
+          counter++;
+        }
+
+        try {
+          const newNode = await addUserNode({
+            name: finalName,
+            type: 'UserNode',
+            code: nodeData.code,
+            parameters: nodeData.parameters || [],
+            functionName: nodeData.functionName,
+            returnType: nodeData.returnType || 'str',
+            functionDescription: nodeData.functionDescription || ''
+          });
+
+          existingNames.push(finalName); // 추가된 이름을 목록에 추가
+          importResults.push({
+            originalName: nodeData.name,
+            finalName: finalName,
+            success: true,
+            node: newNode
+          });
+        } catch (error) {
+          importResults.push({
+            originalName: nodeData.name,
+            finalName: finalName,
+            success: false,
+            error: (error as Error).message
+          });
+        }
+      }
+
+      console.log('FlowStore: User nodes imported successfully:', importResults);
+      return importResults;
+    } catch (error) {
+      console.error('FlowStore: Failed to import user nodes:', error);
       throw error;
     }
   },

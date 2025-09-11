@@ -133,14 +133,14 @@ def my_function(input_data) -> str:
     if (!newParameters[paramIndex].options) {
       newParameters[paramIndex].options = [];
     }
-    newParameters[paramIndex].options.push(`옵션 ${newParameters[paramIndex].options.length + 1}`);
+    (newParameters[paramIndex].options as string[]).push(`옵션 ${(newParameters[paramIndex].options as string[]).length + 1}`);
     setParameters(newParameters);
   };
 
   const updateOption = (paramIndex: number, optionIndex: number, value: string) => {
     const newParameters = [...parameters];
     if (newParameters[paramIndex].options) {
-      newParameters[paramIndex].options[optionIndex] = value;
+      (newParameters[paramIndex].options as string[])[optionIndex] = value;
       setParameters(newParameters);
     }
   };
@@ -148,7 +148,7 @@ def my_function(input_data) -> str:
   const removeOption = (paramIndex: number, optionIndex: number) => {
     const newParameters = [...parameters];
     if (newParameters[paramIndex].options) {
-      newParameters[paramIndex].options.splice(optionIndex, 1);
+      (newParameters[paramIndex].options as string[]).splice(optionIndex, 1);
       setParameters(newParameters);
     }
   };
@@ -207,6 +207,7 @@ def my_function(input_data) -> str:
     }
   };
 
+
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -226,7 +227,7 @@ def my_function(input_data) -> str:
         >
           <Save className="w-4 h-4 mr-2" />
           Save
-          </button>
+        </button>
         </div>
         
       {/* Content */}

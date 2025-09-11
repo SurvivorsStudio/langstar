@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Code, Edit, Trash2 } from 'lucide-react';
+import { Plus, Code, Edit, Trash2, FileDown, X, Upload } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import NodeCreation from './NodeCreation';
 import NodeDetail from './NodeDetail';
@@ -9,9 +9,13 @@ interface NodeManagementProps {
 }
 
 const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
-  const { userNodes, fetchUserNodes, deleteUserNode } = useFlowStore();
+  const { userNodes, fetchUserNodes, deleteUserNode, importUserNodes, exportUserNodes } = useFlowStore();
   const [showNodeCreation, setShowNodeCreation] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  
+  // Import 관련 상태
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importResults, setImportResults] = useState<any[]>([]);
 
   React.useEffect(() => {
     fetchUserNodes();
@@ -45,6 +49,47 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
     }
   };
 
+  // Import 핸들러
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const results = await importUserNodes(file);
+      setImportResults(results);
+      setIsImportModalOpen(true);
+      
+      // 성공한 노드 수 계산
+      const successCount = results.filter((r: any) => r.success).length;
+      const failCount = results.length - successCount;
+      
+      let message = `Import 완료!\n성공: ${successCount}개`;
+      if (failCount > 0) {
+        message += `\n실패: ${failCount}개`;
+      }
+      alert(message);
+      
+      // 파일 입력 초기화
+      event.target.value = '';
+    } catch (error) {
+      console.error('Import 중 오류:', error);
+      alert('Import 중 오류가 발생했습니다: ' + (error as Error).message);
+      event.target.value = '';
+    }
+  };
+
+  // Export 개별 노드 핸들러
+  const handleExportNode = async (nodeId: string, nodeName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await exportUserNodes([nodeId]);
+      alert(`"${nodeName}" 노드가 성공적으로 Export되었습니다.`);
+    } catch (error) {
+      console.error('Export 중 오류:', error);
+      alert('Export 중 오류가 발생했습니다.');
+    }
+  };
+
   if (showNodeCreation) {
     return (
       <div className="h-full">
@@ -74,13 +119,25 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
             Manage your custom nodes
           </p>
         </div>
-        <button
-          onClick={handleAddNode}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Node
-        </button>
+        <div className="flex items-center space-x-2">
+          <label className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors cursor-pointer">
+            <Upload className="w-5 h-5 mr-2" />
+            Import
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={handleAddNode}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Node
+          </button>
+        </div>
       </div>
 
       <div className="p-6">
@@ -97,7 +154,7 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
               onClick={handleAddNode}
               className="flex items-center mx-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-5 h-5 mr-2" />
               Create Your First Node
             </button>
           </div>
@@ -132,12 +189,22 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteNode(node.id, node.name, e)}
-                      className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={(e) => handleExportNode(node.id, node.name, e)}
+                        className="text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                        title="Export this node"
+                      >
+                        <FileDown className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteNode(node.id, node.name, e)}
+                        className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
+                        title="Delete this node"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
@@ -172,6 +239,67 @@ const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
           </div>
         )}
       </div>
+
+      {/* Import 결과 모달 */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                Import Results
+              </h2>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
+              {importResults.map((result, index) => (
+                <div key={index} className={`p-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                  result.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+                }`}>
+                  <div className="flex items-center">
+                    <div className={`w-2 h-2 rounded-full mr-3 ${
+                      result.success ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {result.originalName}
+                        {result.finalName !== result.originalName && (
+                          <span className="text-sm text-blue-600 dark:text-blue-400 ml-2">
+                            → {result.finalName}
+                          </span>
+                        )}
+                      </p>
+                      {result.success ? (
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          Successfully imported
+                        </p>
+                      ) : (
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          Failed: {result.error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
