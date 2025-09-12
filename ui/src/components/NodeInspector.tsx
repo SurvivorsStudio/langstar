@@ -231,7 +231,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       if (nodeType === 'startNode') {
         newDefaultTab = 'settings';
       } else if (nodeType === 'endNode') {
-        newDefaultTab = 'settings';
+        newDefaultTab = 'input_data';
       } else if (nodeType === 'promptNode' || nodeType === 'systemPromptNode') {
         newDefaultTab = 'input_data';
       } else if (nodeType === 'toolsMemoryNode') {
@@ -728,53 +728,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                    </div>
                    );
                  })()}
-                
-                {/* 다른 input data들 표시 */}
-                {incomingEdges.length > 1 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400">Other Available Inputs:</h4>
-                    {incomingEdges
-                      .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-                      .filter(edge => !selectedEdgeInfo || edge.id !== selectedEdgeInfo.edgeId)
-                      .map((edge) => {
-                        const sourceNode = nodes.find(n => n.id === edge.source);
-                        const isSelected = manuallySelectedEdgeId === edge.id;
-                        return (
-                          <div 
-                            key={edge.id}
-                            className={`border rounded-lg p-2 select-text transition-colors ${
-                              isSelected 
-                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 border-2' 
-                                : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
-                            }`}
-                            title="Read-only preview"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                From: {sourceNode?.data.label || edge.source}
-                              </span>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-500 dark:text-gray-500">
-                                  {edge.data.timestamp && edge.data.timestamp > 0 
-                                    ? new Date(edge.data.timestamp).toLocaleTimeString() 
-                                    : 'Not executed yet'
-                                  }
-                                </span>
-                                <Play className="w-3 h-3 text-gray-500 dark:text-gray-500" />
-                              </div>
-                            </div>
-                            <div className="opacity-60">
-                              <JsonViewer 
-                                data={edge.data.output} 
-                                maxHeight="200px"
-                                className="text-xs"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
               </div>
             )}
           </div>
