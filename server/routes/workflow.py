@@ -77,7 +77,7 @@ def agent_node(msg: dict = Body(...)):
 
 
 @router.post('/workflow/node/mergenode')
-def agent_node(msg: dict = Body(...)):
+def merge_node(msg: dict = Body(...)):
     try:
         logger.info("Received merge node request")
         print( msg )
@@ -86,6 +86,18 @@ def agent_node(msg: dict = Body(...)):
         return result
     except Exception as e:
         logger.error(f"Error in merge node endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/workflow/node/conditionnode')
+def condition_node(msg: dict = Body(...)):
+    try:
+        logger.info("Received condition node request")
+        print( msg )
+        result = WorkflowService.process_condition_node(msg)
+        logger.info("condition node request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in condition node endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
