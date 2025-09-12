@@ -7,3 +7,4 @@ langchain-aws==0.2.17
 langgraph==0.5.4
 httpx==0.27.0
 boto3>=1.37.0
+image.png
