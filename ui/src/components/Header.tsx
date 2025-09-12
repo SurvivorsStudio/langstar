@@ -286,7 +286,7 @@ const Header: React.FC = () => {
       </div>
       {apiResponseModalContent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold ml-1 text-gray-900 dark:text-gray-100">API Response</h3>
               <div className="flex items-center space-x-2">
@@ -319,7 +319,7 @@ const Header: React.FC = () => {
               </div>
             </div>
             <div className="p-4 overflow-auto">
-              <div className="h-[60vh] border border-gray-300 dark:border-gray-600 rounded-md">
+              <div className="h-[75vh] border border-gray-300 dark:border-gray-600 rounded-md">
                 <CodeEditor
                   value={editableModalContent}
                   onChange={setEditableModalContent}
