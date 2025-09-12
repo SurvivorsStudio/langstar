@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Play, Undo, Redo, Settings, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
+import { Save, Play, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { useThemeStore } from '../store/themeStore';
 import { Link, useNavigate } from 'react-router-dom';
@@ -206,15 +206,6 @@ const Header: React.FC = () => {
         </div>
       </div>
       <div className="flex items-center space-x-2">
-        <button className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-          <Undo className="h-4 w-4" />
-        </button>
-        <button className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-          <Redo className="h-4 w-4" />
-        </button>
-        <button className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-          <Settings className="h-4 w-4" />
-        </button>
         <button
           onClick={async () => {
             const jsonString = getWorkflowAsJSONString();
