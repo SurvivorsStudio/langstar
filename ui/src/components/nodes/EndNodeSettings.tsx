@@ -127,12 +127,16 @@ const EndNodeSettings: React.FC<EndNodeSettingsProps> = ({ nodeId }) => {
           return null;
         })()}
       </div>
-      <div>
-        <label htmlFor="endnode-displayed-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expected Chatbot Response</label>
-        <pre id="endnode-displayed-value" className="mt-1 text-sm text-gray-600 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 p-2 border border-gray-300 dark:border-gray-600 rounded-md min-h-[38px] whitespace-pre-wrap break-all">
-          {displayedValue}
-        </pre>
-      </div>
+      
+      {/* 선택된 키의 미리보기 */}
+      {selectedKeyName && (
+        <div>
+          <label htmlFor="endnode-displayed-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expected Chatbot Response</label>
+          <pre id="endnode-displayed-value" className="mt-1 text-sm text-gray-600 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 p-2 border border-gray-300 dark:border-gray-600 rounded-md min-h-[38px] whitespace-pre-wrap break-all">
+            {displayedValue}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };
