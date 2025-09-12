@@ -686,8 +686,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       outputVariable: 'user_input'
     } : type === 'agentNode' ? {
       model: '',
-      userPromptInputKey: 'user_input',
-      systemPromptInputKey: 'system_message',
+      userPromptInputKey: '',
+      systemPromptInputKey: '',
       memoryGroup: '',
       tools: [],
       agentOutputVariable: 'agent_response'
@@ -1254,13 +1254,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             output = { error: 'Agent output variable name is required.' };
             break;
           }
-          // 설정에서 가져온 키 또는 기본 키를 사용합니다.
-          const actualSystemPromptKey = systemPromptInputKey || 'system_message';
-          const actualUserPromptKey = userPromptInputKey || 'user_input';
+          // 사용자가 명시적으로 설정한 키만 사용합니다. 기본값 자동 매칭을 제거합니다.
+          if (!systemPromptInputKey || !userPromptInputKey) {
+            console.error(`[AgentNode ${nodeId}] 오류: System Prompt Input Key와 User Prompt Input Key를 모두 설정해야 합니다.`);
+            output = { 
+              error: 'System Prompt Input Key와 User Prompt Input Key를 모두 설정해야 합니다.',
+              systemPromptInputKey: systemPromptInputKey || null,
+              userPromptInputKey: userPromptInputKey || null
+            };
+            break;
+          }
+
+          const actualSystemPromptKey = systemPromptInputKey;
+          const actualUserPromptKey = userPromptInputKey;
 
           console.log(`[AgentNode ${nodeId}] Memory Group 설정값:`, memoryGroup); // memoryGroup 값 로깅 추가
-          console.log(`[AgentNode ${nodeId}] 사용할 System Prompt Key: '${actualSystemPromptKey}' (설정값: '${systemPromptInputKey}')`);
-          console.log(`[AgentNode ${nodeId}] 사용할 User Prompt Key: '${actualUserPromptKey}' (설정값: '${userPromptInputKey}')`);
+          console.log(`[AgentNode ${nodeId}] 사용할 System Prompt Key: '${actualSystemPromptKey}'`);
+          console.log(`[AgentNode ${nodeId}] 사용할 User Prompt Key: '${actualUserPromptKey}'`);
 
           // 키 경로를 API로 전달하기 위해 실제 키 값을 사용합니다.
           // 백엔드에서 data를 파싱할 수 있도록 키 경로를 전송합니다.
@@ -1268,8 +1278,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const userPromptRawValue = actualUserPromptKey && input && input.hasOwnProperty(actualUserPromptKey) ? input[actualUserPromptKey] : undefined;
 
           // 키 경로를 Python 표기법으로 변환하여 전송 (예: "a['b']" 형식)
-          const systemPromptForAPI = convertToPythonNotation(actualSystemPromptKey || "");
-          const userPromptForAPI = convertToPythonNotation(actualUserPromptKey || "");
+          const systemPromptForAPI = convertToPythonNotation(actualSystemPromptKey);
+          const userPromptForAPI = convertToPythonNotation(actualUserPromptKey);
 
           console.log(`[AgentNode ${nodeId}] 입력에서 가져온 Raw System Prompt (input['${actualSystemPromptKey}']):`, systemPromptRawValue);
           console.log(`[AgentNode ${nodeId}] 원본 System Prompt Key: "${actualSystemPromptKey}" → Python 표기법: "${systemPromptForAPI}"`);

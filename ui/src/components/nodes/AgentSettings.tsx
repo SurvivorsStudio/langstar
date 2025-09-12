@@ -375,7 +375,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                   : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
             >
-              <span>
+              <span className={node?.data.config?.systemPromptInputKey ? '' : 'text-gray-400 dark:text-gray-500'}>
                 {node?.data.config?.systemPromptInputKey || 'Select an input key for system prompt'}
               </span>
               <Search className="w-4 h-4 text-gray-400" />
@@ -416,7 +416,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                   : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
             >
-              <span>
+              <span className={node?.data.config?.userPromptInputKey ? '' : 'text-gray-400 dark:text-gray-500'}>
                 {node?.data.config?.userPromptInputKey || 'Select an input key for user prompt'}
               </span>
               <Search className="w-4 h-4 text-gray-400" />
