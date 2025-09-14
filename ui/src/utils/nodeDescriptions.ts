@@ -13,7 +13,6 @@ export const getNodeDescription = (nodeType: string): string => {
     'conditionNode': 'A condition node for workflow branching',
     'toolNode': 'A tool node for external tool integration',
     'toolsMemoryNode': 'A tools and memory management node',
-    'ragNode': 'A RAG node for retrieval-augmented generation',
     'mergeNode': 'A merge node for combining multiple inputs',
     'userNode': 'A user interaction node',
     'groupsNode': 'A groups node for managing collections'
@@ -34,7 +33,6 @@ export const getNodeCategoryDescription = (nodeType: string): string => {
     'functionNode': 'A function node for executing custom logic',
     'toolsMemoryNode': 'A tools and memory management node',
     'mergeNode': 'A merge node for combining multiple inputs',
-    'ragNode': 'A RAG node for retrieval-augmented generation',
     'userNode': 'A user interaction node',
     'startNode': 'A start node in the workflow',
     'endNode': 'An end node that terminates the workflow'

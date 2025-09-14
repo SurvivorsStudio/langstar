@@ -84,16 +84,6 @@ const ToolsMemoryNode = (props: any) => (
 );
 
 
-const RAGNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Database size={20} />,
-      nodeType: 'ragNode'
-    }}
-  />
-);
 
 const MergeNode = (props: any) => (
   <CustomNode
@@ -125,7 +115,6 @@ export const nodeTypes = {
   endNode: EndNode,
   promptNode: PromptNode,
   toolsMemoryNode: ToolsMemoryNode,
-  ragNode: RAGNode,
   mergeNode: MergeNode,
   userNode: UserNode,
 };

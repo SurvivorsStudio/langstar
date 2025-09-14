@@ -8,7 +8,6 @@ import ConditionSettings from './nodes/ConditionSettings';
 import PromptSettings from './nodes/PromptSettings';
 import AgentSettings from './nodes/AgentSettings';
 import StartSettings from './nodes/StartSettings';
-import RAGSettings from './nodes/RAGSettings';
 import MergeSettings from './nodes/MergeSettings';
 import EndNodeSettings from './nodes/EndNodeSettings';
 import ToolsMemorySettings from './nodes/ToolsMemorySettings';
@@ -206,7 +205,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         'agentNode': ['input_data', 'settings'],
         'conditionNode': ['input_data', 'settings'],
         'groupsNode': ['input_data', 'settings'],
-        'ragNode': ['input_data', 'settings'],
         'mergeNode': ['input_data', 'settings'],
         'toolsMemoryNode': ['input_data', 'settings'],
         'userNode': ['input_data', 'code', 'settings'],
@@ -422,7 +420,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const isAgentNode = currentNode.type === 'agentNode';
   const isStartNode = currentNode.type === 'startNode';
   const isToolsMemoryNode = currentNode.type === 'toolsMemoryNode';
-  const isRAGNode = currentNode.type === 'ragNode';
   const isEndNode = currentNode.type === 'endNode';
   const isMergeNode = currentNode.type === 'mergeNode';
   const isUserNode = currentNode.type === 'userNode';
@@ -526,7 +523,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                 <Settings size={16} className="mr-1" /> Settings
               </button>
             );
-          } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isRAGNode || isMergeNode || isUserNode)) {
+          } else if (!(isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isMergeNode || isUserNode)) {
             return (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
@@ -575,7 +572,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
           return null;
         })()}
 
-            {!(isPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isRAGNode || isMergeNode || isUserNode) && (
+            {!(isPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isMergeNode || isUserNode) && (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
@@ -977,7 +974,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
               {isConditionNode && <ConditionSettings nodeId={nodeId} />}
               {isAgentNode && <AgentSettings nodeId={nodeId} />}
               {isToolsMemoryNode && <ToolsMemorySettings nodeId={nodeId} />}
-              {isRAGNode && <RAGSettings nodeId={nodeId} />}
               {isMergeNode && <MergeSettings nodeId={nodeId} />}
               {isEndNode && <EndNodeSettings nodeId={nodeId} />}
               {isUserNode && <UserNodeSettings nodeId={nodeId} />}
