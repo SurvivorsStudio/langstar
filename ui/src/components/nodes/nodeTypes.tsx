@@ -93,16 +93,6 @@ const ToolsMemoryNode = (props: any) => (
   />
 );
 
-const EmbeddingNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Database size={20} />,
-      nodeType: 'embeddingNode'
-    }}
-  />
-);
 
 const RAGNode = (props: any) => (
   <CustomNode 
@@ -146,7 +136,6 @@ export const nodeTypes = {
   promptNode: PromptNode,
   systemPromptNode: SystemPromptNode,
   toolsMemoryNode: ToolsMemoryNode,
-  embeddingNode: EmbeddingNode,
   ragNode: RAGNode,
   mergeNode: MergeNode,
   userNode: UserNode,
