@@ -6,7 +6,6 @@ import CodeEditor from './CodeEditor';
 import CodeEditorPopup from './nodes/CodeEditorPopup';
 import ConditionSettings from './nodes/ConditionSettings';
 import PromptSettings from './nodes/PromptSettings';
-import SystemPromptSettings from './nodes/SystemPromptSettings';
 import AgentSettings from './nodes/AgentSettings';
 import StartSettings from './nodes/StartSettings';
 import RAGSettings from './nodes/RAGSettings';
@@ -204,7 +203,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         'startNode': ['settings'],
         'endNode': ['input_data', 'settings'],
         'promptNode': ['input_data', 'code'],
-        'systemPromptNode': ['input_data', 'code'],
         'agentNode': ['input_data', 'settings'],
         'conditionNode': ['input_data', 'settings'],
         'groupsNode': ['input_data', 'settings'],
@@ -230,7 +228,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         newDefaultTab = 'settings';
       } else if (nodeType === 'endNode') {
         newDefaultTab = 'input_data';
-      } else if (nodeType === 'promptNode' || nodeType === 'systemPromptNode') {
+      } else if (nodeType === 'promptNode') {
         newDefaultTab = 'input_data';
       } else if (nodeType === 'toolsMemoryNode') {
         newDefaultTab = 'input_data';
@@ -421,7 +419,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
   const isConditionNode = currentNode.type === 'conditionNode';
   const isPromptNode = currentNode.type === 'promptNode';
-  const isSystemPromptNode = currentNode.type === 'systemPromptNode';
   const isAgentNode = currentNode.type === 'agentNode';
   const isStartNode = currentNode.type === 'startNode';
   const isToolsMemoryNode = currentNode.type === 'toolsMemoryNode';
@@ -518,7 +515,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             )}
 
         {(() => {
-          if (isPromptNode || isSystemPromptNode) {
+          if (isPromptNode) {
             return (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
@@ -578,7 +575,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
           return null;
         })()}
 
-            {!(isPromptNode || isSystemPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isRAGNode || isMergeNode || isUserNode) && (
+            {!(isPromptNode) && (isStartNode || isEndNode || isAgentNode || isConditionNode || isToolsMemoryNode || isRAGNode || isMergeNode || isUserNode) && (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'settings' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
@@ -733,8 +730,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
           <div className="h-full">
             {isPromptNode ? (
               <PromptSettings nodeId={nodeId} />
-            ) : isSystemPromptNode ? (
-              <SystemPromptSettings nodeId={nodeId} />
             ) : (
               <div className="h-full flex flex-col">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">

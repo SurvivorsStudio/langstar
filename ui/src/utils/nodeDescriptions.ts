@@ -7,7 +7,6 @@ export const getNodeDescription = (nodeType: string): string => {
   const descriptions: Record<string, string> = {
     'startNode': 'A start node in the workflow',
     'promptNode': 'A prompt node for user input and AI responses',
-    'systemPromptNode': 'A system prompt node for defining system behavior',
     'functionNode': 'A function node for executing custom logic',
     'endNode': 'An end node that terminates the workflow',
     'agentNode': 'An agent node for AI agent interactions',
@@ -30,7 +29,6 @@ export const getNodeDescription = (nodeType: string): string => {
 export const getNodeCategoryDescription = (nodeType: string): string => {
   const categoryDescriptions: Record<string, string> = {
     'promptNode': 'A prompt node for user input and AI responses',
-    'systemPromptNode': 'A system prompt node for defining system behavior',
     'agentNode': 'An agent node for AI agent interactions',
     'conditionNode': 'A condition node for workflow branching',
     'functionNode': 'A function node for executing custom logic',

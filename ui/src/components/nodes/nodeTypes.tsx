@@ -71,16 +71,6 @@ const PromptNode = (props: any) => (
   />
 );
 
-const SystemPromptNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Settings size={20} />,
-      nodeType: 'systemPromptNode'
-    }}
-  />
-);
 
 const ToolsMemoryNode = (props: any) => (
   <CustomNode 
@@ -134,7 +124,6 @@ export const nodeTypes = {
   startNode: StartNode,
   endNode: EndNode,
   promptNode: PromptNode,
-  systemPromptNode: SystemPromptNode,
   toolsMemoryNode: ToolsMemoryNode,
   ragNode: RAGNode,
   mergeNode: MergeNode,
