@@ -1407,47 +1407,116 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           break;
         }
         case 'conditionNode': {
-          const allOutgoingEdges = get().edges.filter(edge => edge.source === nodeId);
-          
-          // conditionOrderIndex를 기준으로 엣지 정렬
-          // conditionOrderIndex가 없는 경우를 대비해 기본값(Infinity) 사용
-          const sortedEdges = [...allOutgoingEdges].sort((a, b) => {
-            const orderA = a.data?.conditionOrderIndex ?? Infinity;
-            const orderB = b.data?.conditionOrderIndex ?? Infinity;
-            if (orderA !== orderB) {
-              return orderA - orderB;
-            }
-            // conditionOrderIndex가 같으면 id로 정렬하여 일관성 유지
-            return a.id.localeCompare(b.id);
-          });
-
-          let conditionMetInChain = false; // 해당 조건 체인에서 이미 참인 조건이 발생했는지 여부
-          const inputForBranch = input; // 조건 노드로 들어온 입력값
-          
-          const startNode = get().nodes.find(node => node.type === 'startNode');
-          const argumentNameForEval = startNode?.data.config?.className || 'data';
-          
-          for (const edge of sortedEdges) {
-            if (conditionMetInChain) {
-              // 이미 이 체인에서 참인 조건이 발생했으므로, 현재 엣지 및 이후 엣지들은 
-              // 평가하지 않고 output을 null로 설정합니다.
-              get().setEdgeOutput(edge.id, null);
-              continue;
-            }
-
-            // 아직 참인 조건을 만나지 못했으므로, 현재 엣지의 조건을 평가합니다.
-            const { body: conditionBodyForEval } = prepareConditionForEvaluation(edge.data?.label, argumentNameForEval);
-            const isTrue = evaluateCondition(conditionBodyForEval, inputForBranch, argumentNameForEval);
+          try {
+            // ConditionNode API 호출을 시도
+            const allOutgoingEdges = get().edges.filter(edge => edge.source === nodeId);
             
-            if (isTrue) {
-              get().setEdgeOutput(edge.id, inputForBranch);
-              conditionMetInChain = true; // 참인 조건을 만났음을 표시
-            } else {
-              get().setEdgeOutput(edge.id, null);
+            // conditionOrderIndex를 기준으로 엣지 정렬
+            const sortedEdges = [...allOutgoingEdges].sort((a, b) => {
+              const orderA = a.data?.conditionOrderIndex ?? Infinity;
+              const orderB = b.data?.conditionOrderIndex ?? Infinity;
+              if (orderA !== orderB) {
+                return orderA - orderB;
+              }
+              return a.id.localeCompare(b.id);
+            });
+            
+            const startNode = get().nodes.find(node => node.type === 'startNode');
+            const argumentNameForEval = startNode?.data.config?.className || 'data';
+            
+            // 서버로 보낼 조건 데이터 구성
+            const conditions = sortedEdges.map(edge => ({
+              edge_id: edge.id,
+              condition: edge.data?.label || '',
+              target_node_id: edge.target
+            }));
+            
+            const payload = {
+              input_data: input,
+              conditions: conditions,
+              argument_name: argumentNameForEval
+            };
+            
+            // 서버 API 호출
+            const response = await fetch('http://localhost:8000/workflow/node/conditionnode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Condition API failed: ${response.status}`);
             }
-          }
-          // ConditionNode 자체의 output은 들어온 input 그대로 설정하거나, 특별한 의미를 부여할 수 있음
-          output = input; 
+            
+            const apiResponse = await response.json();
+            
+            if (apiResponse.success) {
+              // 서버에서 받은 평가 결과로 엣지 출력 설정
+              let conditionMetInChain = false;
+              
+              for (const edge of sortedEdges) {
+                if (conditionMetInChain) {
+                  get().setEdgeOutput(edge.id, null);
+                  continue;
+                }
+                
+                // 서버 응답에서 해당 엣지의 평가 결과 찾기
+                const evalResult = apiResponse.evaluation_results.find(
+                  (result: any) => result.edge_id === edge.id
+                );
+                
+                if (evalResult && evalResult.is_matched) {
+                  get().setEdgeOutput(edge.id, input);
+                  conditionMetInChain = true;
+                } else {
+                  get().setEdgeOutput(edge.id, null);
+                }
+              }
+              
+              output = input;
+            } else {
+              // API 에러 - 기존 로직으로 폴백
+              throw new Error(apiResponse.error || 'Unknown API error');
+            }
+            
+          } catch (error) {
+            // API 호출 실패 시 기존 클라이언트 로직으로 폴백
+            console.warn('Condition API failed, falling back to client-side evaluation:', error);
+            
+            const allOutgoingEdges = get().edges.filter(edge => edge.source === nodeId);
+            const sortedEdges = [...allOutgoingEdges].sort((a, b) => {
+              const orderA = a.data?.conditionOrderIndex ?? Infinity;
+              const orderB = b.data?.conditionOrderIndex ?? Infinity;
+              if (orderA !== orderB) {
+                return orderA - orderB;
+              }
+              return a.id.localeCompare(b.id);
+            });
+
+            let conditionMetInChain = false;
+            const inputForBranch = input;
+            const startNode = get().nodes.find(node => node.type === 'startNode');
+            const argumentNameForEval = startNode?.data.config?.className || 'data';
+            
+            for (const edge of sortedEdges) {
+              if (conditionMetInChain) {
+                get().setEdgeOutput(edge.id, null);
+                continue;
+              }
+
+              const { body: conditionBodyForEval } = prepareConditionForEvaluation(edge.data?.label, argumentNameForEval);
+              const isTrue = evaluateCondition(conditionBodyForEval, inputForBranch, argumentNameForEval);
+              
+              if (isTrue) {
+                get().setEdgeOutput(edge.id, inputForBranch);
+                conditionMetInChain = true;
+              } else {
+                get().setEdgeOutput(edge.id, null);
+              }
+            }
+            
+            output = input;
+          } 
           break;
         }
         case 'loopNode':

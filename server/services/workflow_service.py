@@ -343,6 +343,149 @@ class WorkflowService:
             return {"error": str(e)}
 
     @staticmethod
+    def process_condition_node(msg: Dict[str, Any]) -> Dict[str, Any]:
+        """Process condition node"""
+        try:
+            logger.info("Processing condition node")
+            
+            # 클라이언트에서 전송된 데이터 파싱
+            input_data = msg.get("input_data", {})
+            conditions = msg.get("conditions", [])
+            argument_name = msg.get("argument_name", "data")
+            
+            logger.info(f"Evaluating {len(conditions)} conditions with argument_name: {argument_name}")
+            
+            result = {
+                "success": True,
+                "matched_condition": None,
+                "matched_edge_id": None,
+                "evaluation_results": []
+            }
+            
+            # 조건들을 순서대로 평가
+            for condition_info in conditions:
+                edge_id = condition_info.get("edge_id", "")
+                condition_expr = condition_info.get("condition", "")
+                target_node_id = condition_info.get("target_node_id", "")
+                
+                logger.info(f"Evaluating condition: {condition_expr} for edge: {edge_id}")
+                
+                try:
+                    # 조건 평가 로직 (클라이언트와 동일한 방식)
+                    is_matched = WorkflowService._evaluate_condition_server(
+                        condition_expr, input_data, argument_name
+                    )
+                    
+                    evaluation_result = {
+                        "edge_id": edge_id,
+                        "condition": condition_expr,
+                        "target_node_id": target_node_id,
+                        "is_matched": is_matched,
+                        "error": None
+                    }
+                    
+                    result["evaluation_results"].append(evaluation_result)
+                    
+                    # 첫 번째로 참인 조건을 찾으면 멈춤
+                    if is_matched and result["matched_condition"] is None:
+                        result["matched_condition"] = condition_expr
+                        result["matched_edge_id"] = edge_id
+                        logger.info(f"Condition matched: {condition_expr}")
+                        
+                except Exception as eval_error:
+                    logger.error(f"Error evaluating condition '{condition_expr}': {str(eval_error)}")
+                    evaluation_result = {
+                        "edge_id": edge_id,
+                        "condition": condition_expr,
+                        "target_node_id": target_node_id,
+                        "is_matched": False,
+                        "error": str(eval_error)
+                    }
+                    result["evaluation_results"].append(evaluation_result)
+            
+            logger.info(f"Condition node processing completed. Matched: {result['matched_condition']}")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in condition node processing: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "matched_condition": None,
+                "matched_edge_id": None,
+                "evaluation_results": []
+            }
+
+    @staticmethod 
+    def _evaluate_condition_server(condition_expr: str, input_data: Dict[str, Any], argument_name: str) -> bool:
+        """서버에서 조건을 평가합니다 (클라이언트의 evaluateCondition과 동일한 로직)"""
+        try:
+            # 클라이언트의 prepareConditionForEvaluation 로직 재현
+            label = condition_expr.strip()
+            lower_label = label.lower()
+            
+            if lower_label == 'else':
+                return True
+                
+            core_condition = label
+            if lower_label.startswith('if '):
+                core_condition = label[3:].strip()
+            elif lower_label.startswith('elif '):
+                core_condition = label[5:].strip()
+                
+            if not core_condition and (lower_label.startswith('if ') or lower_label.startswith('elif ')):
+                logger.warning(f"Invalid condition: Label '{condition_expr}' is an if/elif without an expression")
+                return False
+                
+            if not core_condition:
+                logger.warning(f"Invalid condition: Label '{condition_expr}' is empty or invalid")
+                return False
+            
+            # 조건 평가 (클라이언트의 evaluateCondition 로직 재현)
+            condition_body = f"return {core_condition};"
+            
+            # Python에서 JavaScript의 new Function과 유사한 동작 구현
+            exec_globals = {}
+            exec_locals = {argument_name: input_data}
+            
+            # 보안을 위해 제한된 builtins만 사용
+            safe_builtins = {
+                '__builtins__': {
+                    'len': len,
+                    'str': str,
+                    'int': int,
+                    'float': float,
+                    'bool': bool,
+                    'list': list,
+                    'dict': dict,
+                    'tuple': tuple,
+                    'set': set,
+                    'abs': abs,
+                    'min': min,
+                    'max': max,
+                    'sum': sum,
+                    'round': round,
+                }
+            }
+            exec_globals.update(safe_builtins)
+            
+            # 조건식을 함수로 감싸서 실행
+            func_code = f"""
+def evaluate_condition({argument_name}):
+    {condition_body}
+"""
+            
+            exec(func_code, exec_globals, exec_locals)
+            result = exec_locals['evaluate_condition'](input_data)
+            
+            return bool(result)
+            
+        except Exception as e:
+            logger.error(f"Error evaluating condition '{condition_expr}' with argument '{argument_name}': {str(e)}")
+            return False
+
+    @staticmethod
     def process_agent_node(msg: Dict[str, Any]) -> str:
 
         try:
