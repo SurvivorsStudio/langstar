@@ -85,8 +85,6 @@ const ExecutionNode = ({ data, isConnectable }: any) => {
         return <Square className="w-4 h-4" />;
       case 'agentNode':
         return <Search className="w-4 h-4" />;
-      case 'ragNode':
-        return <Settings className="w-4 h-4" />;
       default:
         return <Circle className="w-4 h-4" />;
     }
@@ -620,8 +618,6 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
         return <Square className="w-4 h-4" />;
       case 'agentNode':
         return <Search className="w-4 h-4" />;
-      case 'ragNode':
-        return <Settings className="w-4 h-4" />;
       default:
         return <Circle className="w-4 h-4" />;
     }

@@ -206,18 +206,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
         iconColor: isDarkMode ? '#9ca3af' : '#6b7280',
         textColor: isDarkMode ? '#d1d5db' : '#374151'
       },
-      'embeddingNode': {
-        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#8b5cf6',
-        iconColor: '#8b5cf6',
-        textColor: isDarkMode ? '#d1d5db' : '#374151'
-      },
-      'ragNode': {
-        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: '#8b5cf6',
-        iconColor: '#8b5cf6',
-        textColor: isDarkMode ? '#d1d5db' : '#374151'
-      },
       'mergeNode': {
         backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
         borderColor: '#FF6B6C',

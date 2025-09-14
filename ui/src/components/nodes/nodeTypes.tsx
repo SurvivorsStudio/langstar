@@ -71,16 +71,6 @@ const PromptNode = (props: any) => (
   />
 );
 
-const SystemPromptNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Settings size={20} />,
-      nodeType: 'systemPromptNode'
-    }}
-  />
-);
 
 const ToolsMemoryNode = (props: any) => (
   <CustomNode 
@@ -93,27 +83,7 @@ const ToolsMemoryNode = (props: any) => (
   />
 );
 
-const EmbeddingNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Database size={20} />,
-      nodeType: 'embeddingNode'
-    }}
-  />
-);
 
-const RAGNode = (props: any) => (
-  <CustomNode 
-    {...props}
-    data={{
-      ...props.data,
-      icon: <Database size={20} />,
-      nodeType: 'ragNode'
-    }}
-  />
-);
 
 const MergeNode = (props: any) => (
   <CustomNode
@@ -144,10 +114,7 @@ export const nodeTypes = {
   startNode: StartNode,
   endNode: EndNode,
   promptNode: PromptNode,
-  systemPromptNode: SystemPromptNode,
   toolsMemoryNode: ToolsMemoryNode,
-  embeddingNode: EmbeddingNode,
-  ragNode: RAGNode,
   mergeNode: MergeNode,
   userNode: UserNode,
 };

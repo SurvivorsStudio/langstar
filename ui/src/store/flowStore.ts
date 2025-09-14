@@ -1390,22 +1390,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
         }
           break;
-        case 'embeddingNode': {
-          if (!node.data.config?.model) {
-            output = { error: 'Embedding model must be selected' };
-            break;
-          }
-          if (!node.data.config?.inputColumn) {
-            output = { error: 'Input column must be selected' };
-            break;
-          }
-          if (!node.data.config?.outputColumn) {
-            output = { error: 'Output column must be selected' };
-            break;
-          }
-          output = generateEmbedding(input, node.data.config);
-          break;
-        }
         case 'conditionNode': {
           try {
             // ConditionNode API 호출을 시도
