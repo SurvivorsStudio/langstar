@@ -27,6 +27,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [isRightHandleHovered, setIsRightHandleHovered] = useState(false);
   // 툴팁 표시 상태
   const [showTooltip, setShowTooltip] = useState(false);
+  
 
   // ToolsMemoryNode이고 다른 노드가 포커스되었을 때 selectedGroupId 초기화
   React.useEffect(() => {
