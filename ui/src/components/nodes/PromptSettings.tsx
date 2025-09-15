@@ -63,14 +63,6 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="space-y-4 p-4">
-      <div>
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Prompt Settings
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Configure your prompt node settings here.
-        </p>
-      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
