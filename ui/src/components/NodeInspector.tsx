@@ -32,6 +32,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [descriptionHeight, setDescriptionHeight] = useState<number>(3); // 기본 3줄
   const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
   const [isNodeChanging, setIsNodeChanging] = useState<boolean>(false);
+  const [lastValidNodeName, setLastValidNodeName] = useState<string>(''); // 마지막 유효한 노드 이름 저장
   const lastSavedCodeRef = useRef<string>('');
   
   const [incomingEdges, setIncomingEdges] = useState<Edge[]>([]);
@@ -122,7 +123,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       setCode(nodeCode);
       // 마지막 저장된 코드 초기화
       lastSavedCodeRef.current = nodeCode;
-      setNodeName(node.data.label || 'Untitled Node');
+      const currentNodeName = node.data.label || 'Untitled Node';
+      setNodeName(currentNodeName);
+      
+      // 유효한 노드 이름이면 lastValidNodeName에도 저장
+      if (validateNodeName(currentNodeName)) {
+        setLastValidNodeName(currentNodeName);
+      }
       
       // description이 없으면 기본값 설정
       const defaultDescription = getNodeDescription(node.type || '');
@@ -290,19 +297,31 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
-    const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
-    setNodeName(filteredValue);
+    setNodeName(value);
     
-    if (filteredValue.trim() && currentNode) {
+    // 유효한 입력인 경우에만 노드 데이터 업데이트 및 lastValidNodeName 저장
+    if (validateNodeName(value) && value.trim() && currentNode) {
+      setLastValidNodeName(value);
       updateNodeData(nodeId, {
         ...currentNode.data,
-        label: filteredValue.trim()
+        label: value.trim()
       });
     }
   };
 
-  
+  const handleNameBlur = () => {
+    // 입력이 완료되었을 때 유효하지 않으면 이전 유효한 이름으로 복원
+    if (!validateNodeName(nodeName) && lastValidNodeName) {
+      setNodeName(lastValidNodeName);
+      if (currentNode) {
+        updateNodeData(nodeId, {
+          ...currentNode.data,
+          label: lastValidNodeName
+        });
+      }
+    }
+  };
+
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setNodeDescription(value);
@@ -467,9 +486,20 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
               type="text"
               value={nodeName}
               onChange={handleNameChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              placeholder="영문자, 숫자, _만 사용"
+              onBlur={handleNameBlur}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
+                !validateNodeName(nodeName) && nodeName.trim()
+                  ? 'border-red-500 dark:border-red-400 focus:ring-red-500 text-red-600 dark:text-red-400'
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+              }`}
+              placeholder="영문자, 숫자, _만 사용 (다른 언어 입력 시 빨간색 표시)"
             />
+            {!validateNodeName(nodeName) && nodeName.trim() && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400 flex items-center">
+                <span className="mr-1">⚠️</span>
+                영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

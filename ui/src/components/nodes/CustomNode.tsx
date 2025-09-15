@@ -20,6 +20,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [isEditing, setIsEditing] = useState(false);
   // 편집 중인 노드 이름 상태
   const [nodeName, setNodeName] = useState(data.label);
+  // 마지막 유효한 노드 이름 저장
+  const [lastValidNodeName, setLastValidNodeName] = useState(data.label);
   // 재생 버튼 hover 상태 관리
   const [isPlayHovered, setIsPlayHovered] = useState(false);
   // 연결점 hover 상태 관리 (Tools & Memory 노드 제외)
@@ -27,7 +29,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [isRightHandleHovered, setIsRightHandleHovered] = useState(false);
   // 툴팁 표시 상태
   const [showTooltip, setShowTooltip] = useState(false);
-  
 
   // ToolsMemoryNode이고 다른 노드가 포커스되었을 때 selectedGroupId 초기화
   React.useEffect(() => {
@@ -38,6 +39,26 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       }
     }
   }, [focusedElement, id, type, data, updateNodeData]);
+
+  /**
+   * 노드 이름 유효성 검사 함수
+   * @param {string} name - 검사할 노드 이름
+   * @returns {boolean} 유효하면 true, 그렇지 않으면 false
+   */
+  const validateNodeName = (name: string): boolean => {
+    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
+    const validNameRegex = /^[a-zA-Z0-9_]+$/;
+    return validNameRegex.test(name);
+  };
+
+  // 노드 라벨이 변경될 때 상태 업데이트
+  React.useEffect(() => {
+    setNodeName(data.label);
+    // 유효한 라벨이면 lastValidNodeName에도 저장
+    if (validateNodeName(data.label)) {
+      setLastValidNodeName(data.label);
+    }
+  }, [data.label]);
 
   // 노드 타입에 따른 플래그
   const isStartNode = type === 'startNode';
@@ -312,58 +333,61 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   };
 
   /**
-   * 노드 이름 유효성 검사 함수
-   * @param {string} name - 검사할 노드 이름
-   * @returns {boolean} 유효하면 true, 그렇지 않으면 false
-   */
-  const validateNodeName = (name: string): boolean => {
-    // 띄어쓰기 금지, 특수문자는 언더스코어(_)만 허용
-    const validNameRegex = /^[a-zA-Z0-9_]+$/;
-    return validNameRegex.test(name);
-  };
-
-  /**
    * 노드 이름 변경 핸들러 (input 값 변경 시).
    * @param {React.ChangeEvent<HTMLInputElement>} event - 변경 이벤트 객체.
    */
   const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    // 유효한 문자만 입력 허용 (띄어쓰기, 특수문자 금지, 언더스코어만 허용)
-    const filteredValue = value.replace(/[^a-zA-Z0-9_]/g, '');
-    setNodeName(filteredValue);
+    setNodeName(value); // 모든 입력 허용
+    
+    // 유효한 입력인 경우에만 노드 데이터 업데이트 및 lastValidNodeName 저장
+    if (validateNodeName(value) && value.trim()) {
+      setLastValidNodeName(value);
+      updateNodeData(id, { ...data, label: value.trim() });
+    }
   };
 
   /**
-   * 노드 이름 변경 완료 핸들러 (blur 또는 Enter 시).
+   * 노드 이름 변경 완료 핸들러 (Enter 키 시).
    */
   const handleNameSubmit = () => {
     const trimmedName = nodeName.trim();
     
     // 이름이 비어있는 경우
     if (!trimmedName) {
-      alert('노드 이름을 입력해주세요.');
-      setNodeName(data.label);
+      setNodeName(lastValidNodeName || data.label);
       setIsEditing(false);
       return;
     }
     
-    // 이름 유효성 검사
-    if (!validateNodeName(trimmedName)) {
-      alert('노드 이름에는 영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다. 띄어쓰기와 특수문자는 사용할 수 없습니다.');
-      setNodeName(data.label);
-      setIsEditing(false);
-      return;
-    }
-    
-    // 이름이 유효하고 변경된 경우에만 업데이트
-    if (trimmedName !== data.label) {
+    // 유효한 이름인 경우 저장하고 편집 종료
+    if (validateNodeName(trimmedName)) {
+      setLastValidNodeName(trimmedName);
       updateNodeData(id, { ...data, label: trimmedName });
+      setIsEditing(false);
+    } else {
+      // 유효하지 않은 이름인 경우 복원하고 편집 종료
+      setNodeName(lastValidNodeName || data.label);
+      setIsEditing(false);
+    }
+  };
+
+  /**
+   * 노드 이름 입력 포커스 해제 핸들러 (blur 시).
+   */
+  const handleNameBlur = () => {
+    // 입력이 완료되었을 때 유효하지 않으면 이전 유효한 이름으로 복원
+    if (!validateNodeName(nodeName) && lastValidNodeName) {
+      setNodeName(lastValidNodeName);
+      if (lastValidNodeName !== data.label) {
+        updateNodeData(id, { ...data, label: lastValidNodeName });
+      }
     }
     setIsEditing(false);
   };
 
   /**
-   * 키 입력 핸들러 (이름 편집 시 Enter 또는 Escape 처리).
+   * 키 입력 핸들러 (이름 편집 시 Enter, Escape, Backspace, Delete 처리).
    * @param {React.KeyboardEvent} event - 키보드 이벤트 객체.
    */
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -372,6 +396,10 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     } else if (event.key === 'Escape') {
       setNodeName(data.label);
       setIsEditing(false);
+    } else if (event.key === 'Backspace' || event.key === 'Delete') {
+      // 편집 모드에서는 백스페이스와 delete 키가 정상적으로 작동하도록 
+      // 전역 이벤트 핸들러로의 전파를 막음
+      event.stopPropagation();
     }
   };
 
@@ -798,16 +826,28 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
             
             {isEditing ? (
               // 이름 편집 모드
-              <input
-                type="text"
-                value={nodeName}
-                onChange={handleNameChange}
-                onBlur={handleNameSubmit}
-                onKeyDown={handleKeyPress}
-                placeholder="영문자, 숫자, _만 사용"
-                className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-center"
-                autoFocus
-              />
+              <div className="w-full">
+                <input
+                  type="text"
+                  value={nodeName}
+                  onChange={handleNameChange}
+                  onBlur={handleNameBlur}
+                  onKeyDown={handleKeyPress}
+                  placeholder="영문자, 숫자, _만 사용 (다른 언어 입력 시 빨간색 표시)"
+                  className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-center ${
+                    !validateNodeName(nodeName) && nodeName.trim()
+                      ? 'border-red-500 dark:border-red-400 focus:ring-red-500 text-red-600 dark:text-red-400'
+                      : 'border-blue-300 dark:border-blue-600 focus:ring-blue-500 text-gray-900 dark:text-gray-100'
+                  }`}
+                  autoFocus
+                />
+                {!validateNodeName(nodeName) && nodeName.trim() && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400 text-center flex items-center justify-center">
+                    <span className="mr-1">⚠️</span>
+                    영문자, 숫자, 언더스코어(_)만 사용 가능
+                  </p>
+                )}
+              </div>
             ) : (
               // 이름 표시 모드
               <div className="flex items-center justify-center w-full">
