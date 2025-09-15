@@ -470,8 +470,6 @@ const FlowBuilder: React.FC = () => {
             pannable 
             position="bottom-left"
             className="ml-20"
-            // width={120}
-            // height={120}
           />
           <Panel position="top-left" className="ml-4 mt-4">
             {!showNodeSidebar && (
