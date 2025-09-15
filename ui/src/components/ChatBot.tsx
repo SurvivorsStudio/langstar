@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Loader } from 'lucide-react';
+import { MessageSquare, X, Send, Loader, Minimize2, Maximize2 } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore'; // flowStore import
 
 interface Message {
@@ -14,6 +14,9 @@ const ChatBot: React.FC = () => {
   // NodeInspector 감지를 위한 상태 추가
   const [nodeInspectorWidth, setNodeInspectorWidth] = useState(0);
   const [isNodeInspectorVisible, setIsNodeInspectorVisible] = useState(false);
+  // 쳇팅창 크기 상태 관리
+  const [chatSize, setChatSize] = useState<'default' | 'expanded'>('default');
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   // flowStore에서 endNode의 output을 가져옵니다.
   // 필요한 상태와 액션을 모두 가져옵니다.
   const { 
@@ -37,9 +40,46 @@ const ChatBot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // 쳇팅창 크기 계산 함수
+  const getChatSize = () => {
+    const { width, height } = windowSize;
+    
+    if (chatSize === 'expanded') {
+      // 확대 모드: 사용 가능한 공간의 60% (최대 800px)
+      // NodeInspector가 있을 때는 더 작게 조정
+      const availableWidth = isNodeInspectorVisible ? width - nodeInspectorWidth - 48 : width;
+      const maxWidth = Math.min(availableWidth * 0.6, 800);
+      const maxHeight = Math.min(height * 0.8, 700);
+      
+      // 최소 너비 보장 (NodeInspector가 있을 때도 최소 400px)
+      const finalWidth = Math.max(maxWidth, 400);
+      
+      return {
+        width: `${finalWidth}px`,
+        height: `${maxHeight}px`
+      };
+    } else {
+      // 기본 모드: 기존 크기 유지
+      return {
+        width: '384px', // w-96
+        height: '600px'
+      };
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]); // 메시지 목록이나 로딩 상태가 변경될 때 스크롤
+
+  // 브라우저 크기 감지
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // 챗봇 창이 열릴 때 스크롤을 맨 아래로 이동
@@ -207,9 +247,15 @@ const ChatBot: React.FC = () => {
 
   if (!isOpen) {
     // NodeInspector가 표시될 때 버튼 위치 조정
-    const rightPosition = isNodeInspectorVisible 
-      ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
-      : '24px'; // 기본 right-6 (24px)
+    const getButtonPosition = () => {
+      if (isNodeInspectorVisible) {
+        return `${nodeInspectorWidth + 24}px`;  // NodeInspector 너비 + 24px 여백
+      } else {
+        return '24px'; // 기본 right-6 (24px)
+      }
+    };
+
+    const rightPosition = getButtonPosition();
 
     return (
       <button
@@ -236,44 +282,70 @@ const ChatBot: React.FC = () => {
   }
 
   // 채팅창이 열렸을 때도 NodeInspector 위치 고려
-  const chatRightPosition = isNodeInspectorVisible 
-    ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
-    : '24px'; // 기본 right-6 (24px)
+  const getChatPosition = () => {
+    if (chatSize === 'expanded' && isNodeInspectorVisible) {
+      // 확대 모드에서 NodeInspector가 있을 때는 더 큰 여백 필요
+      return `${nodeInspectorWidth + 48}px`;
+    } else if (isNodeInspectorVisible) {
+      // 기본 모드에서 NodeInspector가 있을 때
+      return `${nodeInspectorWidth + 24}px`;
+    } else {
+      // NodeInspector가 없을 때
+      return '24px';
+    }
+  };
+
+  const chatRightPosition = getChatPosition();
+
+  const chatSizeStyle = getChatSize();
 
   return (
     <div 
-      className="fixed bottom-16 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 transition-all duration-300"
-      style={{ right: chatRightPosition }}
+      className={`fixed bottom-16 bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 chat-window ${chatSize}`}
+      style={{ 
+        right: chatRightPosition,
+        width: chatSizeStyle.width,
+        height: chatSizeStyle.height
+      }}
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
         <h3 className="font-semibold">Workflow Assistant</h3>
-        <button
-          onClick={async () => {
-            setIsOpen(false);
-            // API 호출 (챗봇 닫힐 때)
-            console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
-            try {
-              // 여기에 API 호출 로직을 추가하세요. 예:
-              // const response = await fetch('/api/chatbot/event', {
-              //   method: 'POST',
-              //   body: JSON.stringify({ chatId: chatId, event: 'closed' }),
-              //   headers: { 'Content-Type': 'application/json' },
-              // });
-              // if (!response.ok) {
-              //   throw new Error('API call failed on close');
-              // }
-              // console.log('[ChatBot] Close event API call successful');
-            } catch (error) {
-              console.error('[ChatBot] Error calling API on close:', error);
-            }
-          }}
-          className="text-white hover:text-gray-200 transition-colors"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setChatSize(chatSize === 'default' ? 'expanded' : 'default')}
+            className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600 chat-resize-button"
+            title={chatSize === 'default' ? '확대' : '축소'}
+          >
+            {chatSize === 'default' ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+          </button>
+          <button
+            onClick={async () => {
+              setIsOpen(false);
+              // API 호출 (챗봇 닫힐 때)
+              console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
+              try {
+                // 여기에 API 호출 로직을 추가하세요. 예:
+                // const response = await fetch('/api/chatbot/event', {
+                //   method: 'POST',
+                //   body: JSON.stringify({ chatId: chatId, event: 'closed' }),
+                //   headers: { 'Content-Type': 'application/json' },
+                // });
+                // if (!response.ok) {
+                //   throw new Error('API call failed on close');
+                // }
+                // console.log('[ChatBot] Close event API call successful');
+              } catch (error) {
+                console.error('[ChatBot] Error calling API on close:', error);
+              }
+            }}
+            className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-messages">
         {messages.map((message, index) => (
           <div
             key={index}
