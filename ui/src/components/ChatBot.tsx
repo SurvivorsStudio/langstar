@@ -227,7 +227,7 @@ const ChatBot: React.FC = () => {
           ]);
           setIsOpen(true);
         }}
-        className="fixed bottom-20 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300"
+        className="fixed bottom-16 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300"
         style={{ right: rightPosition }}
       >
         <MessageSquare size={24} />
@@ -242,7 +242,7 @@ const ChatBot: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-20 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 transition-all duration-300"
+      className="fixed bottom-16 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 transition-all duration-300"
       style={{ right: chatRightPosition }}
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
