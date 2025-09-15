@@ -1041,9 +1041,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (!isWorkflowRunning) {
       get().resetAllEdgeStatuses(outgoingIds);
     }
-    outgoingEdges.forEach(edge => {
-      get().setEdgeExecuting(edge.id, true);
-    });
+    // 조건 노드는 분기 결정 전까지 어떤 엣지도 실행 표시하지 않는다
+    if (node.type !== 'conditionNode') {
+      outgoingEdges.forEach(edge => {
+        get().setEdgeExecuting(edge.id, true);
+      });
+    }
     
     // Node Inspector와 동일한 방식으로 input data 선택
     const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
@@ -1687,27 +1690,56 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       // 성공/실패에 따라 나가는 엣지들의 상태 설정
       const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
       
-      if (!hasError) {
-        // 성공한 경우
-        outgoingEdges.forEach(edge => {
-          get().setEdgeSuccess(edge.id, true);
-        });
+      if (node.type === 'conditionNode') {
+        // 조건 노드: 실제로 데이터가 전달된 엣지만 성공 처리, 나머지는 기본 상태 유지
+        const latestEdges = get().edges.filter(edge => edge.source === nodeId);
+        if (!hasError) {
+          latestEdges.forEach(edge => {
+            const flowed = !!(edge.data && edge.data.output);
+            if (flowed) {
+              get().setEdgeSuccess(edge.id, true);
+            } else {
+              // 기본 상태 유지: 실행/성공/실패 모두 false로 정리
+              get().updateEdgeData(edge.id, { isExecuting: false, isSuccess: false, isFailure: false });
+            }
+          });
+        } else {
+          // 노드 자체가 실패한 경우: 어떤 엣지도 흐르지 않았으므로 상태를 리셋만 수행
+          latestEdges.forEach(edge => {
+            get().updateEdgeData(edge.id, { isExecuting: false, isSuccess: false, isFailure: false });
+          });
+        }
       } else {
-        // 실패한 경우
-        outgoingEdges.forEach(edge => {
-          get().setEdgeFailure(edge.id, true);
-        });
+        if (!hasError) {
+          // 성공한 경우: 모든 나가는 엣지를 성공 처리 (일반 노드는 동일 출력 전달)
+          outgoingEdges.forEach(edge => {
+            get().setEdgeSuccess(edge.id, true);
+          });
+        } else {
+          // 실패한 경우: 일반 노드는 나가는 엣지를 실패로 표시
+          outgoingEdges.forEach(edge => {
+            get().setEdgeFailure(edge.id, true);
+          });
+        }
       }
     } catch (error) {
       console.error('Error executing node:', error);
       get().setNodeOutput(nodeId, { error: 'Execution failed' });
       get().setNodeExecuting(nodeId, false, false, nodeName, isWorkflowRunning); // 실패로 표시
       
-      // 실패한 경우 나가는 엣지들을 실패 상태로 설정
+      // 실패한 경우 엣지 상태 처리
       const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
-      outgoingEdges.forEach(edge => {
-        get().setEdgeFailure(edge.id, true);
-      });
+      if (node.type === 'conditionNode') {
+        // 조건 노드는 어떤 엣지도 흐르지 않은 것으로 간주: 상태 리셋만
+        outgoingEdges.forEach(edge => {
+          get().updateEdgeData(edge.id, { isExecuting: false, isSuccess: false, isFailure: false });
+        });
+      } else {
+        // 일반 노드: 실패로 표시
+        outgoingEdges.forEach(edge => {
+          get().setEdgeFailure(edge.id, true);
+        });
+      }
     }
   },
 
