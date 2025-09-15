@@ -464,7 +464,15 @@ const FlowBuilder: React.FC = () => {
           )}
           
           <Controls showInteractive={false} />
-          <MiniMap nodeStrokeWidth={3} zoomable pannable />
+          <MiniMap 
+            nodeStrokeWidth={2} 
+            zoomable 
+            pannable 
+            position="bottom-left"
+            className="ml-20"
+            width={120}
+            height={120}
+          />
           <Panel position="top-left" className="ml-4 mt-4">
             {!showNodeSidebar && (
               <button
