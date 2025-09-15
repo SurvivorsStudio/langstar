@@ -297,3 +297,35 @@ body {
 .dark .react-flow__controls {
   border: 1px solid #374151 !important; /* Tailwind gray-700, 사이드바와 동일 */
 }
+
+/* React Flow 워터마크 스타일 */
+.react-flow__attribution {
+  background: transparent !important;
+  color: #5e5e5e !important;
+  font-size: 12px !important;
+  padding: 0 !important;
+  border: none !important;
+  transition: all 0.3s ease !important;
+  display: table;
+  
+  /* 위치 조정 - 우측 상단 */
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 10 !important;
+}
+
+.react-flow__attribution:hover {
+  color: #374151 !important;
+}
+
+/* 다크모드에서 워터마크 스타일 */
+.dark .react-flow__attribution {
+  background: transparent !important;
+  color: #9ca3af !important; /* Tailwind gray-400 */
+  border: none !important;
+}
+
+.dark .react-flow__attribution:hover {
+  color: #f3f4f6 !important; /* Tailwind gray-100 */
+}
