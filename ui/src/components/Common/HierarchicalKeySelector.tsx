@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, ChevronRight, ChevronDown, Key, Folder, FolderOpen, List, Hash, Type, ToggleLeft, Calendar, Search } from 'lucide-react';
+import { X, ChevronRight, ChevronDown, Key, Folder, FolderOpen, List, Hash, Type, ToggleLeft, Calendar, Search, Eye, Copy } from 'lucide-react';
 
 interface HierarchicalKeySelectorProps {
   isOpen: boolean;
@@ -33,14 +33,59 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [autoExpandedNodes, setAutoExpandedNodes] = useState<Set<string>>(new Set());
+  const [viewDataModal, setViewDataModal] = useState<{
+    isOpen: boolean;
+    node: TreeNode | null;
+    title: string;
+  }>({
+    isOpen: false,
+    node: null,
+    title: ''
+  });
 
   useEffect(() => {
     if (isOpen) {
       setSearchTerm('');
       setExpandedNodes(new Set());
       setAutoExpandedNodes(new Set());
+      setViewDataModal({ isOpen: false, node: null, title: '' });
     }
   }, [isOpen]);
+
+  // 전체 데이터 보기 함수
+  const handleViewFullData = (node: TreeNode) => {
+    setViewDataModal({
+      isOpen: true,
+      node,
+      title: `전체 데이터: ${node.key}`
+    });
+  };
+
+  // 클립보드에 복사하는 함수
+  const handleCopyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // 간단한 토스트 알림을 위한 임시 요소 생성 (실제 프로젝트에서는 토스트 컴포넌트 사용)
+      const toast = document.createElement('div');
+      toast.textContent = '클립보드에 복사되었습니다!';
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        z-index: 9999;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => document.body.removeChild(toast), 2000);
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+    }
+  };
 
   const getValueType = (value: any): 'object' | 'array' | 'primitive' => {
     if (Array.isArray(value)) return 'array';
@@ -74,37 +119,100 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
     }
   };
 
-  const formatValue = (value: any, type: 'object' | 'array' | 'primitive') => {
+  const formatValue = (value: any, type: 'object' | 'array' | 'primitive'): { display: string; isTruncated: boolean } => {
     switch (type) {
       case 'object':
         const keys = Object.keys(value);
-        const keyNames = keys.slice(0, 3).join(', ');
+        const hasLongKeys = keys.some(key => key.length > 15);
+        const keyNames = keys.slice(0, 3).map(key => 
+          key.length > 15 ? key.substring(0, 15) + '...' : key
+        ).join(', ');
         const moreKeys = keys.length > 3 ? `, +${keys.length - 3}개 더` : '';
-        return `{${keys.length}개 키: ${keyNames}${moreKeys}}`;
+        const isTruncated = hasLongKeys || keys.length > 3;
+        return {
+          display: `{${keys.length}개 키: ${keyNames}${moreKeys}}`,
+          isTruncated
+        };
       case 'array':
+        const hasLongItems = value.some((item: any) => {
+          if (typeof item === 'string') return item.length > 15;
+          return JSON.stringify(item).length > 20;
+        });
         const preview = value.slice(0, 2).map((item: any) => {
-          if (typeof item === 'string') return `"${item.length > 10 ? item.substring(0, 10) + '...' : item}"`;
-          return JSON.stringify(item);
+          if (typeof item === 'string') {
+            const truncated = item.length > 15 ? item.substring(0, 15) + '...' : item;
+            return `"${truncated}"`;
+          }
+          const stringified = JSON.stringify(item);
+          return stringified.length > 20 ? stringified.substring(0, 20) + '...' : stringified;
         }).join(', ');
         const moreItems = value.length > 2 ? `, +${value.length - 2}개 더` : '';
-        return `[${value.length}개 항목: ${preview}${moreItems}]`;
+        const arrayTruncated = hasLongItems || value.length > 2;
+        return {
+          display: `[${value.length}개 항목: ${preview}${moreItems}]`,
+          isTruncated: arrayTruncated
+        };
       case 'primitive':
         const valueType = typeof value;
         if (valueType === 'string') {
-          if (value.length > 60) {
-            return `"${value.substring(0, 60)}..." (${value.length}자)`;
+          // 줄바꿈이 있는 문자열의 경우 줄바꿈 정보 표시
+          const lineCount = (value.match(/\n/g) || []).length + 1;
+          const lineInfo = lineCount > 1 ? `, ${lineCount}줄` : '';
+          
+          if (value.length > 100) {
+            // 긴 문자열은 더 짧게 자르고 줄바꿈 유지
+            const truncated = value.substring(0, 100);
+            const lastNewline = truncated.lastIndexOf('\n');
+            const preview = lastNewline > 50 ? truncated.substring(0, lastNewline) + '\n...' : truncated + '...';
+            return {
+              display: `"${preview}" (문자열, ${value.length}자${lineInfo})`,
+              isTruncated: true
+            };
           }
-          return `"${value}" (문자열, ${value.length}자)`;
+          return {
+            display: `"${value}" (문자열, ${value.length}자${lineInfo})`,
+            isTruncated: false
+          };
         } else if (valueType === 'number') {
-          return `${value} (숫자)`;
+          // 긴 숫자도 적절히 처리
+          const numberStr = String(value);
+          if (numberStr.length > 20) {
+            return {
+              display: `${numberStr.substring(0, 20)}... (숫자)`,
+              isTruncated: true
+            };
+          }
+          return {
+            display: `${value} (숫자)`,
+            isTruncated: false
+          };
         } else if (valueType === 'boolean') {
-          return `${value} (불린)`;
+          return {
+            display: `${value} (불린)`,
+            isTruncated: false
+          };
         } else if (value === null) {
-          return 'null';
+          return {
+            display: 'null',
+            isTruncated: false
+          };
         } else if (value === undefined) {
-          return 'undefined';
+          return {
+            display: 'undefined',
+            isTruncated: false
+          };
         } else {
-          return `${JSON.stringify(value)} (${valueType})`;
+          const stringified = JSON.stringify(value);
+          if (stringified.length > 100) {
+            return {
+              display: `${stringified.substring(0, 100)}... (${valueType})`,
+              isTruncated: true
+            };
+          }
+          return {
+            display: `${stringified} (${valueType})`,
+            isTruncated: false
+          };
         }
     }
   };
@@ -302,6 +410,7 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
     const hasChildren = node.children && node.children.length > 0;
     const isSelectable = true; // 모든 타입 선택 가능
     const isCurrentSelected = selectedKey === node.key;
+    const valueInfo = formatValue(node.value, node.type);
 
     return (
       <div key={node.fullPath} className="select-none relative">
@@ -378,17 +487,44 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
 
           {/* 키 이름과 값 */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="font-semibold text-gray-900 dark:text-gray-100 break-words">
                 {node.key}
               </span>
-              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">
+              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full break-all">
                 {node.fullPath}
               </span>
             </div>
-            <div className="text-sm text-gray-700 dark:text-gray-300 leading-tight">
-              {formatValue(node.value, node.type)}
+            <div className="text-sm text-gray-700 dark:text-gray-300 leading-tight break-words whitespace-pre-wrap overflow-wrap-anywhere">
+              {valueInfo.display}
             </div>
+            {valueInfo.isTruncated && (
+              <div className="mt-2 flex gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewFullData(node);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                >
+                  <Eye className="w-3 h-3" />
+                  전체 보기
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const copyText = node.type === 'primitive' && typeof node.value === 'string' 
+                      ? node.value 
+                      : JSON.stringify(node.value, null, 2);
+                    handleCopyToClipboard(copyText);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  복사
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 선택 가능 표시 및 버튼 */}
@@ -430,6 +566,7 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-700">
         {/* Header */}
@@ -539,6 +676,77 @@ const HierarchicalKeySelector: React.FC<HierarchicalKeySelectorProps> = ({
         </div>
       </div>
     </div>
+
+    {/* 전체 데이터 보기 모달 */}
+    {viewDataModal.isOpen && viewDataModal.node && (
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-700">
+          {/* 모달 헤더 */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {viewDataModal.title}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  경로: {viewDataModal.node.fullPath}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const copyText = viewDataModal.node.type === 'primitive' && typeof viewDataModal.node.value === 'string' 
+                    ? viewDataModal.node.value 
+                    : JSON.stringify(viewDataModal.node.value, null, 2);
+                  handleCopyToClipboard(copyText);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                복사
+              </button>
+              <button
+                onClick={() => setViewDataModal({ isOpen: false, node: null, title: '' })}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* 모달 내용 */}
+          <div className="flex-1 overflow-hidden p-5">
+            <div className="h-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+              <pre className="h-full overflow-auto p-4 bg-gray-50 dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap break-words">
+                {viewDataModal.node.type === 'primitive' && typeof viewDataModal.node.value === 'string' 
+                  ? viewDataModal.node.value 
+                  : JSON.stringify(viewDataModal.node.value, null, 2)}
+              </pre>
+            </div>
+          </div>
+
+          {/* 모달 푸터 */}
+          <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                💡 전체 JSON 데이터를 확인하고 복사할 수 있습니다
+              </div>
+              <button
+                onClick={() => setViewDataModal({ isOpen: false, node: null, title: '' })}
+                className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
