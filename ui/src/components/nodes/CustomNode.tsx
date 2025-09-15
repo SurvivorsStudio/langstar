@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { ChevronRight, X, Play, Loader, Edit2, AlertCircle, Plus, Trash2, Eye } from 'lucide-react';
+import { X, Play, Loader, Edit2, AlertCircle, Plus, Trash2, Eye } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import { useThemeStore } from '../../store/themeStore';
 import PromptTemplatePopup from './PromptTemplatePopup';
@@ -566,19 +566,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                     >
                       <Trash2 size={14} />
                     </button>
-                    <div 
-                      className="p-1 rounded"
-                      style={{
-                        backgroundColor: isSelected 
-                          ? '#3b82f6' 
-                          : (isDarkMode ? '#6b7280' : '#9ca3af')
-                      }}
-                    >
-                      <ChevronRight 
-                        size={12} 
-                        style={{ color: '#ffffff' }} 
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -621,7 +608,10 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
           className="rounded-xl shadow-xl border-2 overflow-hidden cursor-pointer"
           style={{
             backgroundColor: nodeStyle.backgroundColor,
-            borderColor: nodeStyle.borderColor
+            borderColor: nodeStyle.borderColor,
+            width: '320px',
+            minWidth: '320px',
+            maxWidth: '320px'
           }}
           onDoubleClick={handleNodeDoubleClick}
         >
