@@ -11,6 +11,9 @@ interface Message {
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null); // State for the unique chat ID
+  // NodeInspector 감지를 위한 상태 추가
+  const [nodeInspectorWidth, setNodeInspectorWidth] = useState(0);
+  const [isNodeInspectorVisible, setIsNodeInspectorVisible] = useState(false);
   // flowStore에서 endNode의 output을 가져옵니다.
   // 필요한 상태와 액션을 모두 가져옵니다.
   const { 
@@ -42,6 +45,45 @@ const ChatBot: React.FC = () => {
     // 챗봇 창이 열릴 때 스크롤을 맨 아래로 이동
     if (isOpen) scrollToBottom();
   }, [isOpen]);
+
+  // NodeInspector 감지를 위한 useEffect
+  useEffect(() => {
+    const checkNodeInspector = () => {
+      const nodeInspectorElement = document.querySelector('[data-testid="node-inspector"]') as HTMLElement;
+      if (nodeInspectorElement) {
+        const width = nodeInspectorElement.offsetWidth;
+        setNodeInspectorWidth(width);
+        setIsNodeInspectorVisible(true);
+      } else {
+        setNodeInspectorWidth(0);
+        setIsNodeInspectorVisible(false);
+      }
+    };
+
+    // 초기 체크
+    checkNodeInspector();
+
+    // MutationObserver로 DOM 변경 감지
+    const observer = new MutationObserver(checkNodeInspector);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'] // NodeInspector의 너비 변경도 감지
+    });
+
+    // Resize Observer로 NodeInspector 크기 변경 감지
+    const resizeObserver = new ResizeObserver(checkNodeInspector);
+    const nodeInspectorElement = document.querySelector('[data-testid="node-inspector"]');
+    if (nodeInspectorElement) {
+      resizeObserver.observe(nodeInspectorElement);
+    }
+
+    return () => {
+      observer.disconnect();
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -164,6 +206,11 @@ const ChatBot: React.FC = () => {
   };
 
   if (!isOpen) {
+    // NodeInspector가 표시될 때 버튼 위치 조정
+    const rightPosition = isNodeInspectorVisible 
+      ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
+      : '24px'; // 기본 right-6 (24px)
+
     return (
       <button
         onClick={() => {
@@ -180,15 +227,24 @@ const ChatBot: React.FC = () => {
           ]);
           setIsOpen(true);
         }}
-        className="fixed bottom-20 right-6 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors"
+        className="fixed bottom-16 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300"
+        style={{ right: rightPosition }}
       >
         <MessageSquare size={24} />
       </button>
     );
   }
 
+  // 채팅창이 열렸을 때도 NodeInspector 위치 고려
+  const chatRightPosition = isNodeInspectorVisible 
+    ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
+    : '24px'; // 기본 right-6 (24px)
+
   return (
-    <div className="fixed bottom-20 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700">
+    <div 
+      className="fixed bottom-16 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 transition-all duration-300"
+      style={{ right: chatRightPosition }}
+    >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
         <h3 className="font-semibold">Workflow Assistant</h3>
         <button

@@ -428,6 +428,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     <div 
       className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10 relative"
       style={{ width: `${width}px` }}
+      data-testid="node-inspector"
     >
       {/* 크기 조절 핸들 */}
       <div
