@@ -8,6 +8,55 @@ interface Message {
   timestamp: Date;
 }
 
+// 기본 마크다운 파서 함수
+const parseBasicMarkdown = (text) => {
+  try {
+    return text
+      // Bold: **text** 또는 __text__
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.*?)__/g, '<strong>$1</strong>')
+      // Italic: *text* 또는 _text_ (단, **text**와 겹치지 않도록 주의)
+      .replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/(?<!_)_(?!_)([^_]+?)(?<!_)_(?!_)/g, '<em>$1</em>')
+      // Inline code: `code`
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+      // Links: [text](url)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>')
+      // Line breaks
+      .replace(/\n/g, '<br>');
+  } catch (error) {
+    console.error('Markdown parsing error:', error);
+    return text;
+  }
+};
+
+// 안전한 마크다운 렌더링 컴포넌트
+const SafeMarkdown: React.FC<{ content: string }> = ({ content }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [content]);
+
+  if (hasError) {
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  }
+
+  try {
+    const html = parseBasicMarkdown(content);
+    return (
+      <div 
+        className="text-sm prose prose-sm max-w-none dark:prose-invert"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  } catch (error) {
+    console.error('Markdown rendering error:', error);
+    setHasError(true);
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  }
+};
+
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null); // State for the unique chat ID
@@ -38,6 +87,12 @@ const ChatBot: React.FC = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // 마크다운 감지 함수
+  const isMarkdownContent = (content) => {
+    // 기본적인 마크다운 문법이 있는지 확인
+    return /(\*\*|__|\*|_|`|\[|\]|#)/.test(content);
   };
 
   // 쳇팅창 크기 계산 함수
@@ -358,7 +413,11 @@ const ChatBot: React.FC = () => {
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              {message.type === 'bot' && isMarkdownContent(message.content) ? (
+                <SafeMarkdown content={message.content} />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
               <p className="text-xs mt-1 opacity-70">
                 {message.timestamp.toLocaleTimeString()}
               </p>

@@ -394,3 +394,91 @@ body {
 .dark .chat-messages::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* 마크다운 렌더링 스타일 */
+.prose {
+  color: inherit;
+}
+
+.prose strong {
+  font-weight: 600;
+  color: inherit;
+}
+
+.prose em {
+  font-style: italic;
+  color: inherit;
+}
+
+.prose code {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+}
+
+.dark .prose code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.prose a:hover {
+  color: #1d4ed8;
+}
+
+.dark .prose a {
+  color: #60a5fa;
+}
+
+.dark .prose a:hover {
+  color: #93c5fd;
+}
+
+/* 쳇팅창 내 마크다운 요소 스타일링 */
+.chat-messages .prose {
+  margin: 0;
+  padding: 0;
+}
+
+.chat-messages .prose strong {
+  font-weight: 600;
+}
+
+.chat-messages .prose em {
+  font-style: italic;
+}
+
+.chat-messages .prose code {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+  color: inherit;
+}
+
+.dark .chat-messages .prose code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-messages .prose a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.chat-messages .prose a:hover {
+  color: #1d4ed8;
+}
+
+.dark .chat-messages .prose a {
+  color: #60a5fa;
+}
+
+.dark .chat-messages .prose a:hover {
+  color: #93c5fd;
+}
