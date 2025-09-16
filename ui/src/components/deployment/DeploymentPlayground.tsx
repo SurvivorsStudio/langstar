@@ -71,14 +71,14 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
     }
   };
 
-  // start 노드에서 question 변수의 실제 키명 찾기
-  const getQuestionVariableKey = async (deployment: Deployment): Promise<string | null> => {
+  // start 노드 정보와 question 변수 정보 찾기
+  const getStartNodeInfo = async (deployment: Deployment): Promise<{startNodeName: string, questionVariableName: string} | null> => {
     try {
       let workflowSnapshot = deployment.versions?.[0]?.workflowSnapshot;
       
       // versions가 없으면 API를 호출해서 상세 정보 가져오기
       if (!workflowSnapshot) {
-        console.log(`[DeploymentPlayground] Loading deployment details for question variable: ${deployment.id}`);
+        console.log(`[DeploymentPlayground] Loading deployment details for start node info: ${deployment.id}`);
         const detailedDeployment = await apiService.getDeploymentStatus(deployment.id);
         
         if (!detailedDeployment.versions || detailedDeployment.versions.length === 0) {
@@ -101,6 +101,9 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
         return null;
       }
 
+      // start 노드의 이름 가져오기 (label 우선, 없으면 id 사용)
+      const startNodeName = startNode.data?.label || startNode.id || 'Start';
+
       // start 노드의 변수 중 selectVariable이 'question'인 것 찾기
       const variables = startNode.data?.config?.variables || [];
       const questionVariable = variables.find(variable => variable.selectVariable === 'question');
@@ -110,17 +113,22 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
         return null;
       }
 
-      console.log(`[DeploymentPlayground] Found question variable: ${questionVariable.name}`, {
+      console.log(`[DeploymentPlayground] Found start node and question variable:`, {
         deploymentId: deployment.id,
         deploymentName: deployment.name,
         deploymentVersion: deployment.version,
-        variableName: questionVariable.name,
-        variableType: questionVariable.type,
-        defaultValue: questionVariable.defaultValue
+        startNodeName: startNodeName,
+        questionVariableName: questionVariable.name,
+        questionVariableType: questionVariable.type,
+        questionDefaultValue: questionVariable.defaultValue
       });
-      return questionVariable.name;
+      
+      return {
+        startNodeName: startNodeName,
+        questionVariableName: questionVariable.name
+      };
     } catch (error) {
-      console.error('[DeploymentPlayground] Error finding question variable:', error);
+      console.error('[DeploymentPlayground] Error finding start node info:', error);
       return null;
     }
   };
@@ -142,54 +150,63 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
     setError(null);
 
     try {
-      // start 노드에서 question 변수의 실제 키명 찾기
-      const questionKey = await getQuestionVariableKey(selectedDeployment);
+      // start 노드 정보와 question 변수 정보 찾기
+      const startNodeInfo = await getStartNodeInfo(selectedDeployment);
       
       // API 요청 데이터 구성
-      let inputData: any;
-      if (questionKey) {
-        // 동적으로 찾은 키 사용
-        inputData = {
-          [questionKey]: inputMessage
+      let finalRequestData: any;
+      if (startNodeInfo) {
+        // 동적으로 찾은 start 노드 이름과 question 변수 사용
+        const questionData = {
+          [startNodeInfo.questionVariableName]: inputMessage
         };
-        console.log(`[DeploymentPlayground] Using dynamic key "${questionKey}" for input:`, {
+        
+        finalRequestData = {
+          [startNodeInfo.startNodeName]: questionData
+        };
+        
+        console.log(`[DeploymentPlayground] Using dynamic start node structure:`, {
           deploymentId: selectedDeployment.id,
           deploymentName: selectedDeployment.name,
           deploymentVersion: selectedDeployment.version,
           deploymentStatus: selectedDeployment.status,
-          questionKey: questionKey,
+          startNodeName: startNodeInfo.startNodeName,
+          questionVariableName: startNodeInfo.questionVariableName,
           inputMessage: inputMessage,
-          finalInputData: inputData,
+          questionData: questionData,
+          finalRequestData: finalRequestData,
           apiEndpoint: `/api/deployment/${selectedDeployment.id}/run`
         });
       } else {
-        // fallback: 기본 user_input 키 사용
-        inputData = {
-          user_input: inputMessage
+        // fallback: 기본 구조 사용
+        finalRequestData = {
+          "Start": {
+            user_input: inputMessage
+          }
         };
-        console.warn('[DeploymentPlayground] Using fallback key "user_input" for input:', {
+        console.warn('[DeploymentPlayground] Using fallback structure with "Start" node:', {
           deploymentId: selectedDeployment.id,
           deploymentName: selectedDeployment.name,
           deploymentVersion: selectedDeployment.version,
           deploymentStatus: selectedDeployment.status,
-          fallbackKey: 'user_input',
+          fallbackStructure: 'Start.user_input',
           inputMessage: inputMessage,
-          finalInputData: inputData,
+          finalRequestData: finalRequestData,
           apiEndpoint: `/api/deployment/${selectedDeployment.id}/run`
         });
       }
 
-      // 배포 실행
-      console.log(`[DeploymentPlayground] Sending API request to deployment`, {
+      // 배포 실행 - 이제 finalRequestData를 직접 전달 (input_data 래핑 없이)
+      console.log(`[DeploymentPlayground] Sending API request to deployment:`, {
         deploymentId: selectedDeployment.id,
         deploymentName: selectedDeployment.name,
         deploymentVersion: selectedDeployment.version,
         url: `/api/deployment/${selectedDeployment.id}/run`,
         method: 'POST',
-        requestBody: { input_data: inputData }
+        requestBody: finalRequestData
       });
       
-      const result = await apiService.runDeployment(selectedDeployment.id, inputData);
+      const result = await apiService.runDeployment(selectedDeployment.id, finalRequestData);
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
