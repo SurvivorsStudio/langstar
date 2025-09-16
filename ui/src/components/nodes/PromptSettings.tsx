@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import CodeEditor from '../CodeEditor';
 import { useFlowStore } from '../../store/flowStore';
 import { AlertCircle, Pencil, Check, Maximize2, FileText } from 'lucide-react';
@@ -14,6 +14,7 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const incomingEdge = edges.find(edge => edge.target === nodeId);
 
   const sourceOutput = incomingEdge?.data?.output || null;
@@ -24,6 +25,16 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
   // Get source node info
   const sourceNode = nodes.find(n => n.id === incomingEdge?.source);
+
+  // Auto focus and position cursor at the end when editing starts
+  useEffect(() => {
+    if (isEditingOutputVariable && inputRef.current) {
+      inputRef.current.focus();
+      // Position cursor at the end of the text
+      const value = inputRef.current.value;
+      inputRef.current.setSelectionRange(value.length, value.length);
+    }
+  }, [isEditingOutputVariable]);
 
   const handleOutputVariableChange = (value: string) => {
     if (!node || !node.data) {
@@ -63,9 +74,23 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
 
   return (
     <div className="space-y-4 p-4">
-
+      
+      {/* Node Type Section */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Node Type
+        </label>
+        <div className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+          {node.type}
+        </div>
+      </div>
+
+      <div>
+        <label className={`block text-sm font-medium mb-1 ${
+          !incomingEdge 
+            ? 'text-gray-400 dark:text-gray-500' 
+            : 'text-gray-700 dark:text-gray-300'
+        }`}>
           Output Variable
         </label>
         <div className="relative">
@@ -73,21 +98,25 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
             {isEditingOutputVariable ? (
               <>
                 <input
+                  ref={inputRef}
                   type="text"
                   id="promptOutputVariableInput"
                   value={node?.data.config?.outputVariable || ''}
                   onChange={(e) => handleOutputVariableChange(e.target.value)}
                   placeholder="Enter output variable name"
-                  className={`flex-grow px-3 py-2 border ${
-                    !hasValidOutput && availableVariables.length === 0 
-                      ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                      : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                  } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
-                  disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
+                  className={`flex-grow px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                    !incomingEdge
+                      ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                      : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+                  }`}
                 />
                 <button
                   onClick={() => setIsEditingOutputVariable(false)}
-                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0"
+                  className={`p-2 rounded-md flex-shrink-0 ${
+                    !incomingEdge
+                      ? 'text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
                   aria-label="Confirm output variable"
                 >
                   <Check size={18} />
@@ -95,19 +124,29 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ nodeId }) => {
               </>
             ) : (
               <>
-                <CustomSelect
-                  value={node?.data.config?.outputVariable || ''}
-                  onChange={handleOutputVariableChange}
-                  options={[
-                    ...(node?.data.config?.outputVariable && !availableVariables.includes(node.data.config.outputVariable)
-                      ? [{ value: node.data.config.outputVariable, label: `${node.data.config.outputVariable} (Custom)` }]
-                      : []),
-                    ...availableVariables.map(variable => ({ value: variable, label: variable }))
-                  ]}
-                  placeholder="Select output variable"
-                  disabled={!hasValidOutput && availableVariables.length === 0 && !node?.data.config?.outputVariable}
-                />
-                <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                <div className={!incomingEdge ? 'opacity-60' : ''}>
+                  <CustomSelect
+                    value={node?.data.config?.outputVariable || ''}
+                    onChange={handleOutputVariableChange}
+                    options={[
+                      ...(node?.data.config?.outputVariable && !availableVariables.includes(node.data.config.outputVariable)
+                        ? [{ value: node.data.config.outputVariable, label: `${node.data.config.outputVariable} (Custom)` }]
+                        : []),
+                      ...availableVariables.map(variable => ({ value: variable, label: variable }))
+                    ]}
+                    placeholder="Select output variable"
+                    disabled={!incomingEdge}
+                  />
+                </div>
+                <button 
+                  onClick={() => setIsEditingOutputVariable(true)} 
+                  className={`p-2 rounded-md flex-shrink-0 ${
+                    !incomingEdge
+                      ? 'text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`} 
+                  aria-label="Edit output variable"
+                >
                   <Pencil size={18} />
                 </button>
               </>
