@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Loader2, Copy, Check, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Loader2, Copy, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { Deployment } from '../../types/deployment';
 
@@ -71,6 +71,60 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
     }
   };
 
+  // start 노드에서 question 변수의 실제 키명 찾기
+  const getQuestionVariableKey = async (deployment: Deployment): Promise<string | null> => {
+    try {
+      let workflowSnapshot = deployment.versions?.[0]?.workflowSnapshot;
+      
+      // versions가 없으면 API를 호출해서 상세 정보 가져오기
+      if (!workflowSnapshot) {
+        console.log(`[DeploymentPlayground] Loading deployment details for question variable: ${deployment.id}`);
+        const detailedDeployment = await apiService.getDeploymentStatus(deployment.id);
+        
+        if (!detailedDeployment.versions || detailedDeployment.versions.length === 0) {
+          console.warn('[DeploymentPlayground] No versions found in deployment details');
+          return null;
+        }
+        
+        workflowSnapshot = detailedDeployment.versions[0].workflowSnapshot;
+      }
+
+      if (!workflowSnapshot || !workflowSnapshot.nodes) {
+        console.warn('[DeploymentPlayground] No workflow snapshot found');
+        return null;
+      }
+
+      // start 노드 찾기
+      const startNode = workflowSnapshot.nodes.find(node => node.type === 'startNode');
+      if (!startNode) {
+        console.warn('[DeploymentPlayground] No start node found in workflow');
+        return null;
+      }
+
+      // start 노드의 변수 중 selectVariable이 'question'인 것 찾기
+      const variables = startNode.data?.config?.variables || [];
+      const questionVariable = variables.find(variable => variable.selectVariable === 'question');
+      
+      if (!questionVariable) {
+        console.warn('[DeploymentPlayground] No variable with selectVariable="question" found in start node');
+        return null;
+      }
+
+      console.log(`[DeploymentPlayground] Found question variable: ${questionVariable.name}`, {
+        deploymentId: deployment.id,
+        deploymentName: deployment.name,
+        deploymentVersion: deployment.version,
+        variableName: questionVariable.name,
+        variableType: questionVariable.type,
+        defaultValue: questionVariable.defaultValue
+      });
+      return questionVariable.name;
+    } catch (error) {
+      console.error('[DeploymentPlayground] Error finding question variable:', error);
+      return null;
+    }
+  };
+
   // 메시지 전송
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedDeployment) return;
@@ -88,10 +142,54 @@ const DeploymentPlayground: React.FC<DeploymentPlaygroundProps> = ({
     setError(null);
 
     try {
+      // start 노드에서 question 변수의 실제 키명 찾기
+      const questionKey = await getQuestionVariableKey(selectedDeployment);
+      
+      // API 요청 데이터 구성
+      let inputData: any;
+      if (questionKey) {
+        // 동적으로 찾은 키 사용
+        inputData = {
+          [questionKey]: inputMessage
+        };
+        console.log(`[DeploymentPlayground] Using dynamic key "${questionKey}" for input:`, {
+          deploymentId: selectedDeployment.id,
+          deploymentName: selectedDeployment.name,
+          deploymentVersion: selectedDeployment.version,
+          deploymentStatus: selectedDeployment.status,
+          questionKey: questionKey,
+          inputMessage: inputMessage,
+          finalInputData: inputData,
+          apiEndpoint: `/api/deployment/${selectedDeployment.id}/run`
+        });
+      } else {
+        // fallback: 기본 user_input 키 사용
+        inputData = {
+          user_input: inputMessage
+        };
+        console.warn('[DeploymentPlayground] Using fallback key "user_input" for input:', {
+          deploymentId: selectedDeployment.id,
+          deploymentName: selectedDeployment.name,
+          deploymentVersion: selectedDeployment.version,
+          deploymentStatus: selectedDeployment.status,
+          fallbackKey: 'user_input',
+          inputMessage: inputMessage,
+          finalInputData: inputData,
+          apiEndpoint: `/api/deployment/${selectedDeployment.id}/run`
+        });
+      }
+
       // 배포 실행
-      const result = await apiService.runDeployment(selectedDeployment.id, {
-        user_input: inputMessage
+      console.log(`[DeploymentPlayground] Sending API request to deployment`, {
+        deploymentId: selectedDeployment.id,
+        deploymentName: selectedDeployment.name,
+        deploymentVersion: selectedDeployment.version,
+        url: `/api/deployment/${selectedDeployment.id}/run`,
+        method: 'POST',
+        requestBody: { input_data: inputData }
       });
+      
+      const result = await apiService.runDeployment(selectedDeployment.id, inputData);
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
