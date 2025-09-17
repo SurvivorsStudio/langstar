@@ -3,6 +3,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 
 import types
@@ -517,6 +518,20 @@ def evaluate_condition({argument_name}):
                     WorkflowService.MEMORY_STORE[chat_id][memory_group_name] = memory 
                 
                 memory = WorkflowService.MEMORY_STORE[chat_id][memory_group_name]
+
+            elif memory_type == "ConversationBufferWindowMemory" : 
+                # Window size 가져오기 (기본값: 5)
+                window_size = msg.get('memory_window_size', 5) 
+                if chat_id not in WorkflowService.MEMORY_STORE:
+                    memory = ConversationBufferWindowMemory(k=window_size, return_messages=True)
+                    WorkflowService.MEMORY_STORE[chat_id] = {memory_group_name: memory}
+                elif memory_group_name not in WorkflowService.MEMORY_STORE[chat_id]:
+                    memory = ConversationBufferWindowMemory(k=window_size, return_messages=True)
+                    WorkflowService.MEMORY_STORE[chat_id][memory_group_name] = memory 
+                
+                memory = WorkflowService.MEMORY_STORE[chat_id][memory_group_name] 
+
+
                 
                 
             if msg['model']['providerName'] == 'aws' : 
@@ -658,4 +673,59 @@ def evaluate_condition({argument_name}):
             raise
 
     # Memory store for agent nodes
-    MEMORY_STORE = {} 
+    MEMORY_STORE = {}
+    
+    @staticmethod
+    def clear_all_memory():
+        """전체 메모리 스토어 초기화"""
+        WorkflowService.MEMORY_STORE.clear()
+        logger.info("All memory cleared from MEMORY_STORE")
+        return {"success": True, "message": "All memory cleared"}
+    
+    @staticmethod
+    def clear_chat_memory(chat_id: str):
+        """특정 채팅 ID의 모든 메모리 삭제"""
+        if chat_id in WorkflowService.MEMORY_STORE:
+            del WorkflowService.MEMORY_STORE[chat_id]
+            logger.info(f"Memory cleared for chat_id: {chat_id}")
+            return {"success": True, "message": f"Memory cleared for chat_id: {chat_id}"}
+        else:
+            logger.warning(f"No memory found for chat_id: {chat_id}")
+            return {"success": False, "message": f"No memory found for chat_id: {chat_id}"}
+    
+    @staticmethod
+    def clear_memory_group(chat_id: str, memory_group_name: str):
+        """특정 채팅 ID의 특정 메모리 그룹 삭제"""
+        if chat_id in WorkflowService.MEMORY_STORE:
+            if memory_group_name in WorkflowService.MEMORY_STORE[chat_id]:
+                del WorkflowService.MEMORY_STORE[chat_id][memory_group_name]
+                logger.info(f"Memory group '{memory_group_name}' cleared for chat_id: {chat_id}")
+                
+                # 해당 chat_id에 더 이상 그룹이 없으면 chat_id 자체도 삭제
+                if not WorkflowService.MEMORY_STORE[chat_id]:
+                    del WorkflowService.MEMORY_STORE[chat_id]
+                
+                return {"success": True, "message": f"Memory group '{memory_group_name}' cleared for chat_id: {chat_id}"}
+            else:
+                logger.warning(f"No memory group '{memory_group_name}' found for chat_id: {chat_id}")
+                return {"success": False, "message": f"No memory group '{memory_group_name}' found for chat_id: {chat_id}"}
+        else:
+            logger.warning(f"No memory found for chat_id: {chat_id}")
+            return {"success": False, "message": f"No memory found for chat_id: {chat_id}"}
+    
+    @staticmethod
+    def get_memory_status():
+        """메모리 스토어 상태 조회"""
+        status = {
+            "total_chat_sessions": len(WorkflowService.MEMORY_STORE),
+            "memory_details": {}
+        }
+        
+        for chat_id, groups in WorkflowService.MEMORY_STORE.items():
+            status["memory_details"][chat_id] = {
+                "group_count": len(groups),
+                "groups": list(groups.keys())
+            }
+        
+        logger.info(f"Memory status retrieved: {len(WorkflowService.MEMORY_STORE)} chat sessions")
+        return status 

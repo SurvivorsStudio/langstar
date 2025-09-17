@@ -189,4 +189,69 @@ def undeploy_workflow(msg: dict = Body(...)):
         # return result
     except Exception as e:
         logger.error(f"Error in workflow undeploy endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 메모리 관리 API 엔드포인트들
+@router.post('/workflow/memory/clear-all')
+def clear_all_memory():
+    """전체 메모리 스토어 초기화"""
+    try:
+        logger.info("Received clear all memory request")
+        result = WorkflowService.clear_all_memory()
+        logger.info("Clear all memory request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in clear all memory endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/workflow/memory/clear-chat')
+def clear_chat_memory(msg: dict = Body(...)):
+    """특정 채팅 ID의 메모리 삭제"""
+    try:
+        chat_id = msg.get('chat_id')
+        if not chat_id:
+            raise HTTPException(status_code=400, detail="chat_id is required")
+        
+        logger.info(f"Received clear chat memory request for chat_id: {chat_id}")
+        result = WorkflowService.clear_chat_memory(chat_id)
+        logger.info(f"Clear chat memory request processed successfully for chat_id: {chat_id}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in clear chat memory endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/workflow/memory/clear-group')
+def clear_memory_group(msg: dict = Body(...)):
+    """특정 채팅 ID의 특정 메모리 그룹 삭제"""
+    try:
+        chat_id = msg.get('chat_id')
+        memory_group_name = msg.get('memory_group_name')
+        
+        if not chat_id:
+            raise HTTPException(status_code=400, detail="chat_id is required")
+        if not memory_group_name:
+            raise HTTPException(status_code=400, detail="memory_group_name is required")
+        
+        logger.info(f"Received clear memory group request for chat_id: {chat_id}, group: {memory_group_name}")
+        result = WorkflowService.clear_memory_group(chat_id, memory_group_name)
+        logger.info(f"Clear memory group request processed successfully for chat_id: {chat_id}, group: {memory_group_name}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in clear memory group endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get('/workflow/memory/status')
+def get_memory_status():
+    """메모리 스토어 상태 조회"""
+    try:
+        logger.info("Received memory status request")
+        result = WorkflowService.get_memory_status()
+        logger.info("Memory status request processed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"Error in memory status endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) 
