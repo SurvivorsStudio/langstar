@@ -376,6 +376,7 @@ const ChatBot: React.FC = () => {
           <button
             onClick={async () => {
               setIsOpen(false);
+
               // 메모리 삭제 API 호출 (챗봇 닫힐 때)
               console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
               
@@ -402,6 +403,7 @@ const ChatBot: React.FC = () => {
                 }
               } else {
                 console.log('[ChatBot] No chat ID available, skipping memory clear');
+
               }
             }}
             className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600"
