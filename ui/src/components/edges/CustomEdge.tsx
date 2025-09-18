@@ -655,9 +655,12 @@ const CustomEdge = ({
                 - 진행 중 또는 성공: 민트 유지
                 - 실패: 빨강
                 - 경고: 노랑
-                - 리셋(다른 실행 시작 시): 기본 보라/회색 */}
+                - PENDING 또는 값 없음: 회색
+                - 실제 데이터 있음: 보라색 */}
             <div className={`absolute inset-2 rounded-full transition-colors duration-300 ${
-              !data?.output || (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
+              !data?.output || 
+              data?.output === 'PENDING' ||
+              (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
                 ? 'bg-gray-300'
                 : (hasProgressAnimation || hasSuccessAnimation)
                   ? 'bg-teal-500'
@@ -669,7 +672,9 @@ const CustomEdge = ({
             }`}></div>
             {/* 중심 원 - 입력 데이터 유무 및 상태에 따른 색상 */}
             <div className={`absolute inset-4 rounded-full flex items-center justify-center transition-colors duration-300 ${
-              !data?.output || (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
+              !data?.output || 
+              data?.output === 'PENDING' ||
+              (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
                 ? 'bg-gray-400'
                 : (hasProgressAnimation || hasSuccessAnimation)
                   ? 'bg-teal-600'

@@ -71,8 +71,7 @@ const ChatBot: React.FC = () => {
   const { 
     nodes, 
     updateNodeData, 
-    runWorkflow,
-    setEdgeOutput // setEdgeOutput 액션 추가
+    runWorkflow
   } = useFlowStore(state => ({ ...state }));
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -226,15 +225,8 @@ const ChatBot: React.FC = () => {
         console.warn("[ChatBot] No variable with selectVariable='question' found in startNode, or variables array is missing. Proceeding without updating startNode.");
       }
 
-      // 워크플로우 실행 전 모든 엣지와 노드의 output 초기화
-      console.log('[ChatBot] Initializing all edges to PENDING state for new workflow cycle.');
-      
-      // 모든 엣지를 PENDING 상태로 초기화 (순환 구조 지원)
-      const currentEdges = useFlowStore.getState().edges;
-      currentEdges.forEach(edge => {
-        setEdgeOutput(edge.id, 'PENDING');  // 명확한 대기 상태로 설정
-        console.log(`[ChatBot] Edge ${edge.id} set to PENDING state`);
-      });
+      // 워크플로우 실행 전 노드 output 초기화 (edge는 runWorkflow에서 처리)
+      console.log('[ChatBot] Clearing node outputs before workflow execution.');
       
       // 노드 output 초기화 (startNode와 endNode 제외)
       const currentNodes = useFlowStore.getState().nodes;
