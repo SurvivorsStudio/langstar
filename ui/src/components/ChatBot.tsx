@@ -376,21 +376,34 @@ const ChatBot: React.FC = () => {
           <button
             onClick={async () => {
               setIsOpen(false);
-              // API 호출 (챗봇 닫힐 때)
+
+              // 메모리 삭제 API 호출 (챗봇 닫힐 때)
               console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
-              try {
-                // 여기에 API 호출 로직을 추가하세요. 예:
-                // const response = await fetch('/api/chatbot/event', {
-                //   method: 'POST',
-                //   body: JSON.stringify({ chatId: chatId, event: 'closed' }),
-                //   headers: { 'Content-Type': 'application/json' },
-                // });
-                // if (!response.ok) {
-                //   throw new Error('API call failed on close');
-                // }
-                // console.log('[ChatBot] Close event API call successful');
-              } catch (error) {
-                console.error('[ChatBot] Error calling API on close:', error);
+              
+              if (chatId) {
+                try {
+                  const response = await fetch('http://localhost:8000/workflow/memory/clear-chat', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ chat_id: chatId }),
+                  });
+                  
+                  if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Memory clear API failed with status ${response.status}: ${errorText}`);
+                  }
+                  
+                  const result = await response.json();
+                  console.log('[ChatBot] Memory cleared successfully:', result);
+                } catch (error) {
+                  console.error('[ChatBot] Error clearing memory on close:', error);
+                  // 메모리 삭제 실패해도 UI는 정상적으로 닫기
+                }
+              } else {
+                console.log('[ChatBot] No chat ID available, skipping memory clear');
+
               }
             }}
             className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600"
