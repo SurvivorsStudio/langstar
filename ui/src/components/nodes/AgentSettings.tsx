@@ -371,7 +371,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
             onChange={handleModelChange}
             options={activeConnections.map(conn => ({
               value: conn.id,
-              label: `${conn.name} (${conn.model})`
+              label: conn.name.length > 40 ? conn.name.substring(0, 37) + '...' : conn.name
             }))}
             placeholder="Select a model"
             disabled={activeConnections.length === 0}
