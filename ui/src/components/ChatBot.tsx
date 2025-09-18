@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Loader } from 'lucide-react';
+import { MessageSquare, X, Send, Loader, Minimize2, Maximize2 } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore'; // flowStore import
 
 interface Message {
@@ -8,12 +8,64 @@ interface Message {
   timestamp: Date;
 }
 
+// 기본 마크다운 파서 함수
+const parseBasicMarkdown = (text) => {
+  try {
+    return text
+      // Bold: **text** 또는 __text__
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.*?)__/g, '<strong>$1</strong>')
+      // Italic: *text* 또는 _text_ (단, **text**와 겹치지 않도록 주의)
+      .replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/(?<!_)_(?!_)([^_]+?)(?<!_)_(?!_)/g, '<em>$1</em>')
+      // Inline code: `code`
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+      // Links: [text](url)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>')
+      // Line breaks
+      .replace(/\n/g, '<br>');
+  } catch (error) {
+    console.error('Markdown parsing error:', error);
+    return text;
+  }
+};
+
+// 안전한 마크다운 렌더링 컴포넌트
+const SafeMarkdown: React.FC<{ content: string }> = ({ content }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [content]);
+
+  if (hasError) {
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  }
+
+  try {
+    const html = parseBasicMarkdown(content);
+    return (
+      <div 
+        className="text-sm prose prose-sm max-w-none dark:prose-invert"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  } catch (error) {
+    console.error('Markdown rendering error:', error);
+    setHasError(true);
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  }
+};
+
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null); // State for the unique chat ID
   // NodeInspector 감지를 위한 상태 추가
   const [nodeInspectorWidth, setNodeInspectorWidth] = useState(0);
   const [isNodeInspectorVisible, setIsNodeInspectorVisible] = useState(false);
+  // 쳇팅창 크기 상태 관리
+  const [chatSize, setChatSize] = useState<'default' | 'expanded'>('default');
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   // flowStore에서 endNode의 output을 가져옵니다.
   // 필요한 상태와 액션을 모두 가져옵니다.
   const { 
@@ -37,9 +89,52 @@ const ChatBot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // 마크다운 감지 함수
+  const isMarkdownContent = (content) => {
+    // 기본적인 마크다운 문법이 있는지 확인
+    return /(\*\*|__|\*|_|`|\[|\]|#)/.test(content);
+  };
+
+  // 쳇팅창 크기 계산 함수
+  const getChatSize = () => {
+    const { width, height } = windowSize;
+    
+    if (chatSize === 'expanded') {
+      // 확대 모드: 사용 가능한 공간의 60% (최대 800px)
+      // NodeInspector가 있을 때는 더 작게 조정
+      const availableWidth = isNodeInspectorVisible ? width - nodeInspectorWidth - 48 : width;
+      const maxWidth = Math.min(availableWidth * 0.6, 800);
+      const maxHeight = Math.min(height * 0.8, 700);
+      
+      // 최소 너비 보장 (NodeInspector가 있을 때도 최소 400px)
+      const finalWidth = Math.max(maxWidth, 400);
+      
+      return {
+        width: `${finalWidth}px`,
+        height: `${maxHeight}px`
+      };
+    } else {
+      // 기본 모드: 기존 크기 유지
+      return {
+        width: '384px', // w-96
+        height: '600px'
+      };
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]); // 메시지 목록이나 로딩 상태가 변경될 때 스크롤
+
+  // 브라우저 크기 감지
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // 챗봇 창이 열릴 때 스크롤을 맨 아래로 이동
@@ -207,9 +302,15 @@ const ChatBot: React.FC = () => {
 
   if (!isOpen) {
     // NodeInspector가 표시될 때 버튼 위치 조정
-    const rightPosition = isNodeInspectorVisible 
-      ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
-      : '24px'; // 기본 right-6 (24px)
+    const getButtonPosition = () => {
+      if (isNodeInspectorVisible) {
+        return `${nodeInspectorWidth + 24}px`;  // NodeInspector 너비 + 24px 여백
+      } else {
+        return '24px'; // 기본 right-6 (24px)
+      }
+    };
+
+    const rightPosition = getButtonPosition();
 
     return (
       <button
@@ -236,44 +337,83 @@ const ChatBot: React.FC = () => {
   }
 
   // 채팅창이 열렸을 때도 NodeInspector 위치 고려
-  const chatRightPosition = isNodeInspectorVisible 
-    ? `${nodeInspectorWidth + 24}px`  // NodeInspector 너비 + 24px 여백
-    : '24px'; // 기본 right-6 (24px)
+  const getChatPosition = () => {
+    if (chatSize === 'expanded' && isNodeInspectorVisible) {
+      // 확대 모드에서 NodeInspector가 있을 때는 더 큰 여백 필요
+      return `${nodeInspectorWidth + 48}px`;
+    } else if (isNodeInspectorVisible) {
+      // 기본 모드에서 NodeInspector가 있을 때
+      return `${nodeInspectorWidth + 24}px`;
+    } else {
+      // NodeInspector가 없을 때
+      return '24px';
+    }
+  };
+
+  const chatRightPosition = getChatPosition();
+
+  const chatSizeStyle = getChatSize();
 
   return (
     <div 
-      className="fixed bottom-16 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 transition-all duration-300"
-      style={{ right: chatRightPosition }}
+      className={`fixed bottom-16 bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col border border-gray-200 dark:border-gray-700 chat-window ${chatSize}`}
+      style={{ 
+        right: chatRightPosition,
+        width: chatSizeStyle.width,
+        height: chatSizeStyle.height
+      }}
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-blue-500 text-white rounded-t-lg">
         <h3 className="font-semibold">Workflow Assistant</h3>
-        <button
-          onClick={async () => {
-            setIsOpen(false);
-            // API 호출 (챗봇 닫힐 때)
-            console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
-            try {
-              // 여기에 API 호출 로직을 추가하세요. 예:
-              // const response = await fetch('/api/chatbot/event', {
-              //   method: 'POST',
-              //   body: JSON.stringify({ chatId: chatId, event: 'closed' }),
-              //   headers: { 'Content-Type': 'application/json' },
-              // });
-              // if (!response.ok) {
-              //   throw new Error('API call failed on close');
-              // }
-              // console.log('[ChatBot] Close event API call successful');
-            } catch (error) {
-              console.error('[ChatBot] Error calling API on close:', error);
-            }
-          }}
-          className="text-white hover:text-gray-200 transition-colors"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setChatSize(chatSize === 'default' ? 'expanded' : 'default')}
+            className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600 chat-resize-button"
+            title={chatSize === 'default' ? '확대' : '축소'}
+          >
+            {chatSize === 'default' ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+          </button>
+          <button
+            onClick={async () => {
+              setIsOpen(false);
+
+              // 메모리 삭제 API 호출 (챗봇 닫힐 때)
+              console.log(`[ChatBot] Closing chat. Chat ID: ${chatId}`);
+              
+              if (chatId) {
+                try {
+                  const response = await fetch('http://localhost:8000/workflow/memory/clear-chat', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ chat_id: chatId }),
+                  });
+                  
+                  if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Memory clear API failed with status ${response.status}: ${errorText}`);
+                  }
+                  
+                  const result = await response.json();
+                  console.log('[ChatBot] Memory cleared successfully:', result);
+                } catch (error) {
+                  console.error('[ChatBot] Error clearing memory on close:', error);
+                  // 메모리 삭제 실패해도 UI는 정상적으로 닫기
+                }
+              } else {
+                console.log('[ChatBot] No chat ID available, skipping memory clear');
+
+              }
+            }}
+            className="text-white hover:text-gray-200 transition-colors p-1 rounded hover:bg-blue-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-messages">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -286,7 +426,11 @@ const ChatBot: React.FC = () => {
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              {message.type === 'bot' && isMarkdownContent(message.content) ? (
+                <SafeMarkdown content={message.content} />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
               <p className="text-xs mt-1 opacity-70">
                 {message.timestamp.toLocaleTimeString()}
               </p>
