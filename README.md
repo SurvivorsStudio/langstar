@@ -1,4 +1,6 @@
+
 ![LangStar Project Logo](./ReadMe/langstar1.png)+
+
 
 > 🚧 **LangStar is currently under development.**
 > This project is currently in active development. Features, structure, and documentation may change frequently.
@@ -277,21 +279,28 @@ npm run setup-python:darwin  # Windows의 경우 setup-python:win32
 1. **워크플로우 생성**  
    드래그 앤 드롭 방식으로 LLM 에이전트 파이프라인을 구축하세요.
 
+
    ![워크플로우 생성](./ReadMe/langstar2.png)
+
 
 2. **워크플로우 및 AI 연결 관리**  
    에이전트 플로우, API 키, 실행 설정을 체계적으로 관리하세요.
 
+
    ![설정 관리](./ReadMe/langstar3.png)
+
 
 3. **실시간 에이전트 채팅**  
    완성된 워크플로우를 기반으로 로컬에서 실행되는 에이전트와 실시간으로 대화하세요.
 
+
    ![채팅 인터페이스](./ReadMe/langstar4.png)
+
 
 4. **실시간 디버깅 - 노드별 개별 실행**  
    설계 단계에서 각 노드를 개별적으로 실행하고 검사하세요.  
    중간 출력을 확인하고 문제를 조기에 해결할 수 있습니다.
+
 
    ![노드 디버깅](./ReadMe/langstar5.png)
 
