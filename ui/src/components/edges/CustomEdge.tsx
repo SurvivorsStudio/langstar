@@ -34,13 +34,15 @@ const CustomEdge = ({
   const sourceNode = nodes.find(n => n.id === source);
   const isEdgeTextFocused = focusedElement.type === 'edge' && focusedElement.id === id;
   
-  // 성공/실패/진행 상태 확인
+  // 성공/실패/진행/경고 상태 확인
   const isSuccess = data?.isSuccess;
   const isFailure = data?.isFailure;
   const isExecuting = data?.isExecuting;
+  const isWarning = data?.isWarning; // 제약 조건 위반 경고 상태
   const hasSuccessAnimation = isSuccess;
   const hasFailureAnimation = isFailure;
   const hasProgressAnimation = isExecuting;
+  const hasWarningState = isWarning;
   // 펄스: 기본 1초 유지, 진행 중이면 계속 유지, 완료되면 1초 후 종료
   const [showPulse, setShowPulse] = React.useState(false);
   React.useEffect(() => {
@@ -55,9 +57,14 @@ const CustomEdge = ({
       const t = setTimeout(() => setShowPulse(false), 1000);
       return () => clearTimeout(t);
     }
+    // 경고 상태는 지속적으로 펄스 (타이머 없음)
+    if (hasWarningState) {
+      setShowPulse(true);
+      return;
+    }
     // 아무 상태도 없으면 펄스 끔
     setShowPulse(false);
-  }, [hasSuccessAnimation, hasFailureAnimation, hasProgressAnimation]);
+  }, [hasSuccessAnimation, hasFailureAnimation, hasProgressAnimation, hasWarningState]);
   
   
   
@@ -502,6 +509,19 @@ const CustomEdge = ({
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
         </marker>
+        
+        <marker
+          id="arrow-warning-solid"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="10"
+          markerHeight="10"
+          markerUnits="userSpaceOnUse"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#facc15" />
+        </marker>
       </defs>
       
       {/* 메인 edge 경로 - 두 개의 연결선으로 분리 */}
@@ -514,11 +534,12 @@ const CustomEdge = ({
           hasSuccessAnimation ? "0" : 
           hasFailureAnimation ? "0" : 
           hasProgressAnimation ? "8,4" : 
+          hasWarningState ? "0" :
           "5,5"
         }
         fill="none"
         style={{ 
-          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation) ? 3 : (isDragging ? 3 : 2),
+          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation || hasWarningState) ? 3 : (isDragging ? 3 : 2),
           // 부드러운 곡선을 위한 선 스타일
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
@@ -526,6 +547,7 @@ const CustomEdge = ({
           stroke: hasSuccessAnimation ? "#10b981" : 
                   hasFailureAnimation ? "#ef4444" : 
                   hasProgressAnimation ? "#f59e0b" : 
+                  hasWarningState ? "#facc15" :
                   "#97A2B6",
           // 상태별 글로우 효과
           filter: hasSuccessAnimation
@@ -534,6 +556,8 @@ const CustomEdge = ({
             ? 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.7))'
             : hasProgressAnimation
             ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))'
+            : hasWarningState
+            ? 'drop-shadow(0 0 6px rgba(250, 204, 21, 0.7))'
             : 'none',
           // 베지어 곡선의 자연스러움 강조
           // 좌측 연결선도 우측과 완벽하게 동일한 품질
@@ -550,17 +574,19 @@ const CustomEdge = ({
           hasSuccessAnimation ? "url(#arrow-success-solid)" : 
           hasFailureAnimation ? "url(#arrow-failure-solid)" : 
           hasProgressAnimation ? "url(#arrow-progress-solid)" : 
+          hasWarningState ? "url(#arrow-warning-solid)" :
           "url(#arrow)"
         }
         strokeDasharray={
           hasSuccessAnimation ? "0" : 
           hasFailureAnimation ? "0" : 
           hasProgressAnimation ? "8,4" : 
+          hasWarningState ? "0" :
           "5,5"
         }
         fill="none"
         style={{ 
-          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation) ? 3 : (isDragging ? 3 : 2),
+          strokeWidth: hasProgressAnimation ? 5 : (hasSuccessAnimation || hasFailureAnimation || hasWarningState) ? 3 : (isDragging ? 3 : 2),
           // 부드러운 곡선을 위한 선 스타일
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
@@ -568,6 +594,7 @@ const CustomEdge = ({
           stroke: hasSuccessAnimation ? "#10b981" : 
                   hasFailureAnimation ? "#ef4444" : 
                   hasProgressAnimation ? "#f59e0b" : 
+                  hasWarningState ? "#facc15" :
                   "#97A2B6",
           // 상태별 글로우 효과
           filter: hasSuccessAnimation
@@ -576,6 +603,8 @@ const CustomEdge = ({
             ? 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.7))'
             : hasProgressAnimation
             ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))'
+            : hasWarningState
+            ? 'drop-shadow(0 0 6px rgba(250, 204, 21, 0.7))'
             : 'none',
           // 베지어 곡선의 자연스러움 강조
           // 우측 연결선도 좌측과 완벽하게 동일한 품질
@@ -625,6 +654,7 @@ const CustomEdge = ({
             {/* 내부 링 - 입력 데이터 유무 및 상태에 따른 색상
                 - 진행 중 또는 성공: 민트 유지
                 - 실패: 빨강
+                - 경고: 노랑
                 - 리셋(다른 실행 시작 시): 기본 보라/회색 */}
             <div className={`absolute inset-2 rounded-full transition-colors duration-300 ${
               !data?.output || (typeof data.output === 'object' && Object.keys(data.output || {}).length === 0)
@@ -633,7 +663,9 @@ const CustomEdge = ({
                   ? 'bg-teal-500'
                   : hasFailureAnimation
                     ? 'bg-red-500'
-                    : 'bg-purple-500'
+                    : hasWarningState
+                      ? 'bg-yellow-400'
+                      : 'bg-purple-500'
             }`}></div>
             {/* 중심 원 - 입력 데이터 유무 및 상태에 따른 색상 */}
             <div className={`absolute inset-4 rounded-full flex items-center justify-center transition-colors duration-300 ${
@@ -643,7 +675,9 @@ const CustomEdge = ({
                   ? 'bg-teal-600'
                   : hasFailureAnimation
                     ? 'bg-red-600'
-                    : 'bg-purple-600'
+                    : hasWarningState
+                      ? 'bg-yellow-500'
+                      : 'bg-purple-600'
             }`}>
               {/* 데이터베이스 아이콘 */}
               <Database size={20} className="text-white" />
@@ -660,6 +694,9 @@ const CustomEdge = ({
                 )}
                 {hasProgressAnimation && (
                   <div className="absolute inset-0 rounded-full bg-orange-400 opacity-50 animate-pulse"></div>
+                )}
+                {hasWarningState && (
+                  <div className="absolute inset-0 rounded-full bg-yellow-400 opacity-50 animate-pulse"></div>
                 )}
               </>
             )}

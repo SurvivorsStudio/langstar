@@ -226,16 +226,27 @@ const ChatBot: React.FC = () => {
         console.warn("[ChatBot] No variable with selectVariable='question' found in startNode, or variables array is missing. Proceeding without updating startNode.");
       }
 
-      // 워크플로우 실행 전 모든 엣지의 output 초기화
-      console.log('[ChatBot] Clearing all edge outputs before workflow execution.');
-      const currentEdges = useFlowStore.getState().edges; // 최신 엣지 목록 가져오기
+      // 워크플로우 실행 전 모든 엣지와 노드의 output 초기화
+      console.log('[ChatBot] Clearing all edge and node outputs before workflow execution.');
+      
+      // 엣지 output 초기화
+      const currentEdges = useFlowStore.getState().edges;
       currentEdges.forEach(edge => {
-        // data 객체가 있고 output이 null이 아닌 경우에만 초기화
         if (edge.data && edge.data.output !== null) {
           setEdgeOutput(edge.id, null);
         }
       });
-      console.log('[ChatBot] All edge outputs cleared.');
+      
+      // 노드 output 초기화 (startNode와 endNode 제외)
+      const currentNodes = useFlowStore.getState().nodes;
+      currentNodes.forEach(node => {
+        if (node.type !== 'startNode' && node.type !== 'endNode' && node.data.output !== null) {
+          console.log(`[ChatBot] Clearing output for node: ${node.id} (${node.data.label})`);
+          updateNodeData(node.id, { ...node.data, output: null, inputData: null });
+        }
+      });
+      
+      console.log('[ChatBot] All edge and node outputs cleared.');
 
       // 3. runWorkflow 실행
       console.log('[ChatBot] Starting workflow execution...');

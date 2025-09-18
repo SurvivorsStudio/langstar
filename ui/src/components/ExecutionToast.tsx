@@ -144,7 +144,7 @@ const ExecutionToast: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+    <div className="execution-toast-container fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map((toast) => (
         <ToastItem 
           key={toast.id} 
