@@ -227,14 +227,13 @@ const ChatBot: React.FC = () => {
       }
 
       // 워크플로우 실행 전 모든 엣지와 노드의 output 초기화
-      console.log('[ChatBot] Clearing all edge and node outputs before workflow execution.');
+      console.log('[ChatBot] Initializing all edges to PENDING state for new workflow cycle.');
       
-      // 엣지 output 초기화
+      // 모든 엣지를 PENDING 상태로 초기화 (순환 구조 지원)
       const currentEdges = useFlowStore.getState().edges;
       currentEdges.forEach(edge => {
-        if (edge.data && edge.data.output !== null) {
-          setEdgeOutput(edge.id, null);
-        }
+        setEdgeOutput(edge.id, 'PENDING');  // 명확한 대기 상태로 설정
+        console.log(`[ChatBot] Edge ${edge.id} set to PENDING state`);
       });
       
       // 노드 output 초기화 (startNode와 endNode 제외)

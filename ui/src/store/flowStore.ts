@@ -18,6 +18,13 @@ import { Deployment, DeploymentVersion, DeploymentStatus, DeploymentEnvironment,
 import { deploymentStore } from './deploymentStore';
 import { apiService } from '../services/apiService';
 
+// Edge 상태 상수 정의 - 순환 구조에서 명확한 대기 상태 구분
+export const EDGE_STATES = {
+  PENDING: 'PENDING',    // 대기 중 (merge가 기다려야 함)
+  NULL: null,            // 조건 불만족 또는 비활성화
+  // 실제 데이터는 객체 형태로 저장
+} as const;
+
 export interface NodeData {
   label: string;
   code?: string;
@@ -769,9 +776,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || 'data';
 
-    // 신규 엣지 초기 상태: 데이터/상태 모두 초기화
+    // 신규 엣지 초기 상태: PENDING으로 시작
     const edgeData: any = { 
-      output: null,
+      output: EDGE_STATES.PENDING,  // 명확한 대기 상태로 시작
       isExecuting: false,
       isSuccess: false,
       isFailure: false,
@@ -1624,8 +1631,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   get().setEdgeOutput(edge.id, input);
                   console.log(`🔀 [ConditionNode] Else 경로로 데이터 전달: ${edge.id}`);
                 } else {
-                  // 그 외의 경우 null로 설정
-                  get().setEdgeOutput(edge.id, null);
+                  // 그 외의 경우 명시적으로 NULL 상태로 설정
+                  get().setEdgeOutput(edge.id, EDGE_STATES.NULL);
                 }
               }
               
@@ -1680,8 +1687,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 get().setEdgeOutput(edge.id, inputForBranch);
                 console.log(`🔀 [ConditionNode] Else 경로로 데이터 전달: ${edge.id}`);
               } else {
-                // 그 외의 경우 null로 설정
-                get().setEdgeOutput(edge.id, null);
+                // 그 외의 경우 명시적으로 NULL 상태로 설정
+                get().setEdgeOutput(edge.id, EDGE_STATES.NULL);
               }
             }
             
@@ -1698,46 +1705,133 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           };
           break;
         case 'mergeNode': {
+          // 🎯 1단계: Merge 노드에 연결된 모든 incoming edge ID들 가져오기
           const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
+          const edgeIds = incomingEdges.map(edge => edge.id);
           
-          // 모든 source node가 완료되었는지 확인
-          const sourceNodeIds = [...new Set(incomingEdges.map(edge => edge.source))];
-          const completedSourceNodes = sourceNodeIds.filter(sourceId => {
-            const sourceNode = get().nodes.find(n => n.id === sourceId);
-            return sourceNode && sourceNode.data.output && !sourceNode.data.isExecuting;
+          console.log(`[MergeNode ${nodeId}] 연결된 Edge ID들:`, edgeIds);
+          console.log(`[MergeNode ${nodeId}] 총 ${edgeIds.length}개 edge 확인 시작`);
+          
+          // 🎯 2단계: 각 edge의 실제 데이터 존재 여부를 직접 확인
+          const edgeDataCheck = edgeIds.map(edgeId => {
+            const edge = get().edges.find(e => e.id === edgeId);
+            
+            // 🎯 Edge 데이터 존재 여부 확인 (이전 노드 롤백 상황 고려)
+            // 이전 노드가 롤백되면 edge 데이터도 다시 PENDING이나 NULL로 변경될 수 있음
+            const hasRealData = edge?.data?.output && 
+                               typeof edge.data.output === 'object' && 
+                               edge.data.output !== EDGE_STATES.PENDING &&
+                               edge.data.output !== EDGE_STATES.NULL &&
+                               edge.data.output !== null &&
+                               edge.data.output !== undefined;
+            
+            const edgeStatus = {
+              edgeId: edgeId,
+              sourceNode: edge?.source || 'unknown',
+              hasData: hasRealData,
+              currentOutput: edge?.data?.output,
+              outputType: typeof edge?.data?.output,
+              isPending: edge?.data?.output === EDGE_STATES.PENDING,
+              isNull: edge?.data?.output === EDGE_STATES.NULL || edge?.data?.output === null,
+              timestamp: edge?.data?.timestamp || 0
+            };
+            
+            console.log(`[MergeNode ${nodeId}] Edge ${edgeId} 체크:`, edgeStatus);
+            return edgeStatus;
           });
           
-          // 모든 source node가 완료되지 않았다면 대기
-          if (completedSourceNodes.length < sourceNodeIds.length) {
-            console.log(`[MergeNode ${nodeId}] Waiting for all source nodes to complete. Completed: ${completedSourceNodes.length}/${sourceNodeIds.length}`);
+          // 🎯 3단계: Edge 데이터 기반으로 merge 시작 시점 결정
+          const edgesWithRealData = edgeDataCheck.filter(check => check.hasData);
+          const pendingEdgesCount = edgeDataCheck.filter(check => check.isPending).length;
+          const nullEdgesCount = edgeDataCheck.filter(check => check.isNull).length;
+          
+          console.log(`[MergeNode ${nodeId}] Edge 데이터 상태 종합:`, {
+            총Edge수: edgeIds.length,
+            실제데이터있음: edgesWithRealData.length,
+            PENDING상태: pendingEdgesCount,
+            NULL상태: nullEdgesCount,
+            준비완료비율: `${edgesWithRealData.length}/${edgeIds.length}`
+          });
+          
+          // 🎯 4단계: 이전 노드 롤백 상황 고려 - 엄격한 edge 데이터 검증
+          // 모든 edge에 실제 데이터가 있어야만 merge 시작 (롤백 시 대기 상태로 복귀)
+          const allEdgesHaveData = edgesWithRealData.length === edgeIds.length;
+          
+          if (!allEdgesHaveData) {
+            const missingDataEdges = edgeDataCheck.filter(check => !check.hasData);
+            
+            console.log(`[MergeNode ${nodeId}] 🚫 대기 중 - 롤백 또는 미완료로 인한 edge 데이터 부족`);
+            console.log(`[MergeNode ${nodeId}] 🔍 각 edge 상세 분석:`);
+            
+            edgeDataCheck.forEach(check => {
+              const status = check.isPending ? '⏳ PENDING' : 
+                           check.isNull ? '❌ NULL' : 
+                           check.hasData ? '✅ DATA' : '⚠️ NO_DATA';
+              console.log(`  - Edge ${check.edgeId} (from ${check.sourceNode}): ${status}`);
+            });
+            
+            console.log(`[MergeNode ${nodeId}] 🔄 롤백 감지된 edges:`, missingDataEdges.map(check => 
+              `${check.edgeId} (from: ${check.sourceNode}, 이유: ${check.isPending ? '아직 실행 안됨' : check.isNull ? '조건 불만족' : '데이터 없음'})`
+            ));
+            
             output = { 
               status: 'waiting',
-              message: `Waiting for all source nodes to complete (${completedSourceNodes.length}/${sourceNodeIds.length})`,
-              completedNodes: completedSourceNodes,
-              totalNodes: sourceNodeIds.length
+              message: `Edge 데이터 대기 중: ${edgesWithRealData.length}/${edgeIds.length} ready (롤백 감지)`,
+              waitingReason: 'edge_data_insufficient',
+              edgeAnalysis: {
+                totalEdges: edgeIds.length,
+                readyEdges: edgesWithRealData.length,
+                pendingEdges: pendingEdgesCount,
+                nullEdges: nullEdgesCount,
+                rollbackDetected: missingDataEdges.length > 0,
+                missingDataEdges: missingDataEdges.map(check => ({
+                  id: check.edgeId,
+                  source: check.sourceNode,
+                  reason: check.isPending ? 'PENDING' : check.isNull ? 'NULL' : 'NO_DATA',
+                  timestamp: check.timestamp,
+                  description: check.isPending ? '이전 노드가 아직 실행되지 않음' : 
+                              check.isNull ? '조건 불만족으로 데이터 없음' : 
+                              '알 수 없는 이유로 데이터 없음'
+                }))
+              }
             };
             break;
           }
           
-          // 모든 source node가 완료되었으므로 merge 처리
-          console.log(`[MergeNode ${nodeId}] All source nodes completed. Processing merge via API.`);
+          // 🎯 모든 edge 데이터 확인 완료! merge 처리 시작
+          console.log(`[MergeNode ${nodeId}] ✅ 모든 edge 데이터 준비 완료! merge 실행 시작.`);
+          console.log(`[MergeNode ${nodeId}] 준비된 edge 데이터 상세:`, edgesWithRealData.map(check => ({
+            edgeId: check.edgeId,
+            sourceNode: check.sourceNode,
+            dataPreview: JSON.stringify(check.currentOutput).substring(0, 100) + '...',
+            timestamp: check.timestamp
+          })));
+          
+          // 🎯 Edge 데이터를 실제 edge 객체로 변환하여 merge 처리 (타입 안정성 확보)
+          const actualEdgesWithData = edgesWithRealData.map(check => {
+            const edge = get().edges.find(e => e.id === check.edgeId);
+            if (!edge) {
+              console.warn(`[MergeNode ${nodeId}] ⚠️ Edge ${check.edgeId} not found in current edges`);
+            }
+            return edge;
+          }).filter(edge => edge !== undefined) as Edge[];
           
           // 연결된 노드들의 출력 데이터를 노드별로 그룹화
           const mergedData: Record<string, any> = {};
           
-          incomingEdges.forEach(edge => {
-            if (edge.data?.output && typeof edge.data.output === 'object') {
-              // 소스 노드 정보 가져오기
-              const sourceNode = get().nodes.find(n => n.id === edge.source);
-              const sourceNodeName = sourceNode ? sourceNode.data.label : edge.source;
-              
-              // 노드별로 그룹화하여 저장
-              mergedData[sourceNodeName] = edge.data.output;
-            }
+          actualEdgesWithData.forEach(edge => {
+            // 소스 노드 정보 가져오기
+            const sourceNode = get().nodes.find(n => n.id === edge.source);
+            const sourceNodeName = sourceNode ? sourceNode.data.label : edge.source;
+            
+            // 노드별로 그룹화하여 저장
+            mergedData[sourceNodeName] = edge.data.output;
+            
+            console.log(`[MergeNode ${nodeId}] 데이터 그룹화: ${sourceNodeName} = `, edge.data.output);
           });
 
           // Store a simplified list of inputs for display in NodeInspector's "Input Data" tab
-          const displayInputs = incomingEdges.map(edge => edge.data?.output).filter(o => o);
+          const displayInputs = actualEdgesWithData.map(edge => edge.data.output);
           get().updateNodeData(nodeId, { ...node.data, inputData: displayInputs });
 
           // MERGE 노드 설정 준비
@@ -1929,7 +2023,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   runWorkflow: async (chatId?: string) => { 
     const { nodes, edges, getNodeById, executeNode, setWorkflowRunning } = get();
     setWorkflowRunning(true);
-    // 워크플로 시작 시 전체 엣지 상태 초기화
+    
+    // 워크플로 시작 시 모든 edge를 PENDING 상태로 초기화 (순환 구조 지원)
+    console.log("🔄 [RunWorkflow] Initializing all edges to PENDING state");
+    edges.forEach(edge => {
+      get().setEdgeOutput(edge.id, EDGE_STATES.PENDING);
+    });
+    
+    // 전체 엣지 상태 초기화
     get().resetAllEdgeStatuses([]);
     
     // 워크플로우 실행 시작 토스트 이벤트 발생
@@ -1951,7 +2052,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     // 순환 구조 지원을 위한 실행 로직
     const nodeExecutionCount = new Map<string, number>(); // 각 노드의 실행 횟수 추적
+    const mergeNodeWaitCount = new Map<string, number>(); // merge 노드 대기 횟수 추적
     const MAX_NODE_EXECUTIONS = 10; // 무한 루프 방지를 위한 최대 실행 횟수
+    const MAX_MERGE_WAIT_ATTEMPTS = 10; // merge 노드 최대 대기 시도 횟수
     let frontier: string[] = [startNode.id];
     const errorNodes: string[] = [];
     let totalIterations = 0;
@@ -1964,10 +2067,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         break;
       }
 
-      // 실행 가능한 노드만 필터링 (최대 실행 횟수 체크)
+      // 실행 가능한 노드만 필터링 (최대 실행 횟수 및 merge 대기 제한 체크)
       const executableNodes = Array.from(new Set(frontier)).filter(nodeId => {
         const executionCount = nodeExecutionCount.get(nodeId) || 0;
-        return executionCount < MAX_NODE_EXECUTIONS;
+        const node = get().getNodeById(nodeId);
+        
+        // 일반 노드: 최대 실행 횟수만 체크
+        if (node?.type !== 'mergeNode') {
+          return executionCount < MAX_NODE_EXECUTIONS;
+        }
+        
+        // merge 노드: 실행 횟수와 대기 시도 횟수 모두 체크
+        const waitCount = mergeNodeWaitCount.get(nodeId) || 0;
+        const canExecute = executionCount < MAX_NODE_EXECUTIONS && waitCount < MAX_MERGE_WAIT_ATTEMPTS;
+        
+        if (!canExecute && waitCount >= MAX_MERGE_WAIT_ATTEMPTS) {
+          console.warn(`⚠️ [MergeNode] ${node.data.label} (${nodeId}) 최대 대기 횟수 초과 - 강제 실행`);
+          // 최대 대기 횟수 초과 시 강제로 실행 허용
+          return executionCount < MAX_NODE_EXECUTIONS;
+        }
+        
+        return canExecute;
       });
       
       if (executableNodes.length === 0) {
@@ -2011,14 +2131,56 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const outgoingEdges = latestEdges.filter(edge => edge.source === nodeId);
         outgoingEdges.forEach(edge => {
           if (edge.data?.output !== null && edge.data?.output !== undefined) {
-            next.push(edge.target);
+            const targetNodeId = edge.target;
+            const targetNode = getNodeById(targetNodeId);
+            
+            // 🎯 merge 노드인 경우 모든 incoming edge가 준비되었는지 사전 체크
+            if (targetNode?.type === 'mergeNode') {
+              const allIncomingEdges = latestEdges.filter(e => e.target === targetNodeId);
+              const readyEdges = allIncomingEdges.filter(e => 
+                e.data?.output && 
+                typeof e.data.output === 'object' && 
+                e.data.output !== EDGE_STATES.PENDING &&
+                e.data.output !== EDGE_STATES.NULL &&
+                e.data.output !== null &&
+                e.data.output !== undefined
+              );
+              
+              const allEdgesReady = readyEdges.length === allIncomingEdges.length;
+              
+              console.log(`[Frontier] Merge 노드 ${targetNode.data.label} 준비 상태 체크: ${readyEdges.length}/${allIncomingEdges.length} edges ready`);
+              
+              if (allEdgesReady) {
+                console.log(`[Frontier] ✅ Merge 노드 ${targetNode.data.label} 모든 입력 준비 완료 - frontier 추가`);
+                next.push(targetNodeId);
+              } else {
+                console.log(`[Frontier] ⏳ Merge 노드 ${targetNode.data.label} 아직 대기 필요 - frontier 추가 안함`);
+                const notReadyEdges = allIncomingEdges.filter(e => !readyEdges.includes(e));
+                console.log(`[Frontier] 미완료 edges:`, notReadyEdges.map(e => `${e.source}->${e.id}`));
+              }
+            } else {
+              // 일반 노드는 기존 로직대로
+              next.push(targetNodeId);
+            }
           }
         });
 
         // mergeNode가 대기 상태면 동일 노드를 재시도 대상으로 유지
         const isMergeWaiting = executedNode?.type === 'mergeNode' && output && (output as any).status === 'waiting';
         if (isMergeWaiting) {
+          // merge 노드 대기 횟수 증가
+          const currentWaitCount = mergeNodeWaitCount.get(nodeId) || 0;
+          mergeNodeWaitCount.set(nodeId, currentWaitCount + 1);
+          
+          // 대기 중인 merge 노드는 다음 반복에서 재시도
           next.push(nodeId);
+          console.log(`🔄 [MergeNode] ${executedNode.data.label} (${nodeId}) 대기 중 (${currentWaitCount + 1}/${MAX_MERGE_WAIT_ATTEMPTS}) - 다음 반복에서 재시도`);
+          console.log(`🔄 [MergeNode] 대기 이유:`, (output as any).message);
+          console.log(`🔄 [MergeNode] 완료 대기 중인 노드들:`, (output as any).waitingFor);
+        } else if (executedNode?.type === 'mergeNode' && output && (output as any).status !== 'waiting') {
+          // merge 노드가 성공적으로 완료된 경우 - 대기 카운트 리셋
+          mergeNodeWaitCount.set(nodeId, 0);
+          console.log(`✅ [MergeNode] ${executedNode.data.label} (${nodeId}) 완료 - 다음 노드들로 진행`);
         }
       }
 
