@@ -47,11 +47,15 @@ const ConnectionToast: React.FC = () => {
         type: 'connection-error',
         title: '연결이 거부되었습니다',
         message: reason || '연결 제약 조건을 위반했습니다.',
-        duration: 4000, // 4초간 표시
+        duration: 3000, // 3초간 표시
         timestamp: new Date()
       };
 
-      setToasts(prev => [...prev, errorToast]);
+      setToasts(prev => {
+        const newToasts = [...prev, errorToast];
+        // 최대 3개 토스트만 유지
+        return newToasts.slice(-3);
+      });
     };
 
     window.addEventListener('connectionError', handleConnectionErrorEvent as EventListener);
