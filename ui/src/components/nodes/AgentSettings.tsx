@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, Pencil, Check, Search } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
 import type { AIConnection } from '../../store/flowStore';
@@ -39,6 +39,7 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
+  const outputVariableInputRef = useRef<HTMLInputElement>(null);
   
   // 이전 노드에서 사용 가능한 입력 키 및 연결 상태 가져오기
   const [availableInputKeys, setAvailableInputKeys] = useState<string[]>([]);
@@ -51,6 +52,16 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const DEFAULT_TOP_P = 1;
   const DEFAULT_TEMPERATURE = 0.7;
   const DEFAULT_MAX_TOKENS = 1000;
+
+  // Auto focus and position cursor at the end when editing starts
+  useEffect(() => {
+    if (isEditingOutputVariable && outputVariableInputRef.current) {
+      outputVariableInputRef.current.focus();
+      // Position cursor at the end of the text
+      const value = outputVariableInputRef.current.value;
+      outputVariableInputRef.current.setSelectionRange(value.length, value.length);
+    }
+  }, [isEditingOutputVariable]);
 
   // 컴포넌트 마운트 시 한 번만: AI 연결 정보 로드
   useEffect(() => {
@@ -246,7 +257,11 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
         {/* Output Variable Section - Placed at the top */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label htmlFor="agentOutputVariable" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+            <label htmlFor="agentOutputVariable" className={`block text-sm font-medium ${
+              !isSourceConnected 
+                ? 'text-gray-400 dark:text-gray-500' 
+                : 'text-gray-600 dark:text-gray-300'
+            }`}>
               Output Variable
             </label>
             <div className="flex items-center">
@@ -255,9 +270,16 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                 id="streamToggle"
                 checked={node?.data.config?.stream || false}
                 onChange={(e) => handleStreamChange(e.target.checked)}
-                className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                className={`h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 ${
+                  !isSourceConnected ? 'opacity-50' : ''
+                }`}
+                disabled={!isSourceConnected}
               />
-              <label htmlFor="streamToggle" className="ml-2 text-sm text-gray-600 dark:text-gray-300">
+              <label htmlFor="streamToggle" className={`ml-2 text-sm ${
+                !isSourceConnected 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}>
                 Stream
               </label>
             </div>
@@ -267,20 +289,25 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
               {isEditingOutputVariable ? (
                 <>
                   <input
+                    ref={outputVariableInputRef}
                     type="text"
                     id="agentOutputVariableInput"
                     value={node?.data.config?.agentOutputVariable || ''}
                     onChange={(e) => handleAgentOutputVariableChange(e.target.value)}
                     placeholder="Enter output variable name"
-                    className={`flex-grow px-3 py-2 border ${
-                      (!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0 
-                        ? 'bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500' 
-                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                    } border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                    className={`flex-grow px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                      !isSourceConnected
+                        ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+                    }`}
                   />
                   <button 
                     onClick={() => setIsEditingOutputVariable(false)} 
-                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0"
+                    className={`p-2 rounded-md flex-shrink-0 ${
+                      !isSourceConnected
+                        ? 'text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
                     aria-label="Confirm output variable"
                   >
                     <Check size={18} />
@@ -288,23 +315,33 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                 </>
               ) : (
                 <>
-                  <CustomSelect
-                    value={node?.data.config?.agentOutputVariable || ''}
-                    onChange={handleAgentOutputVariableChange}
-                    options={[
-                      ...(
-                        node?.data.config?.agentOutputVariable &&
-                        node.data.config.agentOutputVariable !== "" &&
-                        !availableInputKeys.includes(node.data.config.agentOutputVariable)
-                          ? [{ value: node.data.config.agentOutputVariable, label: `${node.data.config.agentOutputVariable} (New/Default)` }]
-                          : []
-                      ),
-                      ...availableInputKeys.map(variable => ({ value: variable, label: `${variable} (Overwrite)` }))
-                    ]}
-                    placeholder="Select output variable (required)"
-                    disabled={(!isSourceConnected || !hasValidSourceOutput) && availableInputKeys.length === 0}
-                  />
-                  <button onClick={() => setIsEditingOutputVariable(true)} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex-shrink-0" aria-label="Edit output variable">
+                  <div className={!isSourceConnected ? 'opacity-60' : ''}>
+                    <CustomSelect
+                      value={node?.data.config?.agentOutputVariable || ''}
+                      onChange={handleAgentOutputVariableChange}
+                      options={[
+                        ...(
+                          node?.data.config?.agentOutputVariable &&
+                          node.data.config.agentOutputVariable !== "" &&
+                          !availableInputKeys.includes(node.data.config.agentOutputVariable)
+                            ? [{ value: node.data.config.agentOutputVariable, label: `${node.data.config.agentOutputVariable} (New/Default)` }]
+                            : []
+                        ),
+                        ...availableInputKeys.map(variable => ({ value: variable, label: `${variable} (Overwrite)` }))
+                      ]}
+                      placeholder="Select output variable (required)"
+                      disabled={!isSourceConnected}
+                    />
+                  </div>
+                  <button 
+                    onClick={() => setIsEditingOutputVariable(true)} 
+                    className={`p-2 rounded-md flex-shrink-0 ${
+                      !isSourceConnected
+                        ? 'text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`} 
+                    aria-label="Edit output variable"
+                  >
                     <Pencil size={18} />
                   </button>
                 </>
