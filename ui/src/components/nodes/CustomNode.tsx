@@ -629,7 +629,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     <div
       className="relative transition-all duration-200"
       style={{
-        filter: isNodeFocused ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))' : 'none'
+        filter: isNodeFocused ? 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.8))' : 'none'
       }}
     >
       {/* Tools & Memory 노드일 경우 통합된 디자인 */}
