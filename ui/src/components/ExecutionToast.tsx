@@ -53,7 +53,11 @@ const ExecutionToast: React.FC = () => {
         startTime: startTime
       };
 
-      setToasts(prev => [...prev, executingToast]);
+      setToasts(prev => {
+        const newToasts = [...prev, executingToast];
+        // 최대 3개 토스트만 유지
+        return newToasts.slice(-3);
+      });
     };
 
     const handleExecutionCompleteEvent = (event: CustomEvent) => {
@@ -121,7 +125,11 @@ const ExecutionToast: React.FC = () => {
 
       // 약간의 지연 후 완료 토스트 표시 (부드러운 전환)
       setTimeout(() => {
-        setToasts(prev => [...prev, completeToast]);
+        setToasts(prev => {
+          const newToasts = [...prev, completeToast];
+          // 최대 3개 토스트만 유지
+          return newToasts.slice(-3);
+        });
       }, 100);
     };
 
@@ -144,7 +152,7 @@ const ExecutionToast: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+    <div className="execution-toast-container fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map((toast) => (
         <ToastItem 
           key={toast.id} 
@@ -183,7 +191,7 @@ const ToastItem: React.FC<{
     if (toast.type !== 'executing' && toast.duration !== Infinity) {
       const timer = setTimeout(() => {
         handleRemove();
-      }, toast.duration || 3500);
+      }, toast.duration || 3000);
 
       return () => clearTimeout(timer);
     }
