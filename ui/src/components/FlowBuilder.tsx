@@ -205,7 +205,9 @@ const FlowBuilder: React.FC = () => {
     setSelectedEdge(edge); // 선택된 엣지 정보 저장
     setShowInspector(true);
     setFocusedElement('edge', edge.id); // 엣지 포커스 설정
-  }, [setFocusedElement, setSelectedNode]);
+    // 엣지 클릭 시 해당 노드의 입력 소스로 설정
+    setManuallySelectedEdge(edge.target, edge.id);
+  }, [setFocusedElement, setSelectedNode, setManuallySelectedEdge]);
 
   // 전역 이벤트 리스너 - NodeInspector 활성화
   useEffect(() => {

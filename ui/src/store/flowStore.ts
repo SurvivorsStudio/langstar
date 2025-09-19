@@ -111,6 +111,7 @@ export interface Workflow {
   nodes: Node<NodeData>[];
   edges: Edge[];
   viewport: Viewport;
+  manuallySelectedEdges?: Record<string, string | null>; // 노드별 수동 선택된 엣지 정보
   lastModified: string;
 }
 
@@ -1953,6 +1954,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       // 성공/실패에 따라 나가는 엣지들의 상태 설정
       const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
       
+      // 성공적으로 실행된 경우, 연결된 타겟 노드들의 입력 소스를 자동으로 이 노드로 설정
+      // 단, merge 노드는 예외 (여러 입력을 합치는 역할이므로 특정 입력 소스를 표시하지 않음)
+      if (!hasError) {
+        outgoingEdges.forEach(edge => {
+          const targetNode = get().nodes.find(n => n.id === edge.target);
+          if (targetNode?.type !== 'mergeNode') {
+            get().setManuallySelectedEdge(edge.target, edge.id);
+          }
+        });
+      }
+      
       if (node.type === 'conditionNode') {
         // 조건 노드: 실제로 데이터가 전달된 엣지만 성공 처리, 나머지는 기본 상태 유지
         const latestEdges = get().edges.filter(edge => edge.source === nodeId);
@@ -2178,7 +2190,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   saveWorkflow: async () => {
     set({ isSaving: true, saveError: null });
-    const { projectName, nodes, edges, viewport } = get();
+    const { projectName, nodes, edges, viewport, manuallySelectedEdges } = get();
 
     if (!projectName || projectName.trim() === "") {
       const errorMsg = "Project name cannot be empty.";
@@ -2207,6 +2219,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         nodes: nodesToSave,
         edges,
         viewport,
+        manuallySelectedEdges,
         lastModified: new Date().toISOString(),
       };
 
@@ -2254,6 +2267,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               nodes: workflowData.nodes || [],
               edges: workflowData.edges || [],
               viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
+              manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
               isLoading: false, loadError: null,
               lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
             });

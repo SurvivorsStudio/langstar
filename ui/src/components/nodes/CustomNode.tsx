@@ -13,7 +13,7 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   // 노드 이름 편집 모드 상태
@@ -65,6 +65,36 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const isEndNode = type === 'endNode';
   const isConditionNode = type === 'conditionNode';
   const isToolsMemoryNode = type === 'toolsMemoryNode';
+
+  // 현재 노드의 입력 소스 확인 함수
+  const getCurrentInputSource = React.useMemo(() => {
+    if (isStartNode) return null;
+    
+    // merge 노드는 입력 소스 표시하지 않음 (여러 입력을 합치는 역할이므로)
+    if (type === 'mergeNode') return null;
+    
+    const incomingEdges = edges.filter(edge => edge.target === id);
+    if (incomingEdges.length <= 1) return null; // 입력이 1개 이하면 표시하지 않음
+    
+    // 수동 선택된 엣지가 있는지 확인
+    const manuallySelectedEdgeId = manuallySelectedEdges[id];
+    let currentEdge;
+    
+    if (manuallySelectedEdgeId) {
+      currentEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
+    }
+    
+    // 수동 선택된 엣지가 없거나 찾을 수 없으면 첫 번째 엣지 사용
+    if (!currentEdge && incomingEdges.length > 0) {
+      currentEdge = incomingEdges[0];
+    }
+    
+    if (!currentEdge) return null;
+    
+    // 소스 노드 찾기
+    const sourceNode = nodes.find(node => node.id === currentEdge.source);
+    return sourceNode ? sourceNode.data.label : null;
+  }, [id, edges, nodes, manuallySelectedEdges, isStartNode]);
 
   // ToolsMemoryNode일 경우, 설정에서 그룹 목록 가져오기
   const groups: any[] = data.config?.groups || [];
@@ -663,7 +693,27 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       ) : (
         <>
           {/* 일반 노드들 - 기존 디자인 유지 */}
-          <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+            {/* 현재 입력 소스 표시 (여러 입력이 있을 때만) - 노드 박스 밖에 배치 */}
+            {getCurrentInputSource && (
+              <div 
+                className="mb-2 px-3 py-1.5 rounded-full text-xs font-medium border shadow-sm"
+                style={{
+                  backgroundColor: isDarkMode ? '#374151' : '#f3f4f6',
+                  color: nodeStyle.textColor,
+                  borderColor: nodeStyle.iconColor,
+                  maxWidth: '140px'
+                }}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs">📥</span>
+                  <span className="truncate" title={`현재 입력: ${getCurrentInputSource}`}>
+                    {getCurrentInputSource}
+                  </span>
+                </div>
+              </div>
+            )}
+            
             <div
               className="rounded-lg shadow-lg relative overflow-visible cursor-pointer"
               style={{
@@ -761,6 +811,55 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               )}
             </div>
             
+            {/* 노드 이름 - 메인 컨테이너 안으로 이동 */}
+            <div 
+              className="mt-2 px-6 py-1.5 rounded-lg shadow-md border relative"
+              style={{ 
+                minWidth: 'fit-content',
+                textAlign: 'center',
+                backgroundColor: nodeStyle.backgroundColor,
+                borderColor: nodeStyle.borderColor
+              }}
+            >
+              {isEditing ? (
+                // 이름 편집 모드
+                <div className="w-full">
+                  <input
+                    type="text"
+                    value={nodeName}
+                    onChange={handleNameChange}
+                    onBlur={handleNameBlur}
+                    onKeyDown={handleKeyPress}
+                    placeholder="영문자, 숫자, _만 사용 (다른 언어 입력 시 빨간색 표시)"
+                    className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-center ${
+                      !validateNodeName(nodeName) && nodeName.trim()
+                        ? 'border-red-500 dark:border-red-400 focus:ring-red-500 text-red-600 dark:text-red-400'
+                        : 'border-blue-300 dark:border-blue-600 focus:ring-blue-500 text-gray-900 dark:text-gray-100'
+                    }`}
+                    autoFocus
+                  />
+                  {!validateNodeName(nodeName) && nodeName.trim() && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400 text-center flex items-center justify-center">
+                      <span className="mr-1">⚠️</span>
+                      영문자, 숫자, 언더스코어(_)만 사용 가능
+                    </p>
+                  )}
+                </div>
+              ) : (
+                // 이름 표시 모드
+                <div className="flex items-center justify-center w-full">
+                  <div 
+                    className="font-medium text-sm truncate cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ color: nodeStyle.textColor }}
+                    onClick={() => setIsEditing(true)}
+                    title="Click to rename"
+                  >
+                    {data.label}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             {/* 노드 설명 툴팁 */}
             {showTooltip && (
               <div className="absolute z-50 top-0 left-1/2 transform -translate-x-1/2 -translate-y-full -mt-2">
@@ -798,57 +897,6 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                   className="w-0 h-0 mx-auto border-l-4 border-r-4 border-t-4 border-transparent"
                   style={{ borderTopColor: nodeStyle.borderColor }}
                 ></div>
-              </div>
-            )}
-          </div>
-          
-          {/* 노드 이름 - 메인 컨테이너 밖으로 분리 */}
-          <div 
-            className="mt-2 px-6 py-1.5 rounded-lg shadow-md border relative"
-            style={{ 
-              minWidth: 'fit-content',
-              textAlign: 'center',
-              backgroundColor: nodeStyle.backgroundColor,
-              borderColor: nodeStyle.borderColor
-            }}
-          >
-            {/* 재생 버튼은 상단 우측으로 이동됨 */}
-            
-            {isEditing ? (
-              // 이름 편집 모드
-              <div className="w-full">
-                <input
-                  type="text"
-                  value={nodeName}
-                  onChange={handleNameChange}
-                  onBlur={handleNameBlur}
-                  onKeyDown={handleKeyPress}
-                  placeholder="영문자, 숫자, _만 사용 (다른 언어 입력 시 빨간색 표시)"
-                  className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-center ${
-                    !validateNodeName(nodeName) && nodeName.trim()
-                      ? 'border-red-500 dark:border-red-400 focus:ring-red-500 text-red-600 dark:text-red-400'
-                      : 'border-blue-300 dark:border-blue-600 focus:ring-blue-500 text-gray-900 dark:text-gray-100'
-                  }`}
-                  autoFocus
-                />
-                {!validateNodeName(nodeName) && nodeName.trim() && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400 text-center flex items-center justify-center">
-                    <span className="mr-1">⚠️</span>
-                    영문자, 숫자, 언더스코어(_)만 사용 가능
-                  </p>
-                )}
-              </div>
-            ) : (
-              // 이름 표시 모드
-              <div className="flex items-center justify-center w-full">
-                <div 
-                  className="font-medium text-sm truncate cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ color: nodeStyle.textColor }}
-                  onClick={() => setIsEditing(true)}
-                  title="Click to rename"
-                >
-                  {data.label}
-                </div>
               </div>
             )}
           </div>
