@@ -196,7 +196,15 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       setMergedInputData(currentMergedInputData);
       setSelectedEdgeInfo(selectedEdge);
 
-      const currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
+      // merge 노드의 경우 여러 incoming edge 중 하나라도 데이터가 있으면 valid로 처리
+      let currentHasValidInputData: boolean;
+      if (node.type === 'mergeNode') {
+        currentHasValidInputData = currentIncomingEdges.some(edge => 
+          edge.data?.output && typeof edge.data.output === 'object' && Object.keys(edge.data.output).length > 0
+        );
+      } else {
+        currentHasValidInputData = currentMergedInputData && Object.keys(currentMergedInputData).length > 0;
+      }
       setHasValidInputData(currentHasValidInputData);
 
       // Adjust active tab based on node type and current active tab validity
@@ -700,57 +708,211 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                   }
                 }}
               >
-                                 {/* 선택된 데이터 표시 */}
-                 {selectedEdgeInfo && (() => {
-                   // 에러 상태 확인
-                   const hasError = mergedInputData && typeof mergedInputData === 'object' && mergedInputData.error;
-                   
-                   return (
-                   <div 
-                     className={`border rounded-lg p-3 select-text transition-colors ${
-                       hasError 
-                         ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
-                         : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
-                     } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
-                     title="Read-only preview"
-                   >
-                     <div className="flex items-center justify-between mb-2">
-                       <span className={`text-xs font-medium ${
-                         hasError 
-                           ? 'text-red-700 dark:text-red-300' 
-                           : 'text-green-700 dark:text-green-300'
-                       }`}>
-                         {hasError ? '❌ Selected Input (Error)' : '✅ Selected Input (Latest)'}
-                       </span>
-                       <div className="flex items-center space-x-2">
-                         <span className={`text-xs ${
-                           hasError 
-                             ? 'text-red-600 dark:text-red-400' 
-                             : 'text-green-600 dark:text-green-400'
-                         }`}>
-                           {selectedEdgeInfo.timestamp && selectedEdgeInfo.timestamp > 0 
-                             ? new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()
-                             : 'Not executed yet'
-                           }
-                         </span>
-                         <Play className={`w-3 h-3 ${
-                           hasError 
-                             ? 'text-red-600 dark:text-red-400' 
-                             : 'text-green-600 dark:text-green-400'
-                         }`} />
-                       </div>
-                     </div>
-                     
-                     <div className="space-y-2">
-                       <JsonViewer 
-                         data={mergedInputData} 
-                         maxHeight="300px"
-                         className="text-xs"
-                       />
-                     </div>
-                   </div>
-                   );
-                 })()}
+                {/* merge 노드일 때는 모든 incoming 노드들을 표시 (단, Edge Inspector 모드가 아닐 때만) */}
+                {isMergeNode && !selectedEdge ? (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      📦 All Incoming Nodes ({incomingEdges.length})
+                    </div>
+                    {incomingEdges.map((edge, index) => {
+                      const sourceNode = nodes.find(n => n.id === edge.source);
+                      const hasData = edge.data?.output && typeof edge.data.output === 'object' && Object.keys(edge.data.output).length > 0;
+                      const hasError = hasData && edge.data.output.error;
+                      const isSelected = manuallySelectedEdgeId === edge.id;
+                      
+                      return (
+                        <div 
+                          key={edge.id}
+                          className={`border rounded-lg p-3 select-text transition-colors cursor-pointer ${
+                            hasError 
+                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                              : hasData 
+                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
+                                : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/30'
+                          } ${isSelected ? 'border-2 border-blue-500' : ''}`}
+                          onClick={() => {
+                            if (hasData) {
+                              handleInputDataClick(edge.id, edge.source, edge.data.output);
+                            }
+                          }}
+                          title={hasData ? "Click to select and execute with this data" : "No data available"}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-xs font-medium ${
+                                hasError 
+                                  ? 'text-red-700 dark:text-red-300' 
+                                  : hasData 
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : 'text-gray-700 dark:text-gray-300'
+                              }`}>
+                                {hasError ? '❌' : hasData ? '✅' : '⏳'} {sourceNode?.data?.label || edge.source}
+                              </span>
+                              {isSelected && (
+                                <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
+                                  Selected
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-xs ${
+                                hasError 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : hasData 
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-gray-600 dark:text-gray-400'
+                              }`}>
+                                {edge.data?.timestamp && edge.data.timestamp > 0 
+                                  ? new Date(edge.data.timestamp).toLocaleTimeString()
+                                  : 'Not executed yet'
+                                }
+                              </span>
+                              {hasData && (
+                                <Play className={`w-3 h-3 ${
+                                  hasError 
+                                    ? 'text-red-600 dark:text-red-400' 
+                                    : 'text-green-600 dark:text-green-400'
+                                }`} />
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            {hasData ? (
+                              <JsonViewer 
+                                data={edge.data.output} 
+                                maxHeight="200px"
+                                className="text-xs"
+                              />
+                            ) : (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No data available - execute the source node first
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : selectedEdge ? (
+                  /* Edge Inspector 모드: 선택된 edge의 데이터만 표시 */
+                  (() => {
+                    const edgeHasData = selectedEdge.data?.output && 
+                      typeof selectedEdge.data.output === 'object' && 
+                      Object.keys(selectedEdge.data.output).length > 0;
+                    
+                    if (!edgeHasData) {
+                      // 선택된 edge에 데이터가 없는 경우 경고 표시
+                      return (
+                        <div className="flex items-center mt-1 text-amber-500 text-xs">
+                          <AlertCircle size={12} className="mr-1" />
+                          Connected node(s) have not produced output or output is empty. Execute preceding nodes.
+                        </div>
+                      );
+                    }
+
+                    // 선택된 edge에 데이터가 있는 경우 표시
+                    const hasError = selectedEdge.data.output.error;
+                    
+                    return (
+                      <div 
+                        className={`border rounded-lg p-3 select-text transition-colors ${
+                          hasError 
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                            : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
+                        }`}
+                        title="Selected edge data"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs font-medium ${
+                            hasError 
+                              ? 'text-red-700 dark:text-red-300' 
+                              : 'text-green-700 dark:text-green-300'
+                          }`}>
+                            {hasError ? '❌ Selected Edge (Error)' : '✅ Selected Edge Data'}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-xs ${
+                              hasError 
+                                ? 'text-red-600 dark:text-red-400' 
+                                : 'text-green-600 dark:text-green-400'
+                            }`}>
+                              {selectedEdge.data?.timestamp && selectedEdge.data.timestamp > 0 
+                                ? new Date(selectedEdge.data.timestamp).toLocaleTimeString()
+                                : 'Not executed yet'
+                              }
+                            </span>
+                            <Play className={`w-3 h-3 ${
+                              hasError 
+                                ? 'text-red-600 dark:text-red-400' 
+                                : 'text-green-600 dark:text-green-400'
+                            }`} />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <JsonViewer 
+                            data={selectedEdge.data.output} 
+                            maxHeight="300px"
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* 일반 노드는 기존 로직 유지 */
+                  selectedEdgeInfo && (() => {
+                    // 에러 상태 확인
+                    const hasError = mergedInputData && typeof mergedInputData === 'object' && mergedInputData.error;
+                    
+                    return (
+                    <div 
+                      className={`border rounded-lg p-3 select-text transition-colors ${
+                        hasError 
+                          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                          : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
+                      } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
+                      title="Read-only preview"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium ${
+                          hasError 
+                            ? 'text-red-700 dark:text-red-300' 
+                            : 'text-green-700 dark:text-green-300'
+                        }`}>
+                          {hasError ? '❌ Selected Input (Error)' : '✅ Selected Input (Latest)'}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs ${
+                            hasError 
+                              ? 'text-red-600 dark:text-red-400' 
+                              : 'text-green-600 dark:text-green-400'
+                          }`}>
+                            {selectedEdgeInfo.timestamp && selectedEdgeInfo.timestamp > 0 
+                              ? new Date(selectedEdgeInfo.timestamp).toLocaleTimeString()
+                              : 'Not executed yet'
+                            }
+                          </span>
+                          <Play className={`w-3 h-3 ${
+                            hasError 
+                              ? 'text-red-600 dark:text-red-400' 
+                              : 'text-green-600 dark:text-green-400'
+                          }`} />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <JsonViewer 
+                          data={mergedInputData} 
+                          maxHeight="300px"
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                    );
+                  })()
+                )}
               </div>
             )}
           </div>
