@@ -783,6 +783,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     const { nodes, edges } = get(); // Get current nodes and edges
     const sourceNode = nodes.find(node => node.id === connection.source);
+    const targetNode = nodes.find(node => node.id === connection.target);
     const isConditionNode = sourceNode?.type === 'conditionNode';
     const startNode = nodes.find(node => node.type === 'startNode');
     const className = startNode?.data.config?.className || 'data';
@@ -804,13 +805,85 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edgeData.conditionDescription = `Rule #${existingSourceEdgesCount + 1}`; // Default rule description
     }
     
-    set({
-      edges: addEdge({ 
-        ...connection, 
-        animated: true,
-        data: edgeData
-      }, edges), // Use the initially fetched edges
+    // 연결 생성과 동시에 target 노드의 설정값 초기화
+    set(state => {
+      const updatedNodes = state.nodes.map(node => {
+        if (node.id === connection.target && targetNode) {
+          const resetConfig = { ...node.data.config };
+          
+          // 노드 타입별 설정값 초기화 (재연결시 기존값 복원 방지)
+          switch (targetNode.type) {
+            case 'endNode':
+              resetConfig.receiveKey = '';
+              break;
+            case 'promptNode':
+              // 프롬프트 노드의 입력 관련 설정 초기화
+              if (resetConfig.inputVariable) {
+                resetConfig.inputVariable = '';
+              }
+              if (resetConfig.selectedKeyName) {
+                resetConfig.selectedKeyName = '';
+              }
+              break;
+            case 'agentNode':
+              // 에이전트 노드의 입력 관련 설정 초기화
+              if (resetConfig.userPromptInputKey) {
+                resetConfig.userPromptInputKey = '';
+              }
+              if (resetConfig.systemPromptInputKey) {
+                resetConfig.systemPromptInputKey = '';
+              }
+              break;
+            case 'userNode':
+              // 사용자 노드의 입력 데이터 초기화
+              if (resetConfig.inputData) {
+                resetConfig.inputData = {};
+              }
+              break;
+            case 'mergeNode':
+              // 머지 노드의 경우 기존 매핑 유지 (다중 입력 지원)
+              break;
+            default:
+              // 다른 노드 타입들의 공통 설정 초기화
+              if (resetConfig.inputKey) {
+                resetConfig.inputKey = '';
+              }
+              if (resetConfig.selectedInput) {
+                resetConfig.selectedInput = null;
+              }
+              break;
+          }
+          
+          return {
+            ...node,
+            data: { 
+              ...node.data, 
+              config: resetConfig,
+              inputData: null, // 입력 데이터 초기화
+              output: null     // 출력 데이터도 초기화
+            }
+          };
+        }
+        return node;
+      });
+      
+      return {
+        nodes: updatedNodes,
+        edges: addEdge({ 
+          ...connection, 
+          animated: true,
+          data: edgeData
+        }, state.edges),
+      };
     });
+
+    // 수동 선택된 엣지 정보도 초기화 (재연결시 기존값 복원 방지)
+    set(state => ({
+      manuallySelectedEdges: {
+        ...state.manuallySelectedEdges,
+        [connection.target!]: null
+      }
+    }));
 
     // 연결 후 제약 조건 재검사 및 경고 상태 업데이트
     setTimeout(() => {
@@ -1001,12 +1074,77 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     set(state => {
       const updatedNodes = state.nodes.map(node => {
+        // Source 노드의 output 초기화
         if (node.id === edge.source) {
           return {
             ...node,
             data: { ...node.data, output: null }
           };
         }
+        
+        // Target 노드의 설정값 초기화
+        if (node.id === edge.target) {
+          const resetConfig = { ...node.data.config };
+          
+          // 노드 타입별 설정값 초기화
+          switch (node.type) {
+            case 'endNode':
+              resetConfig.receiveKey = '';
+              break;
+            case 'promptNode':
+              // 프롬프트 노드의 입력 관련 설정 초기화
+              if (resetConfig.inputVariable) {
+                resetConfig.inputVariable = '';
+              }
+              if (resetConfig.selectedKeyName) {
+                resetConfig.selectedKeyName = '';
+              }
+              break;
+            case 'agentNode':
+              // 에이전트 노드의 입력 관련 설정 초기화
+              if (resetConfig.userPromptInputKey) {
+                resetConfig.userPromptInputKey = '';
+              }
+              if (resetConfig.systemPromptInputKey) {
+                resetConfig.systemPromptInputKey = '';
+              }
+              break;
+            case 'userNode':
+              // 사용자 노드의 입력 데이터 초기화
+              if (resetConfig.inputData) {
+                resetConfig.inputData = {};
+              }
+              break;
+            case 'mergeNode':
+              // 머지 노드의 매핑 설정에서 해당 엣지 관련 매핑 제거
+              if (resetConfig.mergeMappings) {
+                resetConfig.mergeMappings = resetConfig.mergeMappings.filter(
+                  (mapping: any) => mapping.sourceNodeId !== edge.source
+                );
+              }
+              break;
+            default:
+              // 다른 노드 타입들의 공통 설정 초기화
+              if (resetConfig.inputKey) {
+                resetConfig.inputKey = '';
+              }
+              if (resetConfig.selectedInput) {
+                resetConfig.selectedInput = null;
+              }
+              break;
+          }
+          
+          return {
+            ...node,
+            data: { 
+              ...node.data, 
+              config: resetConfig,
+              inputData: null, // 입력 데이터 초기화
+              output: null     // 출력 데이터도 초기화
+            }
+          };
+        }
+        
         return node;
       });
 
@@ -1015,6 +1153,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: state.edges.filter(e => e.id !== edgeId)
       };
     });
+
+    // 수동 선택된 엣지 정보도 초기화
+    const { manuallySelectedEdges } = get();
+    if (manuallySelectedEdges[edge.target] === edgeId) {
+      set(state => ({
+        manuallySelectedEdges: {
+          ...state.manuallySelectedEdges,
+          [edge.target]: null
+        }
+      }));
+    }
 
     // edge 삭제 후 제약 조건 재검사 및 경고 상태 업데이트
     setTimeout(() => {
