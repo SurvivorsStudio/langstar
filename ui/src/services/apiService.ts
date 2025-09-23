@@ -298,13 +298,13 @@ class ApiService {
     return response.deployment;
   }
 
-  async runDeployment(deploymentId: string, inputData: any): Promise<{ success: boolean; deployment_id: string; result: any }> {
+  async runDeployment(deploymentId: string, requestData: any): Promise<{ success: boolean; deployment_id: string; result: any }> {
     return this.request(`/api/deployment/${deploymentId}/run`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ input_data: inputData })
+      body: JSON.stringify(requestData)
     });
   }
 

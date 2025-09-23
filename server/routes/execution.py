@@ -180,7 +180,7 @@ def download_execution_logs(execution_id: str):
         import uuid
         unique_filename = f"logs_{uuid.uuid4().hex[:8]}.zip"
         
-        def cleanup_temp_file():
+        async def cleanup_temp_file():
             try:
                 os.remove(temp_zip_path)
             except:

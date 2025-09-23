@@ -281,9 +281,12 @@ def run_deployment(deployment_id: str, msg: dict = Body(...), request: Request =
     try:
         logger.info(f"Running deployment {deployment_id}")
         
-        input_data = msg.get("input_data", {})
+        # msg는 이미 프론트엔드에서 올바른 구조 {start_node_name: {question_variable_name: message}}로 전달됨
+        input_data = msg
         if not input_data:
-            raise HTTPException(status_code=400, detail="input_data is required")
+            raise HTTPException(status_code=400, detail="Request body is required")
+        
+        logger.info(f"[DeploymentRoute] Received request body: {input_data}")
         
         # API 호출 정보 수집
         api_call_info = {}
