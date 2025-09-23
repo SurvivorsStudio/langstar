@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { Plus, X, AlertCircle } from 'lucide-react';
 import CustomSelect from '../Common/CustomSelect';
@@ -22,9 +22,16 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
   const config = node?.data.config || {};
 
   const [variables, setVariables] = useState<Variable[]>(config.variables || []);
-  const [className, setClassName] = useState(config.className || '');
+  const [className, setClassName] = useState(config.className || 'state');
   const [classType, setClassType] = useState<NodeClassType>(config.classType || 'TypedDict');
   const [showClassNameError, setShowClassNameError] = useState(false);
+  
+  // 초기값 설정
+  useEffect(() => {
+    if (!config.className) {
+      updateConfig({ className: 'state', classType: 'TypedDict' });
+    }
+  }, []);
   
   // 이름 유효성 검사 함수
   const validateName = (name: string): boolean => {
@@ -115,11 +122,12 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
             value={className}
             onChange={(e) => handleClassNameChange(e.target.value)}
             placeholder="영문자, 숫자, _만 사용"
+            disabled
             className={`w-full px-3 py-2 border ${
               showClassNameError ? 'border-red-300 ring-red-200 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
             } rounded-md focus:outline-none focus:ring-2 ${
               showClassNameError ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-            } text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+            } text-sm bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed`}
           />
           {showClassNameError && (
             <div className="flex items-center mt-1 text-red-500 text-xs">
@@ -129,20 +137,6 @@ const StartSettings: React.FC<StartSettingsProps> = ({ nodeId }) => {
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-            Class Type
-          </label>
-          <CustomSelect
-            value={classType}
-            onChange={handleClassTypeChange}
-            options={[
-              { value: 'TypedDict', label: 'TypedDict' },
-              { value: 'BaseModel', label: 'BaseModel' }
-            ]}
-            placeholder="Select class type"
-          />
-        </div>
       </div>
 
       <div className="space-y-4">
