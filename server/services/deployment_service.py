@@ -157,13 +157,12 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             if not deployment:
                 raise ValueError(f"Deployment {deployment_id} not found")
             
-            # 2. 입력 데이터 정규화 (문자열인 경우 딕셔너리로 변환)
-            if isinstance(input_data, str):
-                input_data = {"user_input": input_data}
-            elif not isinstance(input_data, dict):
-                input_data = {"user_input": str(input_data)}    
+            # 2. 입력 데이터 검증 및 로깅
+            # 프론트엔드에서 이미 올바른 구조 {start_node_name: {question_variable_name: message}}로 전달됨
+            if not isinstance(input_data, dict):
+                raise ValueError(f"Invalid input_data format. Expected dict, got {type(input_data)}")
             
-            input_data = {"Start" : input_data}
+            logger.info(f"[DeploymentService] Received input_data structure: {input_data}")
 
             # 2. 배포가 활성 상태인지 확인
             if deployment.status != DeploymentStatus.ACTIVE:
@@ -229,11 +228,9 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
                         run_function_name = f"run_deployment_{deployment_id.replace('-', '_')}"
                         if hasattr(deployment_module, run_function_name):
                             run_function = getattr(deployment_module, run_function_name)
+                            logger.info(f"[DeploymentService] Executing {run_function_name} with input_data: {input_data}")
                             result = run_function(input_data)
-                            print("=================")
-                            print(run_function_name)
-                            print(input_data)
-                            print("=================")
+                            logger.info(f"[DeploymentService] Execution result: {result}")
                             
                             if isinstance(result, dict) and result.get("success"):
                                 result = result.get("result", result)
@@ -859,8 +856,26 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             data["execution_metadata"]["api_call_info"] = execution_record["api_call_info"]
             data["execution_metadata"]["execution_source"] = execution_record["execution_source"]
 
+            # HumanMessage, AIMessage 객체를 JSON 직렬화 가능한 형태로 변환
+            def convert_messages_to_dict(obj):
+                if hasattr(obj, 'content') and hasattr(obj, '__class__'):
+                    # LangChain 메시지 객체인 경우
+                    return {
+                        'type': obj.__class__.__name__.lower().replace('message', ''),
+                        'content': obj.content
+                    }
+                elif isinstance(obj, dict):
+                    return {k: convert_messages_to_dict(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_messages_to_dict(item) for item in obj]
+                else:
+                    return obj
+            
+            # 데이터 변환
+            converted_data = convert_messages_to_dict(data)
+            
             with open(snapshot_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(converted_data, f, indent=2, ensure_ascii=False)
             
             logger.info(f"Updated workflow snapshot metadata for execution {execution_id}: {snapshot_file}")
 
