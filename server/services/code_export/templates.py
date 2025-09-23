@@ -411,6 +411,8 @@ def prompt_node_code( node ) :
 
 
     code = """
+import re
+
 def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
     def replacer(match):
         expr = match.group(1).strip()
@@ -735,7 +737,7 @@ def node_{node_name}(state):
         else : 
             tmp_data = ''
 
-        insert_pram[row['funcArgs']] = tmp_data 
+        func_args[row['funcArgs']] = tmp_data 
 
 
 

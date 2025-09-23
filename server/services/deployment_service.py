@@ -856,8 +856,26 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             data["execution_metadata"]["api_call_info"] = execution_record["api_call_info"]
             data["execution_metadata"]["execution_source"] = execution_record["execution_source"]
 
+            # HumanMessage, AIMessage 객체를 JSON 직렬화 가능한 형태로 변환
+            def convert_messages_to_dict(obj):
+                if hasattr(obj, 'content') and hasattr(obj, '__class__'):
+                    # LangChain 메시지 객체인 경우
+                    return {
+                        'type': obj.__class__.__name__.lower().replace('message', ''),
+                        'content': obj.content
+                    }
+                elif isinstance(obj, dict):
+                    return {k: convert_messages_to_dict(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_messages_to_dict(item) for item in obj]
+                else:
+                    return obj
+            
+            # 데이터 변환
+            converted_data = convert_messages_to_dict(data)
+            
             with open(snapshot_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(converted_data, f, indent=2, ensure_ascii=False)
             
             logger.info(f"Updated workflow snapshot metadata for execution {execution_id}: {snapshot_file}")
 
