@@ -29,7 +29,10 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning } = useFlowStore();
+  
+  // 다른 노드가 실행 중인지 확인
+  const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const { isDarkMode } = useThemeStore();
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
@@ -296,6 +299,12 @@ const FlowBuilder: React.FC = () => {
       event.preventDefault();
       event.stopPropagation();
     } else if (event.key === 'Delete') {
+      // 실행 중일 때는 삭제 비활성화
+      if (isWorkflowRunning || isAnyNodeExecuting) {
+        alert('워크플로우 노드가 실행 중 입니다.');
+        return;
+      }
+      
       // 엣지 포커스 상태에서 delete 키: 엣지 삭제
       if (focusedElement.type === 'edge' && focusedElement.id) {
         handleEdgeDelete(focusedElement.id, removeEdge);
@@ -321,7 +330,7 @@ const FlowBuilder: React.FC = () => {
         }
       }
     }
-  }, [selectedNode, nodes, removeNode, setSelectedNode, setFocusedElement, focusedElement, removeEdge]);
+  }, [selectedNode, nodes, removeNode, setSelectedNode, setFocusedElement, focusedElement, removeEdge, isWorkflowRunning, isAnyNodeExecuting]);
 
   // 드래그 앤 드롭으로 노드 추가
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -331,6 +340,7 @@ const FlowBuilder: React.FC = () => {
 
   const onDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+  
     const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
     const data = event.dataTransfer.getData('application/reactflow');
     if (!data || !reactFlowBounds) return;
