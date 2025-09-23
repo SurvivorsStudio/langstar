@@ -1235,6 +1235,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   setNodeExecuting: (nodeId: string, isExecuting: boolean, success: boolean = true, nodeName?: string, isWorkflowExecution?: boolean) => {
+    console.log(`🔄 [setNodeExecuting] Node ${nodeId} (${nodeName}) -> isExecuting: ${isExecuting}, success: ${success}, isWorkflowExecution: ${isWorkflowExecution}`);
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === nodeId) {
@@ -1249,6 +1250,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     
     // 실행 시작 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
     if (isExecuting && !isWorkflowExecution) {
+      console.log(`📢 [setNodeExecuting] Dispatching nodeExecutionStarted event for node ${nodeId}`);
       window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
         detail: { nodeId, nodeName }
       }));
@@ -1256,6 +1258,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     // 실행 완료 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
     if (!isExecuting && !isWorkflowExecution) {
+      console.log(`📢 [setNodeExecuting] Dispatching nodeExecutionCompleted event for node ${nodeId}`);
       window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
         detail: { nodeId, success, nodeName } 
       }));
@@ -1347,16 +1350,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   executeNode: async (nodeId: string, chatId?: string) => { // chatId 파라미터 추가
+    console.log(`🔍 [executeNode] Starting execution for node ${nodeId}`);
     const node = get().nodes.find(n => n.id === nodeId);
-    if (!node) return;
+    if (!node) {
+      console.log(`❌ [executeNode] Node ${nodeId} not found`);
+      return;
+    }
 
     // 노드 이름 가져오기
     const nodeName = node.data?.label || node.type || 'Node';
+    console.log(`📝 [executeNode] Node name: ${nodeName}, type: ${node.type}`);
 
     get().updateNodeData(nodeId, { ...node.data, inputData: null }); // 실행 전 inputData 초기화 (선택적)
     // Check if workflow is running
     const isWorkflowRunning = get().isWorkflowRunning;
-    get().setNodeExecuting(nodeId, true, true, nodeName, isWorkflowRunning);
+    // CustomNode에서 이미 상태를 설정했으므로 여기서는 제거
+    // get().setNodeExecuting(nodeId, true, true, nodeName, isWorkflowRunning);
     
     // 실행 시작 시: 나가는 엣지들을 실행 중으로 설정
     // 개별 실행일 때만 다른 엣지들 상태를 초기화하고, 전체 실행 중에는 이전 성공 상태를 유지
@@ -1495,6 +1504,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           break;
         }
         case 'agentNode': { // Node ID를 로그에 포함시키기 위해 nodeId 변수 사용
+          console.log(`🤖 [AgentNode ${nodeId}] ===== AGENT NODE EXECUTION START =====`);
           console.log(`[AgentNode ${nodeId}] 실행 시작. 입력 데이터:`, JSON.parse(JSON.stringify(input || {})));
           const agentConfig = node.data.config || {};
           const {
@@ -1690,6 +1700,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           console.log(`[AgentNode ${nodeId}] API 요청 페이로드:`, JSON.stringify(payload, null, 2));
 
           try {
+            console.log(`🌐 [AgentNode ${nodeId}] Making API call to agentnode endpoint`);
             const response = await fetch('http://localhost:8000/workflow/node/agentnode', {
               method: 'POST',
               headers: {
@@ -1697,6 +1708,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               },
               body: JSON.stringify(payload),
             });
+            console.log(`📡 [AgentNode ${nodeId}] API response status: ${response.status}`);
 
             console.log(`[AgentNode ${nodeId}] API 응답 상태: ${response.status}`);
 
@@ -1710,9 +1722,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             // input 받은 데이터에 Output Variable에 지정한 key 값에 api가 전달한 값을 추가하여 output 생성
             output = { ...input, [finalAgentOutputVariable]: apiResponse };
 
-            console.log(`[AgentNode ${nodeId}] API 응답 성공. 출력:`, output);
+            console.log(`✅ [AgentNode ${nodeId}] API 응답 성공. 출력:`, output);
+            console.log(`🤖 [AgentNode ${nodeId}] ===== AGENT NODE EXECUTION SUCCESS =====`);
           } catch (apiError) {
-            console.error(`[AgentNode ${nodeId}] API 호출 실패:`, apiError);
+            console.error(`❌ [AgentNode ${nodeId}] API 호출 실패:`, apiError);
+            console.log(`🤖 [AgentNode ${nodeId}] ===== AGENT NODE EXECUTION FAILED =====`);
             output = { error: 'Failed to connect to agent node API', details: (apiError as Error).message };
           }
         }
@@ -2168,7 +2182,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   runWorkflow: async (chatId?: string) => { 
-    const { nodes, edges, getNodeById, executeNode, setWorkflowRunning } = get();
+    const { nodes, edges, getNodeById, executeNode, setWorkflowRunning, isWorkflowRunning } = get();
+    
+    // 중복 실행 방지: 이미 워크플로우가 실행 중이면 리턴
+    if (isWorkflowRunning) {
+      console.log('⚠️ [RunWorkflow] Workflow is already running, skipping...');
+      return;
+    }
+    
+    console.log('🚀 [RunWorkflow] Starting workflow execution');
     setWorkflowRunning(true);
     
     // 워크플로 시작 시 모든 edge를 PENDING 상태로 초기화 (순환 구조 지원)

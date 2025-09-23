@@ -17,7 +17,6 @@ import { useFlowStore } from '../store/flowStore';
 import { useThemeStore } from '../store/themeStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
-import ExecutionStatusIndicator from './ExecutionStatusIndicator';
 import ExecutionToast from './ExecutionToast';
 import ConnectionToast from './ConnectionToast';
 import { nodeTypes } from './nodes/nodeTypes';
@@ -502,7 +501,6 @@ const FlowBuilder: React.FC = () => {
       )}
       
       {/* 실행 상태 표시 컴포넌트들 */}
-      <ExecutionStatusIndicator />
       <ExecutionToast />
       <ConnectionToast />
     </div>
