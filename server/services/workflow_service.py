@@ -133,6 +133,7 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
         max_tokens=max_token,
         openai_api_key=api_key
     )
+    
 
     if memory == "" and len(tool_info) == 0:
         prompt = ChatPromptTemplate.from_messages([
@@ -154,6 +155,7 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
         
         llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
         response = llm_chain.predict(user_prompt=user_prompt)
+
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 도구 있어
@@ -168,7 +170,7 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
-        
+
         # 안전한 response 파싱
         try:
             if isinstance(response, dict) and "output" in response:

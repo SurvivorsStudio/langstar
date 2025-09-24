@@ -57,16 +57,6 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
         capabilities: ['Text generation', 'Code generation', 'Fast processing'],
         tags: ['Fast', 'Efficient', 'CostEffective', 'Optimized', 'Reliable']
       },
-      {
-        id: 'gpt-5-nano',
-        name: 'gpt-5-nano',
-        displayName: 'GPT-5 nano',
-        description: 'Fastest, most cost-efficient version of GPT-5',
-        maxTokens: 200000,
-        pricing: 'Most affordable',
-        capabilities: ['Text generation', 'Code generation', 'Quick responses'],
-        tags: ['Fastest', 'MostAffordable', 'Lightweight', 'Efficient', 'Quick']
-      }
     ],
     authFields: [
       {
@@ -350,8 +340,8 @@ export const PROVIDER_CARDS = [
     id: 'openai',
     name: 'OpenAI',
     logo: '🤖',
-    description: 'GPT-5, GPT-5 mini, GPT-5 nano, GPT-4o, GPT-4o Mini, GPT-4 Turbo',
-    modelCount: 6,
+    description: 'GPT-5, GPT-5 mini, GPT-4o, GPT-4o Mini, GPT-4 Turbo',
+    modelCount: 5,
     color: 'bg-green-50 border-green-200 hover:bg-green-100',
     textColor: 'text-green-700',
     iconColor: 'text-green-600'
