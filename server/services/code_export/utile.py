@@ -43,7 +43,18 @@ def init_node_config( create_node_json ) :
             temp_config = {}
             config_dict = {}
             for token_config in node_config:
-                config_dict.update({token_config['name']: token_config['defaultValue']})
+                if token_config['type'] == 'str' : 
+                    config_dict.update({token_config['name']: token_config['defaultValue']})
+                elif token_config['type'] == 'int':
+                    config_dict.update({token_config['name']: int(token_config['defaultValue'])})
+                elif token_config['type'] == 'float':
+                    config_dict.update({token_config['name']: float(token_config['defaultValue'])})
+                elif token_config['type'] == 'list':
+                    config_dict.update({token_config['name']: list(token_config['defaultValue'])})
+                elif token_config['type'] == 'dict':
+                    config_dict.update({token_config['name']: dict(token_config['defaultValue'])})
+                else : 
+                    config_dict.update({token_config['name']: token_config['defaultValue']})
 
             config_id = node_name + "_Config"
             temp_config[config_id] = {'config': config_dict}
