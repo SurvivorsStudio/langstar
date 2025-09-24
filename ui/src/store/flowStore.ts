@@ -2062,9 +2062,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
               matchData = node.data.config?.inputData?.[param.name] || '';
             } else if (param.inputType === 'text box') {
-              // text box의 경우 settings에서 값을 가져와 문자열로 전달
+              // text box의 경우 settings에서 값을 가져와서 그대로 전달
               const textValue = node.data.config?.settings?.[param.name] || '';
-              matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+              matchData = textValue; // 작은따옴표 제거
+            } else if (param.inputType === 'radio button') {
+              // radio button의 경우 settings에서 선택된 값을 가져와서 그대로 전달
+              const radioValue = node.data.config?.settings?.[param.name] || '';
+              matchData = radioValue; // 작은따옴표 제거
+            } else if (param.inputType === 'checkbox') {
+              // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
+              const checkboxValues = node.data.config?.settings?.[param.name] || [];
+              matchData = checkboxValues; // 배열 자체로 전송
             } else {
               matchData = '';
             }
@@ -2673,16 +2681,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       // UserNode의 경우 parameters에 matchData 추가 및 inputData 변환
       if (currentNode.type === 'userNode' && finalNodeData.config?.parameters) {
-        // parameters에 matchData 추가
-        finalNodeData.config.parameters = finalNodeData.config.parameters.map((param: any) => {
+        // config 객체를 deep copy하여 원본 변경 방지
+        finalNodeData.config = { ...finalNodeData.config };
+        
+        // parameters에 matchData 추가 (실시간 API 호출과 동일한 방식)
+        // 원본 배열을 변경하지 않고 새로운 배열을 생성
+        const parametersWithMatchData = finalNodeData.config.parameters.map((param: any) => {
           let matchData;
           if (param.inputType === 'select box') {
             // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
             matchData = finalNodeData.config?.inputData?.[param.name] || '';
           } else if (param.inputType === 'text box') {
-            // text box의 경우 settings에서 값을 가져와 문자열로 전달
+            // text box의 경우 settings에서 값을 가져와서 그대로 전달
             const textValue = finalNodeData.config?.settings?.[param.name] || '';
-            matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+            matchData = textValue; // 작은따옴표 제거
+          } else if (param.inputType === 'radio button') {
+            // radio button의 경우 settings에서 선택된 값을 가져와서 그대로 전달
+            const radioValue = finalNodeData.config?.settings?.[param.name] || '';
+            matchData = radioValue; // 작은따옴표 제거
+          } else if (param.inputType === 'checkbox') {
+            // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
+            const checkboxValues = finalNodeData.config?.settings?.[param.name] || [];
+            matchData = checkboxValues; // 배열 자체로 전송
           } else {
             matchData = '';
           }
@@ -2691,6 +2711,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             matchData: matchData
           };
         });
+        
+        // 새로운 parameters 배열을 할당 (원본 변경 없음)
+        finalNodeData.config.parameters = parametersWithMatchData;
 
         // inputData를 funcArgs 기반으로 변환
         if (finalNodeData.config?.inputData && Object.keys(finalNodeData.config.inputData).length > 0) {

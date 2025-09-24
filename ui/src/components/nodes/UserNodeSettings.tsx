@@ -9,7 +9,7 @@ interface UserNodeSettingsProps {
 }
 
 const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
-  const { getNodeById, updateNodeData, nodes, edges } = useFlowStore();
+  const { getNodeById, updateNodeData, edges } = useFlowStore();
   const node = getNodeById(nodeId);
   
 
@@ -96,6 +96,11 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
     }
   }, [isEditingOutputVariable]);
 
+  // parameters의 실질적인 내용 변경만 감지하기 위한 안정적인 키 생성
+  const parametersKey = node?.data.config?.parameters
+    ? node.data.config.parameters.map((p: any) => `${p.name}-${p.inputType}-${p.required}`).join('|')
+    : '';
+
   useEffect(() => {
     if (node?.data.config?.parameters) {
       // 기존 설정값을 불러오거나 초기화
@@ -105,7 +110,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       const initialSettings: Record<string, any> = {};
       const initialInputData: Record<string, any> = {};
       
-      node.data.config.parameters.forEach(param => {
+      node.data.config.parameters.forEach((param: any) => {
         if (param.inputType === 'select box') {
           // select box의 경우 기존 값이 있으면 사용, 없으면 빈 문자열
           initialInputData[param.name] = existingInputData[param.name] || '';
@@ -135,7 +140,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       }
     }
 
-  }, [node?.id, node?.data.config?.parameters]); // inputData 제거하고 parameters만 감지
+  }, [node?.id, parametersKey]); // parameters 배열 참조 대신 실질적인 내용 기반 키 사용
 
 
   const handleSettingChange = (paramName: string, value: any) => {
@@ -322,7 +327,7 @@ const UserNodeSettings: React.FC<UserNodeSettingsProps> = ({ nodeId }) => {
       </div>
       
       <div className="space-y-3">
-        {node.data.config.parameters.map((param, index) => (
+        {node.data.config.parameters.map((param: any, index: number) => (
           <div key={index}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {param.name}
