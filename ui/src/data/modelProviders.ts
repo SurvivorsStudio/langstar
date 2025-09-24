@@ -123,33 +123,76 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
     category: 'language',
     models: [
       {
+        id: 'gemini-2.5-pro',
+        name: 'gemini-2.5-pro',
+        displayName: 'Gemini 2.5 Pro',
+        description: 'Most advanced Gemini model with strong reasoning and multimodal capabilities',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Multimodal input Text'],
+        tags: ['HighEnd', 'Reasoning', 'Multimodal', 'ComplexTasks']
+      },
+      {
+        id: 'gemini-2.5-flash',
+        name: 'gemini-2.5-flash',
+        displayName: 'Gemini 2.5 Flash',
+        description: 'Balanced model optimized for latency and throughput with multimodal support',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Code generation', 'Multimodal input Text'],
+        tags: ['Balanced', 'Performance', 'Multimodal']
+      },
+      {
+        id: 'gemini-2.5-flash-lite',
+        name: 'gemini-2.5-flash-lite',
+        displayName: 'Gemini 2.5 Flash-Lite',
+        description: 'Cost-efficient variant optimized for speed and high throughput',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Multimodal input Text'],
+        tags: ['CostEfficient', 'HighThroughput', 'Multimodal']
+      },
+      {
+        id: 'gemini-2.0-flash',
+        name: 'gemini-2.0-flash',
+        displayName: 'Gemini 2.0 Flash',
+        description: 'Fast multimodal model from the 2.0 generation',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Multimodal input Text'],
+        tags: ['Stable', 'Multimodal', 'Fast']
+      },
+      {
+        id: 'gemini-2.0-flash-lite',
+        name: 'gemini-2.0-flash-lite',
+        displayName: 'Gemini 2.0 Flash-Lite',
+        description: 'Lightweight variant of the 2.0 Flash model optimized for efficiency',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Multimodal input Text'],
+        tags: ['Lightweight', 'Efficient', 'Multimodal']
+      },
+      {
         id: 'gemini-1.5-pro',
         name: 'gemini-1.5-pro',
         displayName: 'Gemini 1.5 Pro',
-        description: 'Most capable Gemini model',
-        maxTokens: 1000000,
-        pricing: 'Best performance',
-        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Vision', 'Audio'],
-        tags: ['UltraLongContext', 'Multimodal', 'GoogleEcosystem', 'Fast']
+        description: 'Most capable model in the 1.5 generation, supports ultra-long context',
+        maxTokens: 2097152,
+        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Multimodal input Text'],
+        tags: ['UltraLongContext', 'Reasoning', 'Multimodal']
       },
       {
         id: 'gemini-1.5-flash',
         name: 'gemini-1.5-flash',
         displayName: 'Gemini 1.5 Flash',
-        description: 'Fast and efficient model',
-        maxTokens: 1000000,
-        pricing: 'Most affordable',
-        capabilities: ['Text generation', 'Code generation', 'Vision'],
-        tags: ['Fastest', 'Efficient', 'Affordable', 'Vision']
+        description: 'Fast and efficient 1.5 generation model',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Code generation', 'Multimodal input (Text, Audio, Image, Video)'],
+        tags: ['Fast', 'Efficient', 'Multimodal']
       },
       {
-        id: 'gemini-pro',
-        name: 'gemini-pro',
-        displayName: 'Gemini Pro',
-        description: 'Previous generation, reliable model',
-        maxTokens: 30000,
-        capabilities: ['Text generation', 'Code generation'],
-        tags: ['Reliable', 'Stable', 'Popular', 'TextGeneration']
+        id: 'gemini-1.5-flash-8b',
+        name: 'gemini-1.5-flash-8b',
+        displayName: 'Gemini 1.5 Flash-8B',
+        description: 'Smaller and optimized variant of Gemini 1.5 Flash',
+        maxTokens: 1048576,
+        capabilities: ['Text generation', 'Multimodal input (Text, Audio, Image)'],
+        tags: ['Lightweight', 'Efficient', 'Multimodal']
       }
     ],
     authFields: [
@@ -360,8 +403,8 @@ export const PROVIDER_CARDS = [
     id: 'google',
     name: 'Google',
     logo: '🔍',
-    description: 'Gemini 1.5 Pro, Gemini 1.5 Flash, Gemini Pro',
-    modelCount: 3,
+    description: 'Gemini 2.5 (Pro, Flash, Flash-Lite), Gemini 2.0 (Flash, Flash-Lite), Gemini 1.5 (Pro, Flash, Flash-8B)',
+    modelCount: 8,
     color: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
     textColor: 'text-blue-700',
     iconColor: 'text-blue-600'

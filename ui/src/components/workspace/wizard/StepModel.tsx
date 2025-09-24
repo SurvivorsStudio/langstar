@@ -25,6 +25,9 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
     if (model.id.includes('gpt-3.5')) return 'GPT-3.5 Series';
     if (model.id.includes('claude-3')) return 'Claude 3 Series';
     if (model.id.includes('claude-2')) return 'Claude 2 Series';
+    if (model.id.includes('gemini-2.5')) return 'Gemini 2.5 Series';
+    if (model.id.includes('gemini-2.0')) return 'Gemini 2.0 Series';
+    if (model.id.includes('gemini-1.5')) return 'Gemini 1.5 Series';
     if (model.id.includes('gemini-pro')) return 'Gemini Pro Series';
     if (model.id.includes('gemini-flash')) return 'Gemini Flash Series';
     if (model.id.includes('cohere')) return 'Cohere Series';
@@ -78,6 +81,9 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
               'GPT-3.5 Series',
               'Claude 3 Series',
               'Claude 2 Series',
+              'Gemini 2.5 Series',
+              'Gemini 2.0 Series',
+              'Gemini 1.5 Series',
               'Gemini Pro Series',
               'Gemini Flash Series',
               'Cohere Series',
