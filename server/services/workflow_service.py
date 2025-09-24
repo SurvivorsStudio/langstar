@@ -179,11 +179,11 @@ class WorkflowService:
                 if row['inputType'] == 'select box':
                     tmp_data = eval(row['matchData'], {}, real_data)
                 elif row['inputType'] == 'text box':
-                    tmp_data = row['matchData']
+                    tmp_data = eval(row['matchData'], {}, real_data)
                 elif row['inputType'] == 'checkbox':
-                    tmp_data = row['matchData']
+                    tmp_data = eval(row['matchData'], {}, real_data)
                 elif row['inputType'] == 'radio button':
-                    tmp_data = row['matchData']
+                    tmp_data = eval(row['matchData'], {}, real_data)
                 else : 
                     tmp_data = ''
 
