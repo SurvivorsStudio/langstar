@@ -331,6 +331,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 from typing import Optional
 from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import InMemorySaver 
+import re
 
 {init_log_code()}
 
@@ -411,7 +412,6 @@ def prompt_node_code( node ) :
 
 
     code = """
-import re
 
 def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
     def replacer(match):
