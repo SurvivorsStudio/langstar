@@ -1,6 +1,7 @@
 from langchain_core.prompts import PromptTemplate
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
+from langchain_openai import ChatOpenAI
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
@@ -123,7 +124,100 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             return str(response)
 
 
+def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[], api_key=""):
+    """OpenAI 모델 실행 함수"""
+    # 도구 없이, 메모리 없이
+    llm = ChatOpenAI(
+        model=modelName,
+        temperature=temperature,
+        max_tokens=max_token,
+        openai_api_key=api_key
+    )
 
+    if memory == "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}")
+        ])
+       
+        llm_chain = LLMChain(llm=llm, prompt=prompt)
+        response = llm_chain.predict(user_prompt=user_prompt)
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+
+    # 메모리 있어
+    elif memory != "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}")
+        ])
+        
+        llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
+        response = llm_chain.predict(user_prompt=user_prompt)
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+
+    # 도구 있어
+    elif memory == "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+        
+        # 안전한 response 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                if isinstance(output, list) and len(output) > 0:
+                    text_content = output[0].get('text', '')
+                    if '</thinking>\n\n' in text_content:
+                        return text_content.split('</thinking>\n\n')[1]
+                    else:
+                        return text_content
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing agent response: {str(e)}")
+            return str(response)
+
+    # 도구 있어, 메모리 있어
+    elif memory != "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+        
+        # 안전한 response 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                if isinstance(output, list) and len(output) > 0:
+                    text_content = output[0].get('text', '')
+                    if '</thinking>\n\n' in text_content:
+                        return text_content.split('</thinking>\n\n')[1]
+                    else:
+                        return text_content
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing agent response: {str(e)}")
+            return str(response)
 
 
 class WorkflowService:
@@ -537,14 +631,18 @@ def evaluate_condition({argument_name}):
             if msg['model']['providerName'] == 'aws' : 
                 return run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory, tools )
                 
-            elif msg['providerName'] == 'openai' : 
-                if memory_type == "" : 
-                    pass 
-                else : 
-                    pass 
+            elif msg['model']['providerName'] == 'openai' : 
+                api_key = msg['model'].get('apiKey')
+                if not api_key:
+                    raise ValueError("OpenAI API key is required")
+                
+                return run_openai(
+                    modelName, temperature, max_token, 
+                    system_prompt, user_prompt, memory, tools, api_key
+                ) 
 
 
-            elif msg['providerName'] == 'google' : 
+            elif msg['model']['providerName'] == 'google' : 
                 if memory_type == "" : 
                     pass 
                 else : 

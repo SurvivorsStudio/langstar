@@ -36,6 +36,36 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
         pricing: 'Fast and efficient',
         capabilities: ['Text generation', 'Code generation', 'Reasoning'],
         tags: ['Reliable', 'HighPerformance', 'Popular', 'Versatile']
+      },
+      {
+        id: 'gpt-5',
+        name: 'gpt-5',
+        displayName: 'GPT-5',
+        description: 'The best model for coding and agentic tasks across domains',
+        maxTokens: 200000,
+        pricing: 'Premium performance',
+        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Agentic tasks'],
+        tags: ['Latest', 'HighPerformance', 'Coding', 'Agentic', 'Advanced']
+      },
+      {
+        id: 'gpt-5-mini',
+        name: 'gpt-5-mini',
+        displayName: 'GPT-5 mini',
+        description: 'A faster, cost-efficient version of GPT-5 for well-defined tasks',
+        maxTokens: 200000,
+        pricing: 'Cost-efficient',
+        capabilities: ['Text generation', 'Code generation', 'Fast processing'],
+        tags: ['Fast', 'Efficient', 'CostEffective', 'Optimized', 'Reliable']
+      },
+      {
+        id: 'gpt-5-nano',
+        name: 'gpt-5-nano',
+        displayName: 'GPT-5 nano',
+        description: 'Fastest, most cost-efficient version of GPT-5',
+        maxTokens: 200000,
+        pricing: 'Most affordable',
+        capabilities: ['Text generation', 'Code generation', 'Quick responses'],
+        tags: ['Fastest', 'MostAffordable', 'Lightweight', 'Efficient', 'Quick']
       }
     ],
     authFields: [
@@ -320,8 +350,8 @@ export const PROVIDER_CARDS = [
     id: 'openai',
     name: 'OpenAI',
     logo: '🤖',
-    description: 'GPT-4o, GPT-4o Mini, GPT-4 Turbo',
-    modelCount: 3,
+    description: 'GPT-5, GPT-5 mini, GPT-5 nano, GPT-4o, GPT-4o Mini, GPT-4 Turbo',
+    modelCount: 6,
     color: 'bg-green-50 border-green-200 hover:bg-green-100',
     textColor: 'text-green-700',
     iconColor: 'text-green-600'

@@ -20,6 +20,7 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
   };
 
   const getModelCategory = (model: Model) => {
+    if (model.id.includes('gpt-5')) return 'GPT-5 Series';
     if (model.id.includes('gpt-4')) return 'GPT-4 Series';
     if (model.id.includes('gpt-3.5')) return 'GPT-3.5 Series';
     if (model.id.includes('claude-3')) return 'Claude 3 Series';
@@ -68,7 +69,28 @@ const StepModel: React.FC<StepModelProps> = ({ provider, onSelect, onBack }) => 
 
       {/* Model Categories */}
       <div className="space-y-8">
-        {Object.entries(groupedModels).map(([category, models], categoryIndex) => (
+        {Object.entries(groupedModels)
+          .sort(([a], [b]) => {
+            // 카테고리 우선순위 정의
+            const categoryOrder = [
+              'GPT-5 Series',
+              'GPT-4 Series', 
+              'GPT-3.5 Series',
+              'Claude 3 Series',
+              'Claude 2 Series',
+              'Gemini Pro Series',
+              'Gemini Flash Series',
+              'Cohere Series',
+              'Anthropic Series',
+              'Amazon Series',
+              'Meta Series',
+              'Other'
+            ];
+            const aIndex = categoryOrder.indexOf(a);
+            const bIndex = categoryOrder.indexOf(b);
+            return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+          })
+          .map(([category, models], categoryIndex) => (
           <div key={category} className="animate-fadeIn" style={{ animationDelay: `${300 + categoryIndex * 100}ms` }}>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">{category}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
