@@ -750,11 +750,11 @@ def node_{node_name}(state):
         if row['inputType'] == 'select box':
             tmp_data = eval(tmp_match_data, {{}}, input_param)
         elif row['inputType'] == 'text box':
-            tmp_data = eval(tmp_match_data, {{}}, input_param)
+            tmp_data = tmp_match_data
         elif row['inputType'] == 'checkbox':
-            tmp_data = eval(tmp_match_data, {{}}, input_param)
+            tmp_data = tmp_match_data
         elif row['inputType'] == 'radio button':
-            tmp_data = eval(tmp_match_data, {{}}, input_param)
+            tmp_data = tmp_match_data
         else : 
             tmp_data = ''
 
