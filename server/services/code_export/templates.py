@@ -304,7 +304,7 @@ def init_state_code( config_json ) :
     for config_token in config_json:
         for config_key, config_val in config_token.items():
             if '__annotated__' in config_val:
-                code_token = "    {0} :Annotated[dict, operator.or_] = ".format(config_key) + "{}"
+                code_token = "    {0} ".format(config_key) + " : Annotated[dict, lambda x, y: {**x, **y}] ={}"
             else:
                 if 'node_type' in config_val:
                     if config_val['node_type'] == 'promptNode':
@@ -314,7 +314,7 @@ def init_state_code( config_json ) :
                     elif config_val['node_type'] == 'userNode':
                         del config_val['config']['code'] 
                     #     del config_val['data']['code']
-                        
+                print(config_val)
                 code_token = "    {0} :dict = {1}".format(config_key, str(config_val))
                 
             code_lines.append(code_token)
@@ -331,6 +331,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 from typing import Optional
 from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import InMemorySaver 
+import re
 
 {init_log_code()}
 
@@ -411,7 +412,6 @@ def prompt_node_code( node ) :
 
 
     code = """
-import re
 
 def render_prompt(prompt: str, context: dict, show_error: bool = False) -> str:
     def replacer(match):
@@ -463,6 +463,8 @@ def merge_node_code( node ) :
     node_name = node['data']['label']
     node_id = node['id']
     node_type = node['type']
+
+            
     code = f"""
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}(state):
@@ -475,18 +477,38 @@ def node_{node_name}(state):
     node_input  = state_dict[my_name] 
     node_config = state_dict[node_config_key]
                         
+    print(f"Merge node received inputs: {{node_input}}")
+    print(f"Merge node keys: {{list(node_input.keys())}}")
+    
+    # 입력이 없으면 대기
+    if not node_input:
+        print("No inputs received yet, waiting...")
+        return {{node_config_key: state_dict[node_config_key]}}
+    
+    print("Processing available inputs...")
+    
     # 다음 노드에 전달하는 값 
     return_value = {{}} 
-    for key, value  in node_config['config'].items():
-        match_node  = value['node_name'] 
+    for key, value in node_config['config'].items():
+        print(f"Processing merge config - key: {{key}}, value: {{value}}")
+        match_node = value['node_name'] 
         match_value = value['node_value'] 
-        return_value[key]  = node_input[match_node][match_value]
+        
+        if match_node in node_input:
+            # 딕셔너리에서 직접 값 추출
+            return_value[key] = eval(match_value, {{}}, node_input[match_node])
+            print(f"Successfully merged {{key}}: {{return_value[key]}}")
+      
+        else:
+            print(f"Error: {{match_node}} not found in inputs {{list(node_input.keys())}}")
+            # 설정 오류로 간주하고 None 반환
+            return_value[key] = None
 
-    # 전달하고자 하는 타겟 node 리스트 
     next_node_list = node_config.get('next_node', []) 
-
-    return_config = {{ node_config_key : state_dict[node_config_key] }}
-    return return_next_node( node_name, next_node_list, return_value, return_config )   
+    return_config = {{node_config_key: state_dict[node_config_key]}}
+    
+    print(f"Merge returning value: {{return_value}}")
+    return return_next_node(node_name, next_node_list, return_value, return_config)     
 """
     return code 
 
@@ -673,7 +695,6 @@ def agent_node_code( node ):
         if memory_type =="" and len(tools) == 0: 
             return aws_templates.base_base_agent_code( node )
         elif memory_type !="" and len(tools) == 0: 
-            print ("??????????????????")
             return aws_templates.memory_base_agent_code( node )
         elif memory_type =="" and len(tools) != 0: 
             return aws_templates.base_tool_agent_code( node )
@@ -729,11 +750,11 @@ def node_{node_name}(state):
         if row['inputType'] == 'select box':
             tmp_data = eval(tmp_match_data, {{}}, input_param)
         elif row['inputType'] == 'text box':
-            tmp_data = row['matchData']
+            tmp_data = tmp_match_data
         elif row['inputType'] == 'checkbox':
-            tmp_data = row['matchData']
+            tmp_data = tmp_match_data
         elif row['inputType'] == 'radio button':
-            tmp_data = row['matchData']
+            tmp_data = tmp_match_data
         else : 
             tmp_data = ''
 

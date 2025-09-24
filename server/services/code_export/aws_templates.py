@@ -34,10 +34,10 @@ def node_{node_name}( state ) :
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
-    system_prompt     = node_input[system_prompt_key]
+    system_prompt     = eval(system_prompt_key, {{}}, node_input)    
     
     user_prompt_key = node_config['userPromptInputKey']
-    user_prompt     = node_input[user_prompt_key]
+    user_prompt     = eval(user_prompt_key, {{}}, node_input)
     
     output_value  = node_config['agentOutputVariable']
     
@@ -132,10 +132,11 @@ def node_{node_name}( state ) :
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
-    system_prompt     = node_input[system_prompt_key]
+    system_prompt     = eval(system_prompt_key, {{}}, node_input)    
     
     user_prompt_key = node_config['userPromptInputKey']
-    user_prompt     = node_input[user_prompt_key]
+    user_prompt     = eval(user_prompt_key, {{}}, node_input)
+
     
     output_value  = node_config['agentOutputVariable']
     
@@ -243,10 +244,10 @@ def node_{node_name}( state ) :
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
-    system_prompt     = node_input[system_prompt_key]
+    system_prompt     = eval(system_prompt_key, {{}}, node_input)    
     
     user_prompt_key = node_config['userPromptInputKey']
-    user_prompt     = node_input[user_prompt_key]
+    user_prompt     = eval(user_prompt_key, {{}}, node_input)
     
     output_value  = node_config['agentOutputVariable']
     
@@ -416,10 +417,10 @@ def node_{node_name}( state ) :
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
-    system_prompt     = node_input[system_prompt_key]
+    system_prompt     = eval(system_prompt_key, {{}}, node_input)    
     
     user_prompt_key = node_config['userPromptInputKey']
-    user_prompt     = node_input[user_prompt_key]
+    user_prompt     = eval(user_prompt_key, {{}}, node_input)
     
     output_value  = node_config['agentOutputVariable']
 
