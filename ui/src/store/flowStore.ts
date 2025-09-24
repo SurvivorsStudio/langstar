@@ -2062,9 +2062,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
               matchData = node.data.config?.inputData?.[param.name] || '';
             } else if (param.inputType === 'text box') {
-              // text box의 경우 settings에서 값을 가져와 문자열로 전달
+              // text box의 경우 settings에서 값을 가져와서 그대로 전달
               const textValue = node.data.config?.settings?.[param.name] || '';
-              matchData = `'${textValue}'`; // 문자열 리터럴로 감싸기
+              matchData = textValue; // 작은따옴표 제거
+            } else if (param.inputType === 'radio button') {
+              // radio button의 경우 settings에서 선택된 값을 가져와서 그대로 전달
+              const radioValue = node.data.config?.settings?.[param.name] || '';
+              matchData = radioValue; // 작은따옴표 제거
+            } else if (param.inputType === 'checkbox') {
+              // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
+              const checkboxValues = node.data.config?.settings?.[param.name] || [];
+              matchData = checkboxValues; // 배열 자체로 전송
             } else {
               matchData = '';
             }
