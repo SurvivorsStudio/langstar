@@ -44,10 +44,10 @@ const Header: React.FC = () => {
 
   // 편집 중일 때 포커스를 잃으면 편집 취소
   const handleBlur = () => {
-    if (isEditingName) {
-      // 약간의 지연을 두어 버튼 클릭이 처리될 수 있도록 함
+    if (isEditingName && !isProcessingRename && !isRenaming) {
+      // 처리 중이 아닐 때만 취소, 지연 시간도 늘림
       setTimeout(() => {
-        if (isEditingName) {
+        if (isEditingName && !isProcessingRename && !isRenaming) {
           handleCancelEditName();
         }
       }, 100);
@@ -68,7 +68,8 @@ const Header: React.FC = () => {
 
   // 워크플로우 이름 편집 완료
   const handleFinishEditName = async () => {
-    // 중복 호출 방지
+    
+    // 중복 호출 방지 - 사용자에게 피드백 제공
     if (isProcessingRename) {
       return;
     }
@@ -83,6 +84,7 @@ const Header: React.FC = () => {
       return;
     }
 
+    // 즉시 상태 설정하여 blur 이벤트 방지
     setIsProcessingRename(true);
     setIsRenaming(true);
     
@@ -105,6 +107,7 @@ const Header: React.FC = () => {
     } catch (error) {
       console.error('Failed to rename workflow:', error);
       alert(`워크플로우 이름 변경에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+      // 에러 시 편집 모드 유지
     } finally {
       setIsRenaming(false);
       setIsProcessingRename(false);
@@ -175,6 +178,9 @@ const Header: React.FC = () => {
                   autoFocus
                 />
                 <button
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // blur 이벤트 방지
+                  }}
                   onClick={handleFinishEditName}
                   disabled={isRenaming}
                   className="text-green-600 hover:text-green-700 disabled:opacity-50"
@@ -183,6 +189,9 @@ const Header: React.FC = () => {
                   {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓'}
                 </button>
                 <button
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // blur 이벤트 방지
+                  }}
                   onClick={handleCancelEditName}
                   disabled={isRenaming}
                   className="text-red-600 hover:text-red-700 disabled:opacity-50"

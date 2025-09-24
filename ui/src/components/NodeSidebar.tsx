@@ -8,7 +8,10 @@ interface NodeSidebarProps {
 }
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
-  const { userNodes, fetchUserNodes } = useFlowStore();
+  const { userNodes, fetchUserNodes, nodes, isWorkflowRunning } = useFlowStore();
+  
+  // 다른 노드가 실행 중인지 확인
+  const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     'Sequential Agents': true,
@@ -28,6 +31,13 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
   };
 
   const handleNodeDragStart = (event: React.DragEvent, nodeType: string, label: string) => {
+    // 실행 중일 때는 드래그 비활성화
+    if (isWorkflowRunning || isAnyNodeExecuting) {
+      event.preventDefault();
+      alert('워크플로우나 노드가 실행 중일 때는 노드를 추가할 수 없습니다.');
+      return;
+    }
+    
     event.dataTransfer.setData('application/reactflow', JSON.stringify({ type: nodeType, label }));
     event.dataTransfer.effectAllowed = 'move';
   };
@@ -94,8 +104,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                 {category.nodes.map((node) => (
                   <div
                     key={node.type}
-                    className="flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
-                    draggable
+                    className={`flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md mb-2 ${
+                      isWorkflowRunning || isAnyNodeExecuting 
+                        ? 'cursor-not-allowed opacity-50' 
+                        : 'cursor-pointer'
+                    }`}
+                    draggable={!(isWorkflowRunning || isAnyNodeExecuting)}
                     onDragStart={(event) => handleNodeDragStart(event, node.type, node.label)}
                   >
                     <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">
@@ -135,8 +149,12 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
                 userNodes.map((userNode) => (
                   <div
                     key={userNode.id}
-                    className="flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md cursor-pointer mb-2"
-                    draggable
+                    className={`flex flex-row items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md mb-2 ${
+                      isWorkflowRunning || isAnyNodeExecuting 
+                        ? 'cursor-not-allowed opacity-50' 
+                        : 'cursor-pointer'
+                    }`}
+                    draggable={!(isWorkflowRunning || isAnyNodeExecuting)}
                     onDragStart={(event) => handleNodeDragStart(event, 'userNode', userNode.name)}
                   >
                     <div className="flex-shrink-0 w-8 h-8 flex items-center justify-start mr-3">

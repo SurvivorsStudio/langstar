@@ -13,9 +13,12 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges, isWorkflowRunning } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
+  
+  // 다른 노드가 실행 중인지 확인
+  const isAnyOtherNodeExecuting = nodes.some(node => node.id !== id && node.data?.isExecuting);
   // 노드 이름 편집 모드 상태
   const [isEditing, setIsEditing] = useState(false);
   // 편집 중인 노드 이름 상태
@@ -357,8 +360,29 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    */
   const handleExecute = async (event: React.MouseEvent) => {
     event.stopPropagation(); // 이벤트 버블링 방지
+    console.log(`🔍 [CustomNode] handleExecute called for node ${id} (${data?.label}), isExecuting: ${isExecuting}, isWorkflowRunning: ${isWorkflowRunning}, isAnyOtherNodeExecuting: ${isAnyOtherNodeExecuting}`);
+    
+    // 워크플로우 실행 중이거나 다른 노드가 실행 중이면 실행 차단
+    if (isWorkflowRunning) {
+      console.log(`⚠️ [CustomNode] Workflow is running, skipping individual node execution for ${id}`);
+      return;
+    }
+    
+    if (isAnyOtherNodeExecuting) {
+      console.log(`⚠️ [CustomNode] Another node is executing, skipping individual node execution for ${id}`);
+      return;
+    }
+    
     if (!isExecuting) {
+      console.log(`🚀 [CustomNode] Starting execution for node ${id} (${data?.label})`);
+      // 즉시 실행 상태로 설정하여 중복 클릭 방지
+      const { setNodeExecuting } = useFlowStore.getState();
+      setNodeExecuting(id, true, true, data?.label || 'Node');
+      console.log(`✅ [CustomNode] setNodeExecuting called for node ${id}`);
       await executeNode(id);
+      console.log(`🏁 [CustomNode] executeNode completed for node ${id}`);
+    } else {
+      console.log(`⚠️ [CustomNode] Node ${id} is already executing, skipping`);
     }
   };
 
@@ -715,15 +739,31 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
             )}
             
             <div
-              className="rounded-lg shadow-lg relative overflow-visible cursor-pointer"
+              className={`rounded-lg shadow-lg relative overflow-visible cursor-pointer transition-all duration-300 ${
+                isWorkflowRunning || isAnyOtherNodeExecuting ? 'opacity-75' : ''
+              }`}
               style={{
                 backgroundColor: nodeStyle.backgroundColor,
-                borderColor: nodeStyle.borderColor,
+                borderColor: isWorkflowRunning ? '#3b82f6' : isAnyOtherNodeExecuting ? '#6b7280' : nodeStyle.borderColor,
                 borderWidth: '2px',
-                borderStyle: 'solid'
+                borderStyle: 'solid',
+                position: 'relative'
               }}
               onDoubleClick={handleNodeDoubleClick}
             >
+              {/* 워크플로우 실행 중일 때 로딩 오버레이 */}
+              {isWorkflowRunning && !isExecuting && (
+                <div className="absolute inset-0 bg-blue-500 bg-opacity-10 rounded-lg flex items-center justify-center z-20">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              
+              {/* 다른 노드 실행 중일 때 로딩 오버레이 */}
+              {isAnyOtherNodeExecuting && !isExecuting && (
+                <div className="absolute inset-0 bg-gray-500 bg-opacity-10 rounded-lg flex items-center justify-center z-20">
+                  <div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
               {/* 우상단 상태 점 제거 */}
               
               {/* 노드 우측 상단 버튼들 (재생 버튼 이동) */}
@@ -734,32 +774,40 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                 >
                   <button
                     onClick={handleExecute}
-                    disabled={
-                      isExecuting ||
-                      (isConditionNode && hasValidationError) ||
-                      (!hasConnection) ||
-                      (!hasNonEmptyInput && !isStartNode)
-                    }
+                disabled={
+                  isExecuting ||
+                  isWorkflowRunning ||
+                  isAnyOtherNodeExecuting ||
+                  (isConditionNode && hasValidationError) ||
+                  (!hasConnection) ||
+                  (!hasNonEmptyInput && !isStartNode)
+                }
                     className={`p-1.5 rounded-full shadow-md transition-all duration-200 disabled:cursor-not-allowed 
                       ${(
                         !hasConnection ||
                         isExecuting ||
+                        isWorkflowRunning ||
+                        isAnyOtherNodeExecuting ||
                         (isConditionNode && hasValidationError) ||
                         (!hasNonEmptyInput && !isStartNode)
                       )
                         ? 'bg-gray-300 hover:bg-gray-400 text-white'
                         : 'bg-green-500 hover:bg-green-600 text-white hover:scale-110'}`}
                     title={
-                      !hasConnection
-                        ? '노드를 연결해주세요'
-                        : (!hasNonEmptyInput && !isStartNode)
-                          ? 'No input data. Execute preceding nodes.'
-                          : hasValidationError
-                            ? 'Fix validation errors before executing'
-                            : 'Execute Node'
+                      isWorkflowRunning
+                        ? '워크플로우 실행 중입니다'
+                        : isAnyOtherNodeExecuting
+                          ? '다른 노드가 실행 중입니다'
+                          : !hasConnection
+                            ? '노드를 연결해주세요'
+                            : (!hasNonEmptyInput && !isStartNode)
+                              ? 'No input data. Execute preceding nodes.'
+                              : hasValidationError
+                                ? 'Fix validation errors before executing'
+                                : 'Execute Node'
                     }
                   >
-                    {isExecuting ? (
+                    {isExecuting || isWorkflowRunning || isAnyOtherNodeExecuting ? (
                       <Loader className="w-4 h-4 animate-spin" />
                     ) : (
                       <Play className="w-4 h-4 text-white" />
