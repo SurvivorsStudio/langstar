@@ -102,7 +102,7 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
 
         tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, memory=memory)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
         
         # 안전한 response 파싱
@@ -200,7 +200,7 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
 
         tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
         agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, memory=memory)
         response = agent_executor.invoke( {'user_prompt' : user_prompt} )
         
         # 안전한 response 파싱
