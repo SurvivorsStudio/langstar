@@ -13,16 +13,16 @@
 - 변경한 내용을 요약한다.  
   What are the high level changes contained in this PR ?
 
-## 관련 이슈 / ( Related issue )
+## 관련 이슈 ( Related issue )
 - 이 PR과 관련된 이슈 번호를 입력한다.  
   Please specify the related Github issue
 - fixed to: < Gitgub issue number >
 
-## 기대 효과 / ( Intended Effects )
+## 기대 효과 ( Intended Effects )
 - 수정된 내용이 어떻게 동작해야 하는지 요약한다.  
   What was true about the code base before, that has changed ?
 
-## 코드 품질 / ( Code Quality )
+## 코드 품질 ( Code Quality )
 - [ ] 변경 사항을 자체적으로 리뷰했다.  
   I have performed a self-review of my own code
 - [ ] 변경 사항을 로컬에서 테스트했다.  
