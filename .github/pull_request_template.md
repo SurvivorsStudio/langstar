@@ -16,7 +16,7 @@
 ## 관련 이슈 / ( Related issue )
 - 이 PR과 관련된 이슈 번호를 입력한다.  
   Please specify the related Github issue
-- Related to: < Gitgub issue number >
+- fixed to: < Gitgub issue number >
 
 ## 기대 효과 / ( Intended Effects )
 - 수정된 내용이 어떻게 동작해야 하는지 요약한다.  
@@ -48,7 +48,7 @@
   I have tested on my local environment
 - [ ] 변경 사항이 코딩 스타일 가이드를 준수하고 있다.  
   This PR follows the style guidelines
-- [ ] OWASP Top 10을 고려해 보안 사항을 리뷰했다.  
-  I have reviewed this PR against OWASP Top 10
+- [ ] [OWASP Top 10](https://owasp.org/www-project-top-ten/)을 고려해 보안 사항을 리뷰했다.  
+  I have reviewed this PR against [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [ ] 전체 단위 테스트를 성공적으로 실행했다.  
   I have confirmed that all unit tests are passed
