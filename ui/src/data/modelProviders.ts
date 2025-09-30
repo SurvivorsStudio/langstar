@@ -203,14 +203,10 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
     description: 'Amazon Bedrock foundation models (us-east-1)',
     category: 'language',
     models: [
-      { id: 'amazon.nova-canvas-v1:0', name: 'amazon.nova-canvas-v1:0', displayName: 'Nova Canvas', description: 'Amazon Nova Canvas', maxTokens: 32768, capabilities: ['Text', 'Image'], tags: ['AWS', 'Nova', 'Canvas'] },
       { id: 'amazon.nova-lite-v1:0', name: 'amazon.nova-lite-v1:0', displayName: 'Nova Lite', description: 'Amazon Nova Lite', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Lite'] },
       { id: 'amazon.nova-micro-v1:0', name: 'amazon.nova-micro-v1:0', displayName: 'Nova Micro', description: 'Amazon Nova Micro', maxTokens: 32768, capabilities: ['Text'], tags: ['AWS', 'Nova', 'Micro'] },
       { id: 'amazon.nova-premier-v1:0', name: 'amazon.nova-premier-v1:0', displayName: 'Nova Premier', description: 'Amazon Nova Premier', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Premier'] },
       { id: 'amazon.nova-pro-v1:0', name: 'amazon.nova-pro-v1:0', displayName: 'Nova Pro', description: 'Amazon Nova Pro', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Pro'] },
-      { id: 'amazon.nova-reel-v1:0', name: 'amazon.nova-reel-v1:0', displayName: 'Nova Reel', description: 'Amazon Nova Reel', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Reel'] },
-      { id: 'amazon.nova-reel-v1:1', name: 'amazon.nova-reel-v1:1', displayName: 'Nova Reel v1:1', description: 'Amazon Nova Reel v1:1', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Reel'] },
-      { id: 'amazon.nova-sonic-v1:0', name: 'amazon.nova-sonic-v1:0', displayName: 'Nova Sonic', description: 'Amazon Nova Sonic', maxTokens: 32768, capabilities: ['Speech', 'Text'], tags: ['AWS', 'Nova', 'Sonic'] },
       { id: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', displayName: 'Claude 3.5 Sonnet 20241022 v2:0', description: 'Anthropic Claude 3.5 Sonnet 20241022 v2:0', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', '3.5', 'Sonnet'] },
     ],
     authFields: [
@@ -405,7 +401,7 @@ export const PROVIDER_CARDS = [
     name: 'AWS',
     logo: '☁️',
     description: 'Nova, Claude via Bedrock',
-    modelCount: 9,
+    modelCount: 5,
     color: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
     textColor: 'text-yellow-700',
     iconColor: 'text-yellow-600'
