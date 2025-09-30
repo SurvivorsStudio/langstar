@@ -15,7 +15,7 @@ import textwrap
 import re
 import logging
 import traceback
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from langchain_core.tools import StructuredTool
 from server.services.code_export import templates, utile
 from server.services.code_excute import flower_manager
@@ -29,12 +29,28 @@ from fastapi import HTTPException
 logger = logging.getLogger(__name__)
 flower_manager = flower_manager.FlowerManager()
 
-def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[]):
+def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[], aws_access_key_id=None, aws_secret_access_key=None, aws_region=None):
+    # AWS 자격 증명 필수 검증
+    if not aws_access_key_id:
+        raise ValueError("AWS Access Key ID is required")
+    if not aws_secret_access_key:
+        raise ValueError("AWS Secret Access Key is required")
+    if not aws_region:
+        raise ValueError("AWS Region is required")
+    
+    # AWS 자격 증명 설정
+    aws_config = {
+        'aws_access_key_id': aws_access_key_id,
+        'aws_secret_access_key': aws_secret_access_key,
+        'region_name': aws_region
+    }
+    
     # 도구 없이, 메모리 없이
     llm = ChatBedrockConverse(
             model=modelName,
             temperature=temperature,
-            max_tokens=max_token
+            max_tokens=max_token,
+            **aws_config
         )
 
     if memory == "" and len(tool_info) == 0:
@@ -723,7 +739,24 @@ def evaluate_condition({argument_name}):
                 
                 
             if msg['model']['providerName'] == 'aws' : 
-                return run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, memory, tools )
+                # AWS 자격 증명 정보 추출
+                aws_access_key_id = msg['model'].get('accessKeyId')
+                aws_secret_access_key = msg['model'].get('secretAccessKey')
+                aws_region = msg['model'].get('region')
+                
+                # AWS 자격 증명 검증
+                if not aws_access_key_id:
+                    raise ValueError("AWS Access Key ID is required for AWS Bedrock models")
+                if not aws_secret_access_key:
+                    raise ValueError("AWS Secret Access Key is required for AWS Bedrock models")
+                if not aws_region:
+                    raise ValueError("AWS Region is required for AWS Bedrock models")
+                
+                return run_bedrock(
+                    modelName, temperature, max_token, 
+                    system_prompt, user_prompt, memory, tools,
+                    aws_access_key_id, aws_secret_access_key, aws_region
+                )
                 
             elif msg['model']['providerName'] == 'openai' : 
                 api_key = msg['model'].get('apiKey')
