@@ -2,6 +2,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
@@ -15,7 +16,6 @@ import re
 import logging
 import traceback
 from typing import Dict, Any
-from langchain.chains import LLMChain
 from langchain_core.tools import StructuredTool
 from server.services.code_export import templates, utile
 from server.services.code_excute import flower_manager
@@ -43,8 +43,8 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             ("human", "{user_prompt}")
         ])
        
-        llm_chain = LLMChain(llm=llm, prompt=prompt)
-        response = llm_chain.predict(user_prompt=user_prompt)
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt})
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 메모리 있어
@@ -55,8 +55,8 @@ def run_bedrock(modelName, temperature, max_token, system_prompt, user_prompt, m
             ("human", "{user_prompt}")
         ])
         
-        llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
-        response = llm_chain.predict(user_prompt=user_prompt)
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt, "history": memory.chat_memory.messages})
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 도구 있어
@@ -141,8 +141,8 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
             ("human", "{user_prompt}")
         ])
        
-        llm_chain = LLMChain(llm=llm, prompt=prompt)
-        response = llm_chain.predict(user_prompt=user_prompt)
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt})
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     # 메모리 있어
@@ -153,8 +153,8 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
             ("human", "{user_prompt}")
         ])
         
-        llm_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
-        response = llm_chain.predict(user_prompt=user_prompt)
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt, "history": memory.chat_memory.messages})
 
         return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
@@ -219,6 +219,98 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
                 return str(response)
         except Exception as e:
             logger.error(f"Error parsing agent response: {str(e)}")
+            return str(response)
+
+
+def run_google(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[], api_key=""):
+    """Google Gemini 모델 실행 함수"""
+    # 도구 없이, 메모리 없이
+    llm = ChatGoogleGenerativeAI(
+        model=modelName,
+        temperature=temperature,
+        max_output_tokens=max_token,
+        google_api_key=api_key
+    )
+    
+
+    if memory == "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}")
+        ])
+       
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt})
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+
+    # 메모리 있어
+    elif memory != "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}")
+        ])
+        
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt, "history": memory.chat_memory.messages})
+
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+
+    # 도구 있어
+    elif memory == "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+
+        # Google 모델 전용 응답 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                # Google 모델의 경우 output이 문자열로 직접 반환됨
+                if isinstance(output, str):
+                    return output
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing Google agent response: {str(e)}")
+            return str(response)
+
+    # 도구 있어, 메모리 있어
+    elif memory != "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, memory=memory)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+        
+        # Google 모델 전용 응답 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                # Google 모델의 경우 output이 문자열로 직접 반환됨
+                if isinstance(output, str):
+                    return output
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing Google agent response: {str(e)}")
             return str(response)
 
 
@@ -645,10 +737,14 @@ def evaluate_condition({argument_name}):
 
 
             elif msg['model']['providerName'] == 'google' : 
-                if memory_type == "" : 
-                    pass 
-                else : 
-                    pass 
+                api_key = msg['model'].get('apiKey')
+                if not api_key:
+                    raise ValueError("Google API key is required")
+                
+                return run_google(
+                    modelName, temperature, max_token, 
+                    system_prompt, user_prompt, memory, tools, api_key
+                ) 
 
         except Exception as e: 
             error_msg = f"Error in agent node processing: {str(e)}"
