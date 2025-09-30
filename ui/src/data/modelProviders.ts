@@ -123,15 +123,6 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
     category: 'language',
     models: [
       {
-        id: 'gemini-2.5-pro',
-        name: 'gemini-2.5-pro',
-        displayName: 'Gemini 2.5 Pro',
-        description: 'Most advanced Gemini model with strong reasoning and multimodal capabilities',
-        maxTokens: 1048576,
-        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Multimodal input Text'],
-        tags: ['HighEnd', 'Reasoning', 'Multimodal', 'ComplexTasks']
-      },
-      {
         id: 'gemini-2.5-flash',
         name: 'gemini-2.5-flash',
         displayName: 'Gemini 2.5 Flash',
@@ -403,8 +394,8 @@ export const PROVIDER_CARDS = [
     id: 'google',
     name: 'Google',
     logo: '🔍',
-    description: 'Gemini 2.5 (Pro, Flash, Flash-Lite), Gemini 2.0 (Flash, Flash-Lite), Gemini 1.5 (Pro, Flash, Flash-8B)',
-    modelCount: 8,
+    description: 'Gemini 2.5 (Flash, Flash-Lite), Gemini 2.0 (Flash, Flash-Lite), Gemini 1.5 (Pro, Flash, Flash-8B)',
+    modelCount: 7,
     color: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
     textColor: 'text-blue-700',
     iconColor: 'text-blue-600'
