@@ -149,8 +149,8 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
         tags: ['HybridReasoning', 'Flexible', 'Agentic']
       },
       {
-        id: 'claude-3-5-haiku-20241022',
-        name: 'claude-3-5-haiku-20241022',
+        id: 'claude-3-5-haiku-latest',
+        name: 'claude-3-5-haiku-latest',
         displayName: 'Claude 3.5 Haiku',
         description: 'Fast and efficient model in Claude 3.5 family',
         maxTokens: 200000,

@@ -3,6 +3,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_aws import ChatBedrockConverse
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
@@ -327,6 +328,122 @@ def run_google(modelName, temperature, max_token, system_prompt, user_prompt, me
                 return str(response)
         except Exception as e:
             logger.error(f"Error parsing Google agent response: {str(e)}")
+            return str(response)
+
+
+def run_anthropic(modelName, temperature, max_token, system_prompt, user_prompt, memory="", tool_info=[], api_key=""):
+    """Anthropic Claude 모델 실행 함수"""
+    # 도구 없이, 메모리 없이
+
+    
+    llm = ChatAnthropic(
+        model=modelName,
+        temperature=temperature,
+        max_tokens=max_token,
+        anthropic_api_key=api_key
+    )
+
+
+    if memory == "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}")
+        ])
+
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt})
+
+        
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+        
+
+    # 메모리 있어
+    elif memory != "" and len(tool_info) == 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}")
+        ])
+        
+        chain = prompt | llm
+        response = chain.invoke({"user_prompt": user_prompt, "history": memory.chat_memory.messages})
+
+        return response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
+
+    # 도구 있어
+    elif memory == "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+
+        # Anthropic 모델 전용 응답 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                # Anthropic 모델의 경우 output이 리스트 형태로 반환됨
+                if isinstance(output, list) and len(output) > 0:
+                    # 첫 번째 요소에서 text 값 추출
+                    first_item = output[0]
+                    if isinstance(first_item, dict) and "text" in first_item:
+                        return first_item["text"]
+                    else:
+                        return str(first_item)
+                elif isinstance(output, str):
+                    return output
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing Anthropic agent response: {str(e)}")
+            return str(response)
+
+    # 도구 있어, 메모리 있어
+    elif memory != "" and len(tool_info) != 0:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"{system_prompt}"),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_prompt}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        tools = [WorkflowService.create_tool_from_api(**tool) for tool in tool_info]
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, memory=memory)
+        response = agent_executor.invoke( {'user_prompt' : user_prompt} )
+
+        logger.info("--------------------------------")
+        logger.info("--------------------------------")
+        logger.info("--------------------------------")
+        logger.info(response)
+        
+        # Anthropic 모델 전용 응답 파싱
+        try:
+            if isinstance(response, dict) and "output" in response:
+                output = response["output"]
+                # Anthropic 모델의 경우 output이 리스트 형태로 반환됨
+                if isinstance(output, list) and len(output) > 0:
+                    # 첫 번째 요소에서 text 값 추출
+                    first_item = output[0]
+                    if isinstance(first_item, dict) and "text" in first_item:
+                        return first_item["text"]
+                    else:
+                        return str(first_item)
+                elif isinstance(output, str):
+                    return output
+                else:
+                    return str(response)
+            else:
+                return str(response)
+        except Exception as e:
+            logger.error(f"Error parsing Anthropic agent response: {str(e)}")
             return str(response)
 
 
@@ -775,6 +892,16 @@ def evaluate_condition({argument_name}):
                     raise ValueError("Google API key is required")
                 
                 return run_google(
+                    modelName, temperature, max_token, 
+                    system_prompt, user_prompt, memory, tools, api_key
+                ) 
+
+            elif msg['model']['providerName'] == 'anthropic' : 
+                api_key = msg['model'].get('apiKey')
+                if not api_key:
+                    raise ValueError("Anthropic API key is required")
+                
+                return run_anthropic(
                     modelName, temperature, max_token, 
                     system_prompt, user_prompt, memory, tools, api_key
                 ) 
