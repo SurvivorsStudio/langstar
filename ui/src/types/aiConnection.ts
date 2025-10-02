@@ -6,6 +6,14 @@ export interface ModelProvider {
   models: Model[];
   authFields: AuthField[];
   category: 'language' | 'embedding';
+  supportedRegions?: Region[];
+  commonCapabilities?: string[];
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  displayName: string;
 }
 
 export interface Model {
@@ -14,9 +22,11 @@ export interface Model {
   displayName: string;
   description: string;
   maxTokens?: number;
+  maxOutputTokens?: number;
   pricing?: string;
   capabilities: string[];
   tags?: string[];
+  regions?: string[];
 }
 
 export interface AuthField {

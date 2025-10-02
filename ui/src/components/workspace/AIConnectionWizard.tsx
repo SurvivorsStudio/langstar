@@ -25,6 +25,7 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
   const [selectedType, setSelectedType] = useState<'language' | 'embedding' | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [formData, setFormData] = useState<AIConnectionForm>({
     name: '',
     provider: '',
@@ -96,9 +97,14 @@ const AIConnectionWizard: React.FC<AIConnectionWizardProps> = ({
     setCurrentStep(isUnifiedView ? 3 : 2);
   };
 
-  const handleModelSelect = (modelId: string) => {
+  const handleModelSelect = (modelId: string, region?: string) => {
     setSelectedModel(modelId);
-    setFormData(prev => ({ ...prev, model: modelId }));
+    if (region) {
+      setSelectedRegion(region);
+      setFormData(prev => ({ ...prev, model: modelId, region: region }));
+    } else {
+      setFormData(prev => ({ ...prev, model: modelId }));
+    }
     setCurrentStep(isUnifiedView ? 4 : 3);
   };
 

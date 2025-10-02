@@ -137,9 +137,14 @@ const StepAuth: React.FC<StepAuthProps> = ({
                   type={field.type === 'password' && showPasswords[field.name] ? 'text' : field.type}
                   value={authForm[field.name as keyof typeof authForm] || ''}
                   onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 pr-12 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 pr-12 ${
+                    provider.id === 'aws' && field.name === 'region' 
+                      ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed' 
+                      : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                  }`}
                   placeholder={field.placeholder}
                   required={field.required}
+                  disabled={provider.id === 'aws' && field.name === 'region'}
                 />
                 {field.type === 'password' && (
                   <button
@@ -158,7 +163,11 @@ const StepAuth: React.FC<StepAuthProps> = ({
               {field.helpText && (
                 <div className="flex items-start mt-2">
                   <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-300 mr-2 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{field.helpText}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {provider.id === 'aws' && field.name === 'region' 
+                      ? 'Region is automatically set based on your model selection' 
+                      : field.helpText}
+                  </p>
                 </div>
               )}
             </div>

@@ -76,33 +76,100 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
     category: 'language',
     models: [
       {
-        id: 'claude-3-5-sonnet',
-        name: 'claude-3-5-sonnet',
-        displayName: 'Claude 3.5 Sonnet',
-        description: 'Most capable and balanced model',
+        id: 'claude-sonnet-4-5-20250929',
+        name: 'claude-sonnet-4-5-20250929',
+        displayName: 'Claude Sonnet 4.5',
+        description: 'Our best model for complex agents and coding, with highest intelligence across most tasks',
         maxTokens: 200000,
-        pricing: 'Best performance',
-        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Vision'],
-        tags: ['LongContext', 'Fast', 'Stable', 'VisionSupport']
+        pricing: 'Higher tier / flagship',
+        capabilities: [
+          'Reasoning',
+          'Vision',
+          'Tool use'
+        ],
+        tags: ['LongContext', 'Advanced', 'Agentic', 'VisionSupport']
       },
       {
-        id: 'claude-3-5-haiku',
-        name: 'claude-3-5-haiku',
+        id: 'claude-opus-4-1-20250805',
+        name: 'claude-opus-4-1-20250805',
+        displayName: 'Claude Opus 4.1',
+        description: 'Exceptional model for specialized complex tasks requiring advanced reasoning',
+        maxTokens: 200000,
+        pricing: 'Premium',
+        capabilities: [
+          'Reasoning',
+          'Vision',
+          'Tool use',
+          'Agentic search',
+          'Parallel tool execution'
+        ],
+        tags: ['HighestReasoning', 'Specialist', 'Agentic']
+      },
+      {
+        id: 'claude-sonnet-4-20250514',
+        name: 'claude-sonnet-4-20250514',
+        displayName: 'Claude Sonnet 4',
+        description: 'Balanced model in Claude 4 generation, strong reasoning & intelligence',
+        maxTokens: 200000,
+        pricing: 'Mid-tier',
+        capabilities: [
+          'Reasoning',
+          'Vision',
+          'Tool use'
+        ],
+        tags: ['Balanced', 'Efficient', 'Agentic']
+      },
+      {
+        id: 'claude-opus-4-20250514',
+        name: 'claude-opus-4-20250514',
+        displayName: 'Claude Opus 4',
+        description: 'Previous flagship model in Claude 4 generation, very high intelligence',
+        maxTokens: 200000,
+        pricing: 'High',
+        capabilities: [
+          'Reasoning',
+          'Vision',
+          'Tool use'
+        ],
+        tags: ['Flagship', 'HighPerformance']
+      },
+      {
+        id: 'claude-3-7-sonnet-20250219',
+        name: 'claude-3-7-sonnet-20250219',
+        displayName: 'Claude 3.7 Sonnet',
+        description: 'Hybrid reasoning model; lets you choose between fast or methodical reasoning',
+        maxTokens: 200000,
+        pricing: 'Mid-high',
+        capabilities: [
+          'Reasoning',
+          'Extended thinking',
+          'Hybrid reasoning',
+          'Tool use'
+        ],
+        tags: ['HybridReasoning', 'Flexible', 'Agentic']
+      },
+      {
+        id: 'claude-3-5-haiku-20241022',
+        name: 'claude-3-5-haiku-20241022',
         displayName: 'Claude 3.5 Haiku',
-        description: 'Fast and efficient model',
+        description: 'Fast and efficient model in Claude 3.5 family',
         maxTokens: 200000,
-        pricing: 'Most affordable',
-        capabilities: ['Text generation', 'Code generation'],
-        tags: ['Fastest', 'Efficient', 'LowCost', 'ShortContext']
+        pricing: 'Lower-cost',
+        capabilities: [],
+        tags: ['Fastest', 'CostEffective']
       },
       {
-        id: 'claude-3-opus',
-        name: 'claude-3-opus',
-        displayName: 'Claude 3 Opus',
-        description: 'Previous generation, most powerful',
+        id: 'claude-3-5-sonnet-20241022',
+        name: 'claude-3-5-sonnet-20241022',
+        displayName: 'Claude 3.5 Sonnet',
+        description: 'Most capable model in Claude 3.5 family',
         maxTokens: 200000,
-        capabilities: ['Text generation', 'Code generation', 'Reasoning', 'Vision'],
-        tags: ['Powerful', 'Advanced', 'Vision', 'Reasoning']
+        pricing: 'Standard',
+        capabilities: [
+          'Reasoning',
+          'Vision'
+        ],
+        tags: ['Balanced', 'Versatile']
       }
     ],
     authFields: [
@@ -111,8 +178,8 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
         label: 'API Key',
         type: 'password',
         required: true,
-        placeholder: 'sk-ant-...',
-        helpText: 'Get your API key from Anthropic console'
+        placeholder: 'sk-anthropic-...',
+        helpText: 'Get your API key from Anthropic / Claude console'
       }
     ]
   },
@@ -200,19 +267,53 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
   {
     id: 'aws',
     name: 'AWS',
-    description: 'Amazon Bedrock foundation models (us-east-1)',
+    description: 'Amazon Bedrock foundation models',
     category: 'language',
     models: [
-      { id: 'amazon.nova-lite-v1:0', name: 'amazon.nova-lite-v1:0', displayName: 'Nova Lite', description: 'Amazon Nova Lite', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Lite'] },
-      { id: 'amazon.nova-micro-v1:0', name: 'amazon.nova-micro-v1:0', displayName: 'Nova Micro', description: 'Amazon Nova Micro', maxTokens: 32768, capabilities: ['Text'], tags: ['AWS', 'Nova', 'Micro'] },
-      { id: 'amazon.nova-premier-v1:0', name: 'amazon.nova-premier-v1:0', displayName: 'Nova Premier', description: 'Amazon Nova Premier', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Premier'] },
-      { id: 'amazon.nova-pro-v1:0', name: 'amazon.nova-pro-v1:0', displayName: 'Nova Pro', description: 'Amazon Nova Pro', maxTokens: 32768, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Pro'] },
-      { id: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0', displayName: 'Claude 3.5 Sonnet 20241022 v2:0', description: 'Anthropic Claude 3.5 Sonnet 20241022 v2:0', maxTokens: 200000, capabilities: ['Text', 'Chat'], tags: ['Anthropic', 'Claude', '3.5', 'Sonnet'] },
+      // Amazon Nova Models
+      { id: 'amazon.nova-premier-v1:0', name: 'amazon.nova-premier-v1:0', displayName: 'Nova Premier', description: 'Amazon Nova Premier - Most capable model with 1M context window', maxTokens: 1000000, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Premier', 'UltraLongContext'], regions: ['us-east-1'] },
+      { id: 'amazon.nova-pro-v1:0', name: 'amazon.nova-pro-v1:0', displayName: 'Nova Pro', description: 'Amazon Nova Pro - High performance model with 300K context window', maxTokens: 300000, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Pro', 'LongContext'], regions: ['us-east-1', 'us-gov-west-1', 'ap-northeast-1', 'ap-southeast-2', 'eu-west-2'] },
+      { id: 'amazon.nova-lite-v1:0', name: 'amazon.nova-lite-v1:0', displayName: 'Nova Lite', description: 'Amazon Nova Lite - Balanced model with 300K context window', maxTokens: 300000, capabilities: ['Text', 'Image', 'Video'], tags: ['AWS', 'Nova', 'Lite', 'LongContext'], regions: ['us-east-1', 'us-gov-west-1', 'ap-northeast-1', 'ap-southeast-2', 'eu-west-2'] },
+      { id: 'amazon.nova-micro-v1:0', name: 'amazon.nova-micro-v1:0', displayName: 'Nova Micro', description: 'Amazon Nova Micro - Efficient model with 128K context window', maxTokens: 128000, capabilities: ['Text'], tags: ['AWS', 'Nova', 'Micro', 'Efficient'], regions: ['us-east-1', 'us-gov-west-1', 'ap-northeast-1', 'ap-southeast-2', 'eu-west-2'] },
+      
+      // Anthropic Claude Models
+      { id: 'anthropic.claude-3-haiku-20240307-v1:0', name: 'anthropic.claude-3-haiku-20240307-v1:0', displayName: 'Claude 3 Haiku', description: 'Fast and efficient Claude model', maxTokens: 200000, maxOutputTokens: 4096, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3', 'Haiku', 'Fast'], regions: ['us-east-1', 'us-west-2', 'us-gov-west-1', 'ap-northeast-1', 'ap-northeast-2', 'ap-south-1', 'ap-southeast-1', 'ap-southeast-2', 'ca-central-1', 'eu-central-1', 'eu-central-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'sa-east-1'] },
+      { id: 'anthropic.claude-3-opus-20240229-v1:0', name: 'anthropic.claude-3-opus-20240229-v1:0', displayName: 'Claude 3 Opus', description: 'Most powerful Claude model', maxTokens: 200000, maxOutputTokens: 4096, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3', 'Opus', 'Powerful'], regions: ['us-west-2'] },
+      { id: 'anthropic.claude-3-sonnet-20240229-v1:0', name: 'anthropic.claude-3-sonnet-20240229-v1:0', displayName: 'Claude 3 Sonnet', description: 'Balanced Claude model', maxTokens: 200000, maxOutputTokens: 4096, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3', 'Sonnet', 'Balanced'], regions: ['us-east-1', 'us-west-2', 'ap-south-1', 'ap-southeast-2', 'ca-central-1', 'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'sa-east-1'] },
+      { id: 'anthropic.claude-3-5-haiku-20241022-v1:0', name: 'anthropic.claude-3-5-haiku-20241022-v1:0', displayName: 'Claude 3.5 Haiku', description: 'Latest generation Haiku model', maxTokens: 200000, maxOutputTokens: 8192, capabilities: ['텍스트'], tags: ['Anthropic', 'Claude', '3.5', 'Haiku', 'Latest'], regions: ['us-west-2'] },
+      { id: 'anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'anthropic.claude-3-5-sonnet-20241022-v2:0', displayName: 'Claude 3.5 Sonnet v2', description: 'Latest generation Sonnet model v2', maxTokens: 200000, maxOutputTokens: 8192, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3.5', 'Sonnet', 'v2', 'Latest'], regions: ['us-west-2', 'ap-southeast-2'] },
+      { id: 'anthropic.claude-3-5-sonnet-20240620-v1:0', name: 'anthropic.claude-3-5-sonnet-20240620-v1:0', displayName: 'Claude 3.5 Sonnet', description: 'Latest generation Sonnet model', maxTokens: 200000, maxOutputTokens: 8192, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3.5', 'Sonnet', 'Latest'], regions: ['us-east-1', 'us-west-2', 'us-gov-west-1', 'ap-northeast-1', 'ap-northeast-2', 'ap-southeast-1', 'eu-central-1', 'eu-central-2'] },
+      { id: 'anthropic.claude-3-7-sonnet-20250219-v1:0', name: 'anthropic.claude-3-7-sonnet-20250219-v1:0', displayName: 'Claude 3.7 Sonnet', description: 'Advanced Claude model', maxTokens: 200000, maxOutputTokens: 8192, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', '3.7', 'Sonnet', 'Advanced'], regions: ['us-gov-west-1', 'eu-west-2'] },
+      { id: 'anthropic.claude-opus-4-1-20250805-v1:0', name: 'anthropic.claude-opus-4-1-20250805-v1:0', displayName: 'Claude Opus 4.1', description: 'Next generation Opus model', maxTokens: 200000, maxOutputTokens: 32000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Opus', '4.1', 'NextGen'], regions: [] },
+      { id: 'anthropic.claude-opus-4-20250514-v1:0', name: 'anthropic.claude-opus-4-20250514-v1:0', displayName: 'Claude Opus 4', description: 'Next generation Opus model', maxTokens: 200000, maxOutputTokens: 32000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Opus', '4', 'NextGen'], regions: [] },
+      { id: 'anthropic.claude-sonnet-4-20250514-v1:0', name: 'anthropic.claude-sonnet-4-20250514-v1:0', displayName: 'Claude Sonnet 4', description: 'Next generation Sonnet model', maxTokens: 200000, maxOutputTokens: 64000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Sonnet', '4', 'NextGen'], regions: [] },
+      
+      // OpenAI Series Models
+      { id: 'openai.gpt-oss-120b-1:0', name: 'openai.gpt-oss-120b-1:0', displayName: 'GPT-OSS-120B', description: 'OpenAI Series 120B parameter model', maxTokens: 128000, capabilities: ['텍스트'], tags: ['OpenAI', 'OSS', '120B', 'Large'], regions: ['us-west-2'] },
+      { id: 'openai.gpt-oss-20b-1:0', name: 'openai.gpt-oss-20b-1:0', displayName: 'GPT-OSS-20B', description: 'OpenAI Series 20B parameter model', maxTokens: 128000, capabilities: ['텍스트'], tags: ['OpenAI', 'OSS', '20B', 'Medium'], regions: ['us-west-2'] },
     ],
     authFields: [
       { name: 'accessKeyId', label: 'Access Key ID', type: 'text', required: true, placeholder: 'AKIA...', helpText: 'AWS Access Key ID' },
       { name: 'secretAccessKey', label: 'Secret Access Key', type: 'password', required: true, placeholder: '...', helpText: 'AWS Secret Access Key' },
       { name: 'region', label: 'Region', type: 'text', required: true, placeholder: 'us-east-1', helpText: 'AWS region (e.g., us-east-1, us-west-2)' }
+    ],
+    supportedRegions: [
+      { id: 'us-east-1', name: 'US East (N. Virginia)', displayName: 'us-east-1' },
+      { id: 'us-west-2', name: 'US West (Oregon)', displayName: 'us-west-2' },
+      { id: 'us-gov-west-1', name: 'US Gov West (N. California)', displayName: 'us-gov-west-1' },
+      { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)', displayName: 'ap-northeast-1' },
+      { id: 'ap-northeast-2', name: 'Asia Pacific (Seoul)', displayName: 'ap-northeast-2' },
+      { id: 'ap-south-1', name: 'Asia Pacific (Mumbai)', displayName: 'ap-south-1' },
+      { id: 'ap-southeast-1', name: 'Asia Pacific (Singapore)', displayName: 'ap-southeast-1' },
+      { id: 'ap-southeast-2', name: 'Asia Pacific (Sydney)', displayName: 'ap-southeast-2' },
+      { id: 'ca-central-1', name: 'Canada (Central)', displayName: 'ca-central-1' },
+      { id: 'eu-central-1', name: 'Europe (Frankfurt)', displayName: 'eu-central-1' },
+      { id: 'eu-central-2', name: 'Europe (Zurich)', displayName: 'eu-central-2' },
+      { id: 'eu-west-1', name: 'Europe (Ireland)', displayName: 'eu-west-1' },
+      { id: 'eu-west-2', name: 'Europe (London)', displayName: 'eu-west-2' },
+      { id: 'eu-west-3', name: 'Europe (Paris)', displayName: 'eu-west-3' },
+      { id: 'eu-north-1', name: 'Europe (Stockholm)', displayName: 'eu-north-1' },
+      { id: 'sa-east-1', name: 'South America (São Paulo)', displayName: 'sa-east-1' }
     ]
   }
 ];
@@ -380,8 +481,8 @@ export const PROVIDER_CARDS = [
     id: 'anthropic',
     name: 'Anthropic',
     logo: '🧠',
-    description: 'Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus',
-    modelCount: 3,
+    description: 'Claude Sonnet 4.5, Claude Opus 4.1, Claude Sonnet 4, Claude Opus 4, Claude 3.7 Sonnet, Claude 3.5 (Sonnet, Haiku)',
+    modelCount: 7,
     color: 'bg-orange-50 border-orange-200 hover:bg-orange-100',
     textColor: 'text-orange-700',
     iconColor: 'text-orange-600'
@@ -400,8 +501,8 @@ export const PROVIDER_CARDS = [
     id: 'aws',
     name: 'AWS',
     logo: '☁️',
-    description: 'Nova, Claude via Bedrock',
-    modelCount: 5,
+    description: 'Nova, Claude 3/3.5/3.7/4, GPT-OSS via Bedrock',
+    modelCount: 17,
     color: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
     textColor: 'text-yellow-700',
     iconColor: 'text-yellow-600'
