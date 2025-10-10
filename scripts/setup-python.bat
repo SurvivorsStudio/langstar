@@ -3,42 +3,64 @@ setlocal enabledelayedexpansion
 
 echo [INFO] Setting up Python virtual environment...
 
-:: Python 버전 확인 함수
-:check_python_version
-set python_cmd=%1
-set major_version=
-set minor_version=
-
-%python_cmd% --version >nul 2>&1
-if %errorlevel% neq 0 goto :eof
-
-for /f "tokens=2" %%i in ('%python_cmd% --version 2^>^&1') do set version_output=%%i
-for /f "tokens=1,2 delims=." %%a in ("%version_output%") do (
-    set major_version=%%a
-    set minor_version=%%b
-)
-
-if "%major_version%"=="3" (
-    if %minor_version% geq 11 (
-        set PYTHON_CMD=%python_cmd%
-        goto :found_python
-    )
-)
-goto :eof
-
-:: 사용 가능한 Python 버전 찾기
+:: Python 버전 확인
 set PYTHON_CMD=
 
-call :check_python_version python3.12
-call :check_python_version python3.11
-call :check_python_version python3
-call :check_python_version python
+echo [DEBUG] Checking for Python installations...
+
+:: Python 3.12 확인
+python3.12 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3.12
+    goto :found_python
+)
+
+:: Python 3.11 확인
+python3.11 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3.11
+    goto :found_python
+)
+
+:: Python 3 확인
+python3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3
+    goto :found_python
+)
+
+:: Python 확인
+python --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python
+    goto :found_python
+)
+
+:: py 명령어 확인 (Python Launcher)
+py --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=py
+    goto :found_python
+)
+
+:: Python이 없으면 설치 안내 메시지 출력
+echo [ERROR] No compatible Python version found (3.11+ required).
+echo.
+echo [INFO] Python installation required:
+echo.
+echo    1. Download Python 3.12: https://www.python.org/downloads/release/python-3120/
+echo    2. Run the installer
+echo    3. Check "Add Python to PATH" during installation
+echo    4. Restart your terminal and run this script again
+echo.
+echo [INFO] Or install using the following command:
+echo    winget install Python.Python.3.12
+echo.
+exit /b 1
 
 :found_python
 if "%PYTHON_CMD%"=="" (
-    echo [ERROR] No compatible Python version found (3.11+ required).
-    echo [INFO] Please install Python 3.11 or higher:
-    echo    Download from: https://www.python.org/downloads/
+    echo [ERROR] PYTHON_CMD is not set
     exit /b 1
 )
 
@@ -101,4 +123,4 @@ if %errorlevel% neq 0 (
 )
 
 echo [SUCCESS] All packages installed successfully.
-echo [SUCCESS] Python environment setup completed! 
+echo [SUCCESS] Python environment setup completed!
