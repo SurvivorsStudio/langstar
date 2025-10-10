@@ -77,7 +77,7 @@ concurrently \
     --prefix-colors "bgBlue.bold,bgGreen.bold" \
     --success "first" \
     "npm run dev --prefix ui" \
-    "uvicorn server.app:app --reload --log-level info --timeout-keep-alive 5"
+    "source server/venv/bin/activate && uvicorn server.app:app --reload --log-level info --timeout-keep-alive 5"
 
 # concurrently가 실패한 경우
 if [ $? -ne 0 ]; then

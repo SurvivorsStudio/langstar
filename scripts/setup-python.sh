@@ -7,7 +7,77 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🐍 Setting up Python virtual environment...${NC}"
+echo -e "${BLUE}🐍 Setting up Python virtual environment with auto-install...${NC}"
+
+# Python 설치 함수 (macOS)
+install_python_macos() {
+    echo -e "${BLUE}📦 Installing Python 3.12 via Homebrew...${NC}"
+    
+    # Homebrew 설치 확인
+    if ! command -v brew &> /dev/null; then
+        echo -e "${YELLOW}⚠️  Homebrew not found. Installing Homebrew...${NC}"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        
+        # PATH 업데이트
+        if [[ -f "/opt/homebrew/bin/brew" ]]; then
+            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zshrc
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [[ -f "/usr/local/bin/brew" ]]; then
+            echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zshrc
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+    fi
+    
+    # Python 3.12 설치
+    brew install python@3.12
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Python 3.12 installed successfully via Homebrew${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ Failed to install Python 3.12 via Homebrew${NC}"
+        return 1
+    fi
+}
+
+# Python 설치 함수 (Linux)
+install_python_linux() {
+    echo -e "${BLUE}📦 Installing Python 3.12 via package manager...${NC}"
+    
+    # Ubuntu/Debian
+    if command -v apt &> /dev/null; then
+        sudo apt update
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt update
+        sudo apt install -y python3.12 python3.12-venv python3.12-pip
+        
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Python 3.12 installed successfully via apt${NC}"
+            return 0
+        fi
+    fi
+    
+    # CentOS/RHEL/Fedora
+    if command -v yum &> /dev/null; then
+        sudo yum install -y python3.12 python3.12-pip
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Python 3.12 installed successfully via yum${NC}"
+            return 0
+        fi
+    fi
+    
+    if command -v dnf &> /dev/null; then
+        sudo dnf install -y python3.12 python3.12-pip
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Python 3.12 installed successfully via dnf${NC}"
+            return 0
+        fi
+    fi
+    
+    echo -e "${RED}❌ Failed to install Python 3.12. Please install manually.${NC}"
+    return 1
+}
 
 # Python 버전 확인 함수
 check_python_version() {
@@ -22,7 +92,7 @@ check_python_version() {
             major_version=${BASH_REMATCH[1]}
             minor_version=${BASH_REMATCH[2]}
             
-            if [ "$major_version" -eq 3 ] && [ "$minor_version" -ge 11 ]; then
+            if [ "$major_version" -eq 3 ] && [ "$minor_version" -ge 12 ]; then
                 echo "$python_cmd"
                 return 0
             fi
@@ -41,11 +111,34 @@ for cmd in python3.12 python3.11 python3 python; do
 done
 
 if [ -z "$PYTHON_CMD" ]; then
-    echo -e "${RED}❌ No compatible Python version found (3.11+ required).${NC}"
-    echo -e "${YELLOW}💡 Please install Python 3.11 or higher:${NC}"
-    echo -e "   macOS: ${GREEN}brew install python@3.12${NC}"
-    echo -e "   Ubuntu/Debian: ${GREEN}sudo apt install python3.11 python3.11-venv python3.11-pip${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠️  No compatible Python version found (3.12+ required).${NC}"
+    echo -e "${BLUE}🔧 Attempting to install Python 3.12 automatically...${NC}"
+    
+    # OS별 설치 시도
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        install_python_macos
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        install_python_linux
+    else
+        echo -e "${RED}❌ Unsupported OS: $OSTYPE${NC}"
+        echo -e "${YELLOW}💡 Please install Python 3.12 manually:${NC}"
+        echo -e "   macOS: ${GREEN}brew install python@3.12${NC}"
+        echo -e "   Ubuntu/Debian: ${GREEN}sudo apt install python3.12 python3.12-venv python3.12-pip${NC}"
+        exit 1
+    fi
+    
+    # 설치 후 다시 확인
+    for cmd in python3.12 python3.11 python3 python; do
+        if check_python_version "$cmd"; then
+            PYTHON_CMD="$cmd"
+            break
+        fi
+    done
+    
+    if [ -z "$PYTHON_CMD" ]; then
+        echo -e "${RED}❌ Python installation failed. Please install manually.${NC}"
+        exit 1
+    fi
 fi
 
 PYTHON_VERSION=$($PYTHON_CMD --version)
