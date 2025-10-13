@@ -196,8 +196,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       // 순수 조건 텍스트가 비어있다면 (예: "if "만 있고 실제 조건이 없는 경우) 유효하지 않음
       if (!conditionText.trim()) return true; 
 
-      // 한글 등 유니코드 문자 지원을 위해 정규표현식 대신 단순 문자열 포함 검사 사용
-      return !conditionText.includes(`${className}['`); // 패턴에 맞지 않으면 true (에러)
+      const conditionRegex = new RegExp(`^${className}\\['[^']+'\\]`); // className['propertyName'] 형식 검사 (모든 유니코드 문자 지원)
+      return !conditionRegex.test(conditionText); // 패턴에 맞지 않으면 true (에러)
     });
   }, [isConditionNode, id, nodes, edges]);
 
