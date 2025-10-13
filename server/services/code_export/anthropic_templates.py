@@ -9,7 +9,7 @@ def base_base_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_aws import ChatBedrockConverse
+    from langchain_anthropic import ChatAnthropic
 
     my_name = "{node_name}" 
     node_name = my_name
@@ -24,13 +24,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -48,18 +42,12 @@ def node_{node_name}( state ) :
     top_k       = node_config['topK']
     top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm = ChatBedrockConverse(
+    llm = ChatAnthropic(
                     model=modelName,
                     temperature=temperature,
                     max_tokens=max_token,
-                    **aws_config
+                    anthropic_api_key=apiKey
                 )
                 
     prompt = ChatPromptTemplate.from_messages([
@@ -67,15 +55,9 @@ def node_{node_name}( state ) :
         ("human", "{{user_prompt}}")
     ])
 
-    llm_chian = LLMChain(
-        llm=llm,
-        prompt=prompt
-    )
-
-
-    # 도구 없이 LLM 직접 호출
-    response = llm_chian.predict( **{{ "user_prompt" : user_prompt }}  )
-    node_input[output_value] = response.content if hasattr(response, 'content') else response
+    chain = prompt | llm
+    response = chain.invoke({{"user_prompt": user_prompt}})
+    node_input[output_value] = response.content if hasattr(response, 'content') else str(response)
 
     return_value = node_input.copy()
 
@@ -106,7 +88,7 @@ def memory_base_agent_code(node) :
     # if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
     code += f"""
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_aws import ChatBedrockConverse
+from langchain_anthropic import ChatAnthropic
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
 
@@ -127,13 +109,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    apiKey = model_info['apiKey'] 
 
     memory = get_memory_data( state_dict[node_config_name] )
 
@@ -154,18 +130,12 @@ def node_{node_name}( state ) :
     top_k       = node_config['topK']
     top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatAnthropic(
                     model=modelName,
                     temperature=temperature,
                     max_tokens=max_token,
-                    **aws_config
+                    anthropic_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -174,16 +144,9 @@ def node_{node_name}( state ) :
         ("human", "{{user_prompt}}")
     ])
 
-    llm_chian = LLMChain(
-        llm=llm,
-        prompt=prompt,
-        memory=memory
-    )
-
-
-    # 도구 없이 LLM 직접 호출
-    response = llm_chian.predict( **{{ "user_prompt" : user_prompt }}  )
-    node_input[output_value] = response.content if hasattr(response, 'content') else response
+    chain = prompt | llm
+    response = chain.invoke({{"user_prompt": user_prompt, "history": memory.chat_memory.messages}})
+    node_input[output_value] = response.content if hasattr(response, 'content') else str(response)
 
     return_value = node_input.copy()
 
@@ -232,7 +195,7 @@ def base_tool_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
-    from langchain_aws import ChatBedrockConverse
+    from langchain_anthropic import ChatAnthropic
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
     my_name = "{node_name}" 
@@ -248,13 +211,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -272,18 +229,12 @@ def node_{node_name}( state ) :
     top_k       = node_config['topK']
     top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatAnthropic(
                     model=modelName,
                     temperature=temperature,
                     max_tokens=max_token,
-                    **aws_config
+                    anthropic_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -300,9 +251,22 @@ def node_{node_name}( state ) :
     agent_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=False)
 
     
-    # 도구 없이 LLM 직접 호출
+    # Anthropic 모델 응답 처리
     response = agent_executor.invoke({{"user_prompt": user_prompt}})
-    node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
+    if isinstance(response, dict) and "output" in response:
+        output = response["output"]
+        if isinstance(output, list) and len(output) > 0:
+            first_item = output[0]
+            if isinstance(first_item, dict) and "text" in first_item:
+                node_input[output_value] = first_item["text"]
+            else:
+                node_input[output_value] = str(first_item)
+        elif isinstance(output, str):
+            node_input[output_value] = output
+        else:
+            node_input[output_value] = str(response)
+    else:
+        node_input[output_value] = str(response)
 
     return_value = node_input.copy()
 
@@ -412,7 +376,7 @@ def memory_tool_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
-    from langchain_aws import ChatBedrockConverse
+    from langchain_anthropic import ChatAnthropic
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
     my_name = "{node_name}" 
@@ -428,13 +392,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -454,18 +412,12 @@ def node_{node_name}( state ) :
     top_k       = node_config['topK']
     top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatAnthropic(
                     model=modelName,
                     temperature=temperature,
                     max_tokens=max_token,
-                    **aws_config
+                    anthropic_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -483,9 +435,22 @@ def node_{node_name}( state ) :
     agent_executor = AgentExecutor(agent=agent, tools=tool_list, memory=memory, verbose=False)
 
     
-    # 도구 없이 LLM 직접 호출
+    # Anthropic 모델 응답 처리
     response = agent_executor.invoke({{"user_prompt": user_prompt}})
-    node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
+    if isinstance(response, dict) and "output" in response:
+        output = response["output"]
+        if isinstance(output, list) and len(output) > 0:
+            first_item = output[0]
+            if isinstance(first_item, dict) and "text" in first_item:
+                node_input[output_value] = first_item["text"]
+            else:
+                node_input[output_value] = str(first_item)
+        elif isinstance(output, str):
+            node_input[output_value] = output
+        else:
+            node_input[output_value] = str(response)
+    else:
+        node_input[output_value] = str(response)
 
     return_value = node_input.copy()
 
