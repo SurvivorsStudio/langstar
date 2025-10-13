@@ -327,7 +327,9 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
     
     if (match) {
       const functionName = match[1];
-      const newFunctionDef = `def ${functionName}(${paramString}):`;
+      // 반환 타입이 있으면 포함
+      const returnTypePart = editReturnType && editReturnType !== 'any' ? ` -> ${editReturnType}` : '';
+      const newFunctionDef = `def ${functionName}(${paramString})${returnTypePart}:`;
       
       const updatedCode = editCode.replace(functionRegex, newFunctionDef);
       setEditCode(updatedCode);
@@ -365,6 +367,11 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
       updateFunctionName(editFunctionName);
     }
   }, [editFunctionName]);
+
+  // Return Type이 변경될 때마다 함수 정의 업데이트
+  React.useEffect(() => {
+    updateFunctionParameters(editParameters);
+  }, [editReturnType]);
 
   // 코드, 함수 이름, 반환 타입, 파라미터가 변경될 때마다 일치성 검증
   React.useEffect(() => {
