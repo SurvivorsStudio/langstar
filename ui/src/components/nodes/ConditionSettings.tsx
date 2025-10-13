@@ -26,12 +26,11 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
       return { isValid: false, error: 'Class Name is not defined in Start Node' };
     }
 
-    // Simple string check instead of regex
-    const classNamePattern = `${className}['`;
-    if (!condition.includes(classNamePattern)) {
+    const conditionRegex = new RegExp(`^${className}\\['[\\w_]+'\\]`);
+    if (!conditionRegex.test(condition)) {
       return { 
         isValid: false, 
-        error: `Condition must contain at least one reference to ${className}['propertyName']` 
+        error: `Condition must start with ${className}['propertyName']` 
       };
     }
 

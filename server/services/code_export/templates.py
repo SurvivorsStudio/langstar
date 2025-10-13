@@ -438,10 +438,6 @@ def node_{node_name}(state):
     node_input  = state_dict[my_name] 
     node_config = state_dict[node_config_key]
 
-    if not node_input:
-        print("No inputs received yet, waiting...")
-        return {{}}
-
     prompt_template = '''{prompt_template}'''
     
     # prompt 생성 
@@ -506,8 +502,7 @@ def node_{node_name}(state):
         else:
             print(f"Error: {{match_node}} not found in inputs {{list(node_input.keys())}}")
             # 설정 오류로 간주하고 None 반환
-            return_value = {{}}
-            break
+            return_value[key] = None
 
     next_node_list = node_config.get('next_node', []) 
     return_config = {{node_config_key: state_dict[node_config_key]}}
@@ -580,10 +575,6 @@ def node_branch_{function_name}(state):
 
     # 함수 실행
     input_param = state_dict[node_name] 
-    if not input_param:
-        print("No inputs received yet, waiting...")
-        return {{}}
-
     return {tmp_function_name}( input_param ) 
     
 """
@@ -620,10 +611,6 @@ def node_{function_name}(state):
 
     # 함수 실행
     input_param = state_dict[node_name] 
-    if not input_param:
-        print("No inputs received yet, waiting...")
-        return {{}}
-
     return {tmp_function_name}( input_param ) 
     
 """
@@ -669,10 +656,6 @@ def node_{node_name}(state):
 
     # 함수 실행
     input_param = state_dict[node_name ] 
-    if not input_param:
-        print("No inputs received yet, waiting...")
-        return {{}}
-
     result = {function_name}( input_param ) 
     
     node_config = state_dict[node_config_key]
@@ -753,9 +736,6 @@ def node_{node_name}(state):
 
     # 함수 실행
     input_param = state_dict[ node_name ] 
-    if not input_param:
-        print("No inputs received yet, waiting...")
-        return {{}}
 
     node_parameters = state_dict[node_config_key]['parameters']
     output_value    = state_dict[node_config_key]['outputVariable']
