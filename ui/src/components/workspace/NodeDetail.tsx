@@ -296,13 +296,24 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
 
   // Parameters가 변경될 때 함수 파라미터를 자동으로 업데이트하는 함수
   const updateFunctionParameters = (newParameters: Parameter[]) => {
+    // 파라미터 이름과 타입 힌트를 포함하여 생성
+    const createParamString = (param: Parameter): string => {
+      const paramName = param.funcArgs && param.funcArgs.trim() ? param.funcArgs.trim() : param.name.trim();
+      const paramType = param.type && param.type !== 'any' ? param.type : '';
+      
+      if (paramType) {
+        return `${paramName}: ${paramType}`;
+      }
+      return paramName;
+    };
+    
     const requiredParams = newParameters
       .filter(param => param.required && param.name.trim())
-      .map(param => param.funcArgs && param.funcArgs.trim() ? param.funcArgs.trim() : param.name.trim());
+      .map(param => createParamString(param));
     
     const optionalParams = newParameters
       .filter(param => !param.required && param.name.trim())
-      .map(param => param.funcArgs && param.funcArgs.trim() ? param.funcArgs.trim() : param.name.trim());
+      .map(param => createParamString(param));
     
     // 모든 파라미터를 required 먼저, 그 다음 optional 순으로 정렬
     const allParams = [...requiredParams, ...optionalParams];
