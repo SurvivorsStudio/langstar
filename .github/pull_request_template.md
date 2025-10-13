@@ -3,6 +3,7 @@
   Why do we need to change this ?
 
 ## 변경의 종류 ( Type of Change )
+- [ ] 문서 작성 ( Writing or updating documentation )
 - [ ] 버그 수정 ( Bug fix )
 - [ ] 새 기능 ( New feature )
 - [ ] 기능 변경 ( Modification of the existing feature )
@@ -16,7 +17,7 @@
 ## 관련 이슈 ( Related issue )
 - 이 PR과 관련된 이슈 번호를 입력한다.  
   Please specify the related Github issue
-- fixed to: < Gitgub issue number >
+- Closes: < Github issue number >
 
 ## 기대 효과 ( Intended Effects )
 - 수정된 내용이 어떻게 동작해야 하는지 요약한다.  

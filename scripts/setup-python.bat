@@ -1,98 +1,67 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo [INFO] Setting up Python virtual environment with auto-install...
+echo [INFO] Setting up Python virtual environment...
 
-:: Python 설치 함수 (Windows)
-:install_python_windows
-echo [INFO] Installing Python 3.12 via winget...
-
-:: winget 설치 확인
-winget --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [WARN] winget not found. Installing winget...
-    :: winget 설치 (Windows 10/11)
-    powershell -Command "Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe"
-)
-
-:: Python 3.12 설치
-winget install Python.Python.3.12
-
-if %errorlevel% equ 0 (
-    echo [SUCCESS] Python 3.12 installed successfully via winget
-    goto :python_installed
-)
-
-:: Chocolatey 설치 시도
-echo [INFO] Trying Chocolatey...
-choco --version >nul 2>&1
-if %errorlevel% equ 0 (
-    choco install python312 -y
-    if %errorlevel% equ 0 (
-        echo [SUCCESS] Python 3.12 installed successfully via Chocolatey
-        goto :python_installed
-    )
-)
-
-:: 수동 설치 안내
-echo [ERROR] Failed to install Python 3.12 automatically.
-echo [INFO] Please install Python 3.12 manually:
-echo    Download from: https://www.python.org/downloads/
-echo    Make sure to check "Add Python to PATH" during installation
-exit /b 1
-
-:python_installed
-:: PATH 새로고침
-call refreshenv
-goto :eof
-
-:: Python 버전 확인 함수
-:check_python_version
-set python_cmd=%1
-set major_version=
-set minor_version=
-
-%python_cmd% --version >nul 2>&1
-if %errorlevel% neq 0 goto :eof
-
-for /f "tokens=2" %%i in ('%python_cmd% --version 2^>^&1') do set version_output=%%i
-for /f "tokens=1,2 delims=." %%a in ("%version_output%") do (
-    set major_version=%%a
-    set minor_version=%%b
-)
-
-if "%major_version%"=="3" (
-    if %minor_version% geq 12 (
-        set PYTHON_CMD=%python_cmd%
-        goto :found_python
-    )
-)
-goto :eof
-
-:: 사용 가능한 Python 버전 찾기
+:: Python 버전 확인
 set PYTHON_CMD=
 
-call :check_python_version python3.12
-call :check_python_version python3.11
-call :check_python_version python3
-call :check_python_version python
+echo [DEBUG] Checking for Python installations...
+
+:: Python 3.12 확인
+python3.12 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3.12
+    goto :found_python
+)
+
+:: Python 3.11 확인
+python3.11 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3.11
+    goto :found_python
+)
+
+:: Python 3 확인
+python3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3
+    goto :found_python
+)
+
+:: Python 확인
+python --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python
+    goto :found_python
+)
+
+:: py 명령어 확인 (Python Launcher)
+py --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=py
+    goto :found_python
+)
+
+:: Python이 없으면 설치 안내 메시지 출력
+echo [ERROR] No compatible Python version found (3.11+ required).
+echo.
+echo [INFO] Python installation required:
+echo.
+echo    1. Download Python 3.12: https://www.python.org/downloads/release/python-3120/
+echo    2. Run the installer
+echo    3. Check "Add Python to PATH" during installation
+echo    4. Restart your terminal and run this script again
+echo.
+echo [INFO] Or install using the following command:
+echo    winget install Python.Python.3.12
+echo.
+exit /b 1
 
 :found_python
 if "%PYTHON_CMD%"=="" (
-    echo [WARN] No compatible Python version found (3.12+ required).
-    echo [INFO] Attempting to install Python 3.12 automatically...
-    call :install_python_windows
-    
-    :: 설치 후 다시 확인
-    call :check_python_version python3.12
-    call :check_python_version python3.11
-    call :check_python_version python3
-    call :check_python_version python
-    
-    if "%PYTHON_CMD%"=="" (
-        echo [ERROR] Python installation failed. Please install manually.
-        exit /b 1
-    )
+    echo [ERROR] PYTHON_CMD is not set
+    exit /b 1
 )
 
 for /f "tokens=*" %%i in ('%PYTHON_CMD% --version') do set PYTHON_VERSION=%%i
@@ -154,4 +123,4 @@ if %errorlevel% neq 0 (
 )
 
 echo [SUCCESS] All packages installed successfully.
-echo [SUCCESS] Python environment setup completed! 
+echo [SUCCESS] Python environment setup completed!
