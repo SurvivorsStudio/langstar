@@ -43,6 +43,13 @@ const CustomEdge = ({
   const hasFailureAnimation = isFailure;
   const hasProgressAnimation = isExecuting;
   const hasWarningState = isWarning;
+  
+  // 디버깅: isWarning 값이 변경될 때 로그 출력
+  React.useEffect(() => {
+    if (isWarning !== undefined) {
+      console.log(`🟡 [CustomEdge ${id}] isWarning 변경됨:`, isWarning);
+    }
+  }, [isWarning, id]);
   // 펄스: 기본 1초 유지, 진행 중이면 계속 유지, 완료되면 1초 후 종료
   const [showPulse, setShowPulse] = React.useState(false);
   React.useEffect(() => {
@@ -76,8 +83,12 @@ const CustomEdge = ({
   );
 
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
-  const [dragStartTimeout, setDragStartTimeout] = useState<number | null>(null);
   const [trashZoneRect, setTrashZoneRect] = useState<DOMRect | null>(null);
+  
+  // 드래그 시작 위치 추적 (ref 사용으로 리렌더링 방지)
+  const dragStartPositionRef = React.useRef<{ x: number; y: number } | null>(null);
+  const mouseDownTimeRef = React.useRef<number>(0);
+  const globalListenersAttachedRef = React.useRef<boolean>(false);
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
@@ -328,12 +339,6 @@ const CustomEdge = ({
     console.log('handleClickhandleClickhandleClickhandleClickhandleClickhandleClickhandleClick');
     e.stopPropagation();
     
-    // 드래그 시작 타이머가 있다면 취소 (클릭으로 인식)
-    if (dragStartTimeout) {
-      clearTimeout(dragStartTimeout);
-      setDragStartTimeout(null);
-    }
-    
     setFocusedElement('edge', id);
     
     // 직접 FlowBuilder의 상태 업데이트
@@ -360,96 +365,134 @@ const CustomEdge = ({
     if (targetElement) {
       targetElement.focus();
     }
-  }, [id, source, target, data, setFocusedElement, dragStartTimeout, setSelectedNode]);
+  }, [id, source, target, data, setFocusedElement, setSelectedNode]);
 
-  // 드래그 핸들러 - 엣지 노드만 드래그 (지연된 드래그 시작)
+  // 드래그 핸들러 - 마우스다운 즉시 전역 리스너 등록 (레이스 컨디션 완전 제거)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setFocusedElement('edge', id);
     
-    // 클릭한 시점의 위치를 엣지 노드 위치로 설정
-    const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
-    if (coordinates) {
-      setEdgeNodePosition(coordinates); // 초기 위치 설정
+    // 이미 리스너가 등록되어 있으면 무시 (중복 방지)
+    if (globalListenersAttachedRef.current) {
+      return;
     }
     
-    // 150ms 후에 드래그 시작 (클릭과 구분)
-    const timeout = setTimeout(() => {
-      setIsDragging(true);
-      // 실제 드래그가 시작되었을 때만 휴지통 표시 이벤트 발생
-      window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
-      // 휴지통 위치 저장 (휴지통이 나타난 뒤에 측정)
-      setTimeout(() => {
-        const trashZone = document.getElementById('trash-zone');
-        if (trashZone) {
-          const rect = trashZone.getBoundingClientRect();
-          setTrashZoneRect(rect);
-        } else {
-          setTrashZoneRect(null);
-        }
-      }, 50);
-    }, 150);
+    // 시작 위치 저장 (화면 좌표)
+    dragStartPositionRef.current = { x: e.clientX, y: e.clientY };
+    mouseDownTimeRef.current = Date.now();
+    globalListenersAttachedRef.current = true;
     
-    setDragStartTimeout(timeout);
-  }, [id, setFocusedElement, getReactFlowCoordinates]);
-
-  // 마우스 이벤트 리스너 추가 - 실시간 드래그 업데이트
-  React.useEffect(() => {
-    if (isDragging) {
-      const handleMouseMove = (e: MouseEvent) => {
-        const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
+    // 클릭한 시점의 위치를 엣지 노드 위치로 설정
+    const startCoordinates = getReactFlowCoordinates(e.clientX, e.clientY);
+    if (startCoordinates) {
+      setEdgeNodePosition(startCoordinates);
+    }
+    
+    let dragActivated = false;
+    
+    // 전역 마우스 무브 핸들러 - 즉시 등록
+    const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartPositionRef.current) return;
+      
+      // 마우스 이동 거리 계산
+      const deltaX = moveEvent.clientX - dragStartPositionRef.current.x;
+      const deltaY = moveEvent.clientY - dragStartPositionRef.current.y;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const timeSinceMouseDown = Date.now() - mouseDownTimeRef.current;
+      
+      // 드래그 조건: 5px 이상 이동하거나 150ms 이상 누르고 있으면서 움직임이 있는 경우
+      const shouldActivateDrag = distance > 5 || (timeSinceMouseDown > 150 && distance > 0);
+      
+      if (shouldActivateDrag && !dragActivated) {
+        dragActivated = true;
+        setIsDragging(true);
+        
+        // 드래그 시작 이벤트 발생 (휴지통 표시)
+        window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
+        
+        // 휴지통 위치 저장
+        setTimeout(() => {
+          const trashZone = document.getElementById('trash-zone');
+          if (trashZone) {
+            const rect = trashZone.getBoundingClientRect();
+            setTrashZoneRect(rect);
+          }
+        }, 50);
+      }
+      
+      // 드래그가 활성화되었으면 위치 업데이트
+      if (dragActivated) {
+        const coordinates = getReactFlowCoordinates(moveEvent.clientX, moveEvent.clientY);
         if (coordinates) {
-          // 실시간으로 엣지 노드 위치 업데이트 (드래그 중에도 즉시 반영)
           setEdgeNodePosition(coordinates);
           setLastMousePosition(coordinates);
         }
-      };
-
-      const handleMouseUp = (e: MouseEvent) => {
+      }
+    };
+    
+    // 전역 마우스 업 핸들러 - 즉시 등록
+    const handleGlobalMouseUp = (upEvent: MouseEvent) => {
+      // 리스너 제거
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      globalListenersAttachedRef.current = false;
+      
+      // 드래그가 활성화되었으면 드래그 종료 처리
+      if (dragActivated) {
         setIsDragging(false);
-
-        // 저장된 휴지통 위치로 확인
-        const checkTrashZone = () => {
-          if (trashZoneRect) {
-            // 휴지통 영역을 조금 더 크게 계산 (여백 20px 추가)
-            const margin = 20;
-            const isOverTrash = e.clientX >= (trashZoneRect.left - margin) && 
-                              e.clientX <= (trashZoneRect.right + margin) && 
-                              e.clientY >= (trashZoneRect.top - margin) && 
-                              e.clientY <= (trashZoneRect.bottom + margin);
-            return isOverTrash;
-          }
-          return false;
-        };
-
-        const isOverTrashZone = checkTrashZone();
-
-        // 휴지통 영역 정보와 함께 이벤트 발생
+        
+        // 휴지통 확인
+        let isOverTrashZone = false;
+        if (trashZoneRect) {
+          const margin = 20;
+          isOverTrashZone = upEvent.clientX >= (trashZoneRect.left - margin) && 
+                           upEvent.clientX <= (trashZoneRect.right + margin) && 
+                           upEvent.clientY >= (trashZoneRect.top - margin) && 
+                           upEvent.clientY <= (trashZoneRect.bottom + margin);
+        }
+        
+        // 드래그 종료 이벤트
         window.dispatchEvent(new CustomEvent('edge-drag-end', { 
           detail: { 
             edgeId: id,
-            mouseX: e.clientX,
-            mouseY: e.clientY,
+            mouseX: upEvent.clientX,
+            mouseY: upEvent.clientY,
             isOverTrashZone
           } 
         }));
         
-        // 마지막 마우스 위치를 엣지 노드 위치로 저장 (휴지통에 드롭되지 않은 경우)
+        // 마지막 위치 저장
         if (lastMousePosition) {
           updateEdgeData(id, { edgeNodePosition: lastMousePosition });
         }
         setLastMousePosition(null);
-      };
+        setTrashZoneRect(null);
+      }
+      
+      // 상태 초기화
+      dragStartPositionRef.current = null;
+      mouseDownTimeRef.current = 0;
+    };
+    
+    // 즉시 리스너 등록
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    
+  }, [id, setFocusedElement, getReactFlowCoordinates, lastMousePosition, updateEdgeData, trashZoneRect]);
 
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, lastMousePosition, id, updateEdgeData, getReactFlowCoordinates]);
+  // 컴포넌트 언마운트 시 정리 (드래그 상태 복구)
+  React.useEffect(() => {
+    return () => {
+      // 컴포넌트 언마운트 시 드래그 상태였다면 종료 이벤트 발생
+      if (isDragging) {
+        window.dispatchEvent(new CustomEvent('edge-drag-end', { 
+          detail: { edgeId: id, mouseX: 0, mouseY: 0, isOverTrashZone: false } 
+        }));
+      }
+      // 전역 리스너 플래그 초기화
+      globalListenersAttachedRef.current = false;
+    };
+  }, [isDragging, id]);
 
   return (
     <>

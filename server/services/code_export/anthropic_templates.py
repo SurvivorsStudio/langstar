@@ -17,6 +17,10 @@ def node_{node_name}( state ) :
 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
+    if not node_input:
+        print("No inputs received yet, waiting...")
+        return {{}}
+        
     node_config = state_dict[node_config_name]['config']
     print( node_config )
 
@@ -102,6 +106,10 @@ def node_{node_name}( state ) :
 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
+    if not node_input:
+        print("No inputs received yet, waiting...")
+        return {{}}
+        
     node_config = state_dict[node_config_name]['config']
     print( node_config )
 
@@ -204,6 +212,10 @@ def node_{node_name}( state ) :
 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
+    if not node_input:
+        print("No inputs received yet, waiting...")
+        return {{}}
+        
     node_config = state_dict[node_config_name]['config']
     print( node_config )
 
@@ -385,6 +397,10 @@ def node_{node_name}( state ) :
 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
+    if not node_input:
+        print("No inputs received yet, waiting...")
+        return {{}}
+        
     node_config = state_dict[node_config_name]['config']
     print( node_config )
 

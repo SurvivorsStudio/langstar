@@ -28,13 +28,9 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    accessKeyId     = model_info['accessKeyId'] 
+    secretAccessKey = model_info['secretAccessKey'] 
+    region          = model_info['region'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -135,13 +131,9 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    accessKeyId     = model_info['accessKeyId'] 
+    secretAccessKey = model_info['secretAccessKey'] 
+    region          = model_info['region'] 
 
     memory = get_memory_data( state_dict[node_config_name] )
 
@@ -261,13 +253,9 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    accessKeyId     = model_info['accessKeyId'] 
+    secretAccessKey = model_info['secretAccessKey'] 
+    region          = model_info['region'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -445,13 +433,9 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    if provider == "aws" : 
-        accessKeyId     = model_info['accessKeyId'] 
-        secretAccessKey = model_info['secretAccessKey'] 
-        region          = model_info['region'] 
-        
-    else :
-        apiKey = model_info['apiKey'] 
+    accessKeyId     = model_info['accessKeyId'] 
+    secretAccessKey = model_info['secretAccessKey'] 
+    region          = model_info['region'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
