@@ -224,7 +224,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
         {
           id: 'start',
           type: 'executionNode',
-          position: { x: (containerWidth - nodeWidth) / 2, y: startY },
+          position: { x: (containerWidth - 2 * nodeWidth - fixedSpacing) / 2, y: startY },
           data: {
             label: 'Start',
             description: 'Starting point of the workflow',
@@ -240,7 +240,7 @@ const ExecutionDetail: React.FC<ExecutionDetailProps> = ({ execution, onBack }) 
         {
           id: 'end',
           type: 'executionNode',
-          position: { x: (containerWidth - nodeWidth) / 2, y: startY + fixedSpacing },
+          position: { x: (containerWidth - 2 * nodeWidth - fixedSpacing) / 2 + nodeWidth + fixedSpacing, y: startY },
           data: {
             label: 'End',
             description: 'End point of the workflow',
