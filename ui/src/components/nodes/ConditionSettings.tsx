@@ -104,7 +104,7 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
       } else {
         const oldLabel = edge.data?.label || '';
         const wasElse = oldLabel.trim().toLowerCase() === 'else';
-        if (wasElse && determinedType !== 'else') { // Transitioned from else to if/elif
+        if (wasElse) { // Transitioned from else to if/elif
           conditionTextForNewLabel = `${className}['value'] > 0`; // Provide a default condition
         }
         newLabel = `${determinedType} ${conditionTextForNewLabel}`;
@@ -274,7 +274,6 @@ const ConditionSettings: React.FC<ConditionSettingsProps> = ({ nodeId }) => {
                     value={conditionText}
                     onChange={(e) => handleConditionTextChange(edge, e.target.value, determinedType)}
                     placeholder={`${className}['value'] > 100`}
-                    disabled={determinedType === 'else'}
                     className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm bg-white dark:bg-gray-800 ${
                       !validation.isValid 
                         ? 'border-red-300 dark:border-red-500 focus:ring-red-500 text-red-600 dark:text-red-400' 
