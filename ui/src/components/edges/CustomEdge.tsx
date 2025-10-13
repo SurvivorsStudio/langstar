@@ -76,8 +76,9 @@ const CustomEdge = ({
   );
 
   const [lastMousePosition, setLastMousePosition] = useState<{ x: number; y: number } | null>(null);
-  const [dragStartTimeout, setDragStartTimeout] = useState<number | null>(null);
+  const [dragStartTimeout, setDragStartTimeout] = useState<NodeJS.Timeout | null>(null);
   const [trashZoneRect, setTrashZoneRect] = useState<DOMRect | null>(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
 
   // Calculate the center point between source and target
   const centerX = (sourceX + targetX) / 2;
@@ -316,12 +317,46 @@ const CustomEdge = ({
     };
   }, [isEdgeTextFocused, handleDelete]);
 
+  // 전역 클릭 이벤트 리스너 추가 - 외부 클릭 시 엣지 포커스 해제
+  React.useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      // 엣지 노드가 포커스된 상태에서만 처리
+      if (isEdgeTextFocused) {
+        // 클릭된 요소가 현재 엣지 노드인지 확인
+        const clickedElement = e.target as HTMLElement;
+        const edgeNodeElement = document.querySelector(`[data-edge-id="${id}"]`);
+        
+        // 엣지 노드 자체나 그 자식 요소를 클릭한 경우가 아니라면 포커스 해제
+        if (!edgeNodeElement || !edgeNodeElement.contains(clickedElement)) {
+          setFocusedElement(null, null);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleGlobalClick);
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [isEdgeTextFocused, id, setFocusedElement]);
+
   // 마우스 위치를 React Flow 좌표로 변환하는 함수 - 최적화
   const getReactFlowCoordinates = useCallback((clientX: number, clientY: number) => {
     // React Flow의 screenToFlowPosition을 사용하여 정확한 좌표 계산
     const flowPosition = screenToFlowPosition({ x: clientX, y: clientY });
     return { x: flowPosition.x, y: flowPosition.y };
   }, [screenToFlowPosition]);
+
+  // 우클릭 핸들러 - 엣지 노드를 초기 위치로 리셋
+  const handleRightClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // 엣지 노드 위치를 초기화 (중앙 위치로 복원)
+    setEdgeNodePosition(null);
+    updateEdgeData(id, { edgeNodePosition: null });
+    
+    console.log('[CustomEdge] Right click - reset edge node to initial position');
+  }, [id, updateEdgeData]);
 
   // 클릭 핸들러 - 엣지 노드 포커스 및 NodeInspector 활성화
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -362,10 +397,11 @@ const CustomEdge = ({
     }
   }, [id, source, target, data, setFocusedElement, dragStartTimeout, setSelectedNode]);
 
-  // 드래그 핸들러 - 엣지 노드만 드래그 (지연된 드래그 시작)
+  // 드래그 핸들러 - 엣지 노드만 드래그 (마우스 클릭 상태에서만)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setFocusedElement('edge', id);
+    setIsMouseDown(true);
     
     // 클릭한 시점의 위치를 엣지 노드 위치로 설정
     const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
@@ -375,19 +411,25 @@ const CustomEdge = ({
     
     // 150ms 후에 드래그 시작 (클릭과 구분)
     const timeout = setTimeout(() => {
-      setIsDragging(true);
-      // 실제 드래그가 시작되었을 때만 휴지통 표시 이벤트 발생
-      window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
-      // 휴지통 위치 저장 (휴지통이 나타난 뒤에 측정)
-      setTimeout(() => {
-        const trashZone = document.getElementById('trash-zone');
-        if (trashZone) {
-          const rect = trashZone.getBoundingClientRect();
-          setTrashZoneRect(rect);
-        } else {
-          setTrashZoneRect(null);
+      // 최신 상태를 확인하기 위해 함수형 업데이트 사용
+      setIsMouseDown(currentMouseDown => {
+        if (currentMouseDown) { // 마우스가 여전히 눌린 상태일 때만 드래그 시작
+          setIsDragging(true);
+          // 실제 드래그가 시작되었을 때만 휴지통 표시 이벤트 발생
+          window.dispatchEvent(new CustomEvent('edge-drag-start', { detail: { edgeId: id } }));
+          // 휴지통 위치 저장 (휴지통이 나타난 뒤에 측정)
+          setTimeout(() => {
+            const trashZone = document.getElementById('trash-zone');
+            if (trashZone) {
+              const rect = trashZone.getBoundingClientRect();
+              setTrashZoneRect(rect);
+            } else {
+              setTrashZoneRect(null);
+            }
+          }, 50);
         }
-      }, 50);
+        return currentMouseDown; // 상태 변경 없이 현재 값 반환
+      });
     }, 150);
     
     setDragStartTimeout(timeout);
@@ -395,18 +437,26 @@ const CustomEdge = ({
 
   // 마우스 이벤트 리스너 추가 - 실시간 드래그 업데이트
   React.useEffect(() => {
-    if (isDragging) {
+    if (isDragging && isMouseDown) {
       const handleMouseMove = (e: MouseEvent) => {
-        const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
-        if (coordinates) {
-          // 실시간으로 엣지 노드 위치 업데이트 (드래그 중에도 즉시 반영)
-          setEdgeNodePosition(coordinates);
-          setLastMousePosition(coordinates);
+        // 마우스가 눌린 상태일 때만 드래그 처리
+        if (e.buttons === 1) { // 왼쪽 마우스 버튼이 눌린 상태
+          const coordinates = getReactFlowCoordinates(e.clientX, e.clientY);
+          if (coordinates) {
+            // 실시간으로 엣지 노드 위치 업데이트 (드래그 중에도 즉시 반영)
+            setEdgeNodePosition(coordinates);
+            setLastMousePosition(coordinates);
+          }
+        } else {
+          // 마우스 버튼이 떼어진 경우 드래그 중단
+          setIsDragging(false);
+          setIsMouseDown(false);
         }
       };
 
       const handleMouseUp = (e: MouseEvent) => {
         setIsDragging(false);
+        setIsMouseDown(false);
 
         // 저장된 휴지통 위치로 확인
         const checkTrashZone = () => {
@@ -449,7 +499,7 @@ const CustomEdge = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, lastMousePosition, id, updateEdgeData, getReactFlowCoordinates]);
+  }, [isDragging, isMouseDown, lastMousePosition, id, updateEdgeData, getReactFlowCoordinates]);
 
   return (
     <>
@@ -629,7 +679,9 @@ const CustomEdge = ({
                 ? 'scale-105' 
                 : 'scale-100'
           }`}
+          data-edge-id={id}
           onClick={handleClick}
+          onContextMenu={handleRightClick}
           onMouseDown={handleMouseDown}
           onKeyDown={handleKeyDown}
           tabIndex={0}
