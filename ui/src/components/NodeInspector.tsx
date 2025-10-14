@@ -23,7 +23,7 @@ interface NodeInspectorProps {
 }
 
 const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onClose }) => {
-  const { nodes, edges, updateNodeData, executeNode, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
+  const { nodes, edges, updateNodeData, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
   const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>('input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
@@ -31,7 +31,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [nodeDescription, setNodeDescription] = useState<string>('');
   const [descriptionHeight, setDescriptionHeight] = useState<number>(3); // 기본 3줄
   const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
-  const [isNodeChanging, setIsNodeChanging] = useState<boolean>(false);
   const [lastValidNodeName, setLastValidNodeName] = useState<string>(''); // 마지막 유효한 노드 이름 저장
   const lastSavedCodeRef = useRef<string>('');
   
@@ -115,7 +114,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     if (node) {
       console.log(`[NodeInspector] Found node: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
       console.log(`[NodeInspector] Current node data:`, node.data);
-      setIsNodeChanging(true);
       setCurrentNode(node as any);
       // 코드 상태를 즉시 업데이트 - 노드의 실제 코드 데이터 사용
       const nodeCode = node.data.code || 'def exce_code(state):\n    # Access input variables:\n    # value = state[\'variable_name\']\n    # \n    # Your code here...\n    # \n    return state';
@@ -254,12 +252,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       if (!currentTabIsValid) {
         setActiveTab(newDefaultTab);
       }
-      
-      // 노드 변경 완료 후 플래그 해제
-      setTimeout(() => {
-        console.log(`[NodeInspector] Node change completed, setting isNodeChanging to false`);
-        setIsNodeChanging(false);
-      }, 100);
     }
   }, [nodeId, activeTab, manuallySelectedEdges]); // edges 의존성 제거
 
@@ -365,47 +357,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
 
 
-  // input data 클릭 핸들러
-  const handleInputDataClick = async (edgeId: string, sourceNodeId: string, inputData: Record<string, VariableValue>) => {
-    setManuallySelectedEdgeId(edgeId);
-    
-    // store에 수동 선택 정보 저장
-    setManuallySelectedEdge(nodeId, edgeId);
-    
-    // 선택된 input data로 노드 실행
-    if (currentNode) {
-      try {
-        // input data를 노드에 설정
-        updateNodeData(nodeId, {
-          ...currentNode.data,
-          inputData: inputData
-        });
-        
-        // 노드 실행을 위해 임시로 edge 데이터 수정
-        const originalEdgeData = edges.find(e => e.id === edgeId)?.data;
-        
-        // 선택된 input data로 edge 업데이트 (타임스탬프는 노드 실행 시에만 설정)
-        updateEdgeData(edgeId, {
-          output: inputData
-          // timestamp는 노드 실행 시에만 설정되도록 제거
-        });
-        
-        // 노드 실행
-        await executeNode(nodeId);
-        
-        // 원래 edge 데이터 복원 (선택적)
-        if (originalEdgeData) {
-          setTimeout(() => {
-            updateEdgeData(edgeId, originalEdgeData);
-          }, 100);
-        }
-        
-        console.log(`Node ${nodeId} executed with manually selected input from node ${sourceNodeId}`);
-      } catch (error) {
-        console.error('Error executing node with selected input:', error);
-      }
-    }
-  };
 
   // input data 전체 삭제 핸들러
   const handleClearInputData = () => {
@@ -714,7 +665,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                       📦 All Incoming Nodes ({incomingEdges.length})
                     </div>
-                    {incomingEdges.map((edge, index) => {
+                    {incomingEdges.map((edge) => {
                       const sourceNode = nodes.find(n => n.id === edge.source);
                       const hasData = edge.data?.output && typeof edge.data.output === 'object' && Object.keys(edge.data.output).length > 0;
                       const hasError = hasData && edge.data.output.error;
@@ -723,19 +674,14 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                       return (
                         <div 
                           key={edge.id}
-                          className={`border rounded-lg p-3 select-text transition-colors cursor-pointer ${
+                          className={`border rounded-lg p-3 select-text transition-colors ${
                             hasError 
-                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
                               : hasData 
-                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
-                                : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/30'
+                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
+                                : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
                           } ${isSelected ? 'border-2 border-blue-500' : ''}`}
-                          onClick={() => {
-                            if (hasData) {
-                              handleInputDataClick(edge.id, edge.source, edge.data.output);
-                            }
-                          }}
-                          title={hasData ? "Click to select and execute with this data" : "No data available"}
+                          title="Read-only preview"
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center space-x-2">
@@ -767,13 +713,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                   : 'Not executed yet'
                                 }
                               </span>
-                              {hasData && (
-                                <Play className={`w-3 h-3 ${
-                                  hasError 
-                                    ? 'text-red-600 dark:text-red-400' 
-                                    : 'text-green-600 dark:text-green-400'
-                                }`} />
-                              )}
                             </div>
                           </div>
                           
