@@ -2652,6 +2652,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             }
           }
 
+          // OpenAI mini 모델 체크 (provider가 openai이고 model name에 mini가 포함된 경우)
+          const isOpenAiMiniModel = modelConfigForExport.providerName === 'openai' && 
+                                    modelConfigForExport.modelName?.toLowerCase().includes('mini');
+
           // 모델 설정값들을 포함하여 변환된 객체로 기존 config를 대체합니다.
           // 중복되거나 불필요한 필드들을 제거하고 깔끔한 구조로 만듭니다.
           finalNodeData.config = {
@@ -2662,11 +2666,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             userPromptInputKey: finalNodeData.config.userPromptInputKey || 'user_input',
             systemPromptInputKey: finalNodeData.config.systemPromptInputKey || 'system_message',
             agentOutputVariable: finalNodeData.config.agentOutputVariable || 'agent_response',
-            // 모델 설정값들
+            // 모델 설정값들 (OpenAI mini 모델 예외 처리)
             topK: finalNodeData.config.topK ?? 40,
             topP: finalNodeData.config.topP ?? 1,
-            temperature: finalNodeData.config.temperature ?? 0.7,
-            maxTokens: finalNodeData.config.maxTokens ?? 1000,
+            temperature: isOpenAiMiniModel ? 1 : (finalNodeData.config.temperature ?? 0.7),
+            maxTokens: isOpenAiMiniModel ? null : (finalNodeData.config.maxTokens ?? 1000),
           };
 
           // Agent 노드의 최종 JSON 데이터를 콘솔에 출력
