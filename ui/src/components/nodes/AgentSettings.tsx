@@ -249,6 +249,28 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const selectedMemoryGroup = memoryGroups.find(g => g.id === node?.data.config?.memoryGroup);
 
+  // OpenAI mini 모델 체크 (provider가 openai이고 model name에 mini가 포함된 경우)
+  const isOpenAiMiniModel = selectedConnection?.provider === 'openai' && 
+                            selectedConnection?.model?.toLowerCase().includes('mini');
+
+  // OpenAI mini 모델일 때 자동으로 값 설정
+  useEffect(() => {
+    if (isOpenAiMiniModel && node) {
+      const needsUpdate = 
+        node.data.config?.maxTokens !== null || 
+        node.data.config?.temperature !== 1;
+      
+      if (needsUpdate) {
+        updateNodeData(nodeId, {
+          config: {
+            maxTokens: null,
+            temperature: 1,
+          },
+        });
+      }
+    }
+  }, [isOpenAiMiniModel, nodeId, node, updateNodeData]);
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -574,32 +596,56 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
         {/* Temperature Section */}
         <div className="space-y-2">
-          <label htmlFor="temperature" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          <label htmlFor="temperature" className={`block text-sm font-medium ${
+            isOpenAiMiniModel 
+              ? 'text-gray-400 dark:text-gray-500' 
+              : 'text-gray-600 dark:text-gray-300'
+          }`}>
             Temperature
+            {isOpenAiMiniModel && (
+              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 1로 고정)</span>
+            )}
           </label>
           <input
             type="number"
             id="temperature"
-            value={node?.data.config?.temperature ?? DEFAULT_TEMPERATURE}
+            value={isOpenAiMiniModel ? 1 : (node?.data.config?.temperature ?? DEFAULT_TEMPERATURE)}
             onChange={(e) => handleTemperatureChange(e.target.value)}
             placeholder="e.g., 0.7 (usually 0-1)"
-            step="0.1" // Optional: for fine-grained control with number input arrows
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            step="0.1"
+            disabled={isOpenAiMiniModel}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+              isOpenAiMiniModel
+                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
+                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+            }`}
           />
         </div>
         
         {/* Max Token Size Section */}
         <div className="space-y-2">
-          <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          <label htmlFor="maxTokens" className={`block text-sm font-medium ${
+            isOpenAiMiniModel 
+              ? 'text-gray-400 dark:text-gray-500' 
+              : 'text-gray-600 dark:text-gray-300'
+          }`}>
             Max Token Size
+            {isOpenAiMiniModel && (
+              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 사용 불가)</span>
+            )}
           </label>
           <input
             type="number"
             id="maxTokens"
-            value={node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS}
+            value={isOpenAiMiniModel ? '' : (node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS)}
             onChange={(e) => handleMaxTokensChange(e.target.value)}
-            placeholder="e.g., 1000"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            placeholder={isOpenAiMiniModel ? "N/A" : "e.g., 1000"}
+            disabled={isOpenAiMiniModel}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+              isOpenAiMiniModel
+                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
+                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+            }`}
           />
         </div>
       </div>

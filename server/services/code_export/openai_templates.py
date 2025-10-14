@@ -48,7 +48,7 @@ def node_{node_name}( state ) :
     llm = ChatOpenAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
+                    max_completion_tokens=max_token,
                     openai_api_key=apiKey
                 )
                 
@@ -138,7 +138,7 @@ def node_{node_name}( state ) :
     llm  = ChatOpenAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
+                    max_completion_tokens=max_token,
                     openai_api_key=apiKey
                 )
 
@@ -239,7 +239,7 @@ def node_{node_name}( state ) :
     llm  = ChatOpenAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
+                    max_completion_tokens=max_token,
                     openai_api_key=apiKey
                 )
 
@@ -424,7 +424,7 @@ def node_{node_name}( state ) :
     llm  = ChatOpenAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
+                    max_completion_tokens=max_token,
                     openai_api_key=apiKey
                 )
 

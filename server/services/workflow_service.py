@@ -147,7 +147,7 @@ def run_openai(modelName, temperature, max_token, system_prompt, user_prompt, me
     llm = ChatOpenAI(
         model=modelName,
         temperature=temperature,
-        max_tokens=max_token,
+        max_completion_tokens=max_token,
         openai_api_key=api_key
     )
     
