@@ -249,6 +249,22 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const selectedMemoryGroup = memoryGroups.find(g => g.id === node?.data.config?.memoryGroup);
 
+  // OpenAI mini 모델 체크
+  const isOpenAIMini = selectedConnection?.provider === 'openai' && 
+    selectedConnection?.model?.toLowerCase().includes('mini');
+
+  // OpenAI mini 모델이 선택되면 자동으로 값 설정
+  useEffect(() => {
+    if (isOpenAIMini && node) {
+      updateNodeData(nodeId, {
+        config: {
+          temperature: 1,
+          maxTokens: null,
+        },
+      });
+    }
+  }, [isOpenAIMini, nodeId, updateNodeData]);
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -576,15 +592,23 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
         <div className="space-y-2">
           <label htmlFor="temperature" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Temperature
+            {isOpenAIMini && (
+              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 1로 고정)</span>
+            )}
           </label>
           <input
             type="number"
             id="temperature"
-            value={node?.data.config?.temperature ?? DEFAULT_TEMPERATURE}
+            value={isOpenAIMini ? 1 : (node?.data.config?.temperature ?? DEFAULT_TEMPERATURE)}
             onChange={(e) => handleTemperatureChange(e.target.value)}
             placeholder="e.g., 0.7 (usually 0-1)"
             step="0.1" // Optional: for fine-grained control with number input arrows
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            disabled={isOpenAIMini}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+              isOpenAIMini 
+                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
+                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+            }`}
           />
         </div>
         
@@ -592,14 +616,22 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
         <div className="space-y-2">
           <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Max Token Size
+            {isOpenAIMini && (
+              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 사용 불가)</span>
+            )}
           </label>
           <input
             type="number"
             id="maxTokens"
-            value={node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS}
+            value={isOpenAIMini ? '' : (node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS)}
             onChange={(e) => handleMaxTokensChange(e.target.value)}
-            placeholder="e.g., 1000"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            placeholder={isOpenAIMini ? "N/A" : "e.g., 1000"}
+            disabled={isOpenAIMini}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+              isOpenAIMini 
+                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
+                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
+            }`}
           />
         </div>
       </div>

@@ -245,7 +245,7 @@ export const initialNodes: Node<NodeData>[] = [
   {
     id: 'end',
     type: 'endNode',
-    position: { x: 100, y: 300 },
+    position: { x: 400, y: 100 },
     data: {
       label: 'End',
       description: 'End point of the workflow',
@@ -279,7 +279,7 @@ export const emptyInitialNodes: Node<NodeData>[] = [
   {
     id: 'end',
     type: 'endNode',
-    position: { x: 100, y: 300 },
+    position: { x: 400, y: 100 },
     data: {
       label: 'End',
       description: 'End point of the workflow',
