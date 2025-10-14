@@ -2,6 +2,9 @@ import re
 import textwrap
 import ast
 from server.services.code_export import aws_templates
+from server.services.code_export import openai_templates
+from server.services.code_export import anthropic_templates
+from server.services.code_export import google_templates
 
 
 
@@ -717,15 +720,33 @@ def agent_node_code( node ):
             return aws_templates.base_tool_agent_code( node )
         elif memory_type !="" and len(tools) != 0: 
             return aws_templates.memory_tool_agent_code( node )
-    else : 
+    elif provider == "openai":
         if memory_type =="" and len(tools) == 0: 
-            return aws_templates.base_base_agent_code( node )
+            return openai_templates.base_base_agent_code( node )
         elif memory_type !="" and len(tools) == 0: 
-            return aws_templates.memory_base_agent_code( node )
+            return openai_templates.memory_base_agent_code( node )
         elif memory_type =="" and len(tools) != 0: 
-            return aws_templates.base_tool_agent_code( node )
+            return openai_templates.base_tool_agent_code( node )
         elif memory_type !="" and len(tools) != 0: 
-            return aws_templates.memory_tool_agent_code( node )
+            return openai_templates.memory_tool_agent_code( node )
+    elif provider == "google":
+        if memory_type =="" and len(tools) == 0: 
+            return google_templates.base_base_agent_code( node )
+        elif memory_type !="" and len(tools) == 0: 
+            return google_templates.memory_base_agent_code( node )
+        elif memory_type =="" and len(tools) != 0: 
+            return google_templates.base_tool_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return google_templates.memory_tool_agent_code( node )
+    elif provider == "anthropic":
+        if memory_type =="" and len(tools) == 0: 
+            return anthropic_templates.base_base_agent_code( node )
+        elif memory_type !="" and len(tools) == 0: 
+            return anthropic_templates.memory_base_agent_code( node )
+        elif memory_type =="" and len(tools) != 0: 
+            return anthropic_templates.base_tool_agent_code( node )
+        elif memory_type !="" and len(tools) != 0: 
+            return anthropic_templates.memory_tool_agent_code( node )
 
 
 

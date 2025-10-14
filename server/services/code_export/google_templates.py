@@ -9,7 +9,7 @@ def base_base_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_aws import ChatBedrockConverse
+    from langchain_google_genai import ChatGoogleGenerativeAI
 
     my_name = "{node_name}" 
     node_name = my_name
@@ -28,9 +28,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    accessKeyId     = model_info['accessKeyId'] 
-    secretAccessKey = model_info['secretAccessKey'] 
-    region          = model_info['region'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -45,21 +43,13 @@ def node_{node_name}( state ) :
     # 답변 옵션     
     temperature = node_config['temperature']
     max_token   = node_config['maxTokens']
-    top_k       = node_config['topK']
-    top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm = ChatBedrockConverse(
+    llm = ChatGoogleGenerativeAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    **aws_config
+                    max_output_tokens=max_token,
+                    google_api_key=apiKey
                 )
                 
     prompt = ChatPromptTemplate.from_messages([
@@ -67,15 +57,12 @@ def node_{node_name}( state ) :
         ("human", "{{user_prompt}}")
     ])
 
-    llm_chian = LLMChain(
-        llm=llm,
-        prompt=prompt
-    )
+    chain = prompt | llm
 
 
     # 도구 없이 LLM 직접 호출
-    response = llm_chian.predict( **{{ "user_prompt" : user_prompt }}  )
-    node_input[output_value] = response.content if hasattr(response, 'content') else response
+    response = chain.invoke({{"user_prompt": user_prompt}})
+    node_input[output_value] = response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     return_value = node_input.copy()
 
@@ -106,7 +93,7 @@ def memory_base_agent_code(node) :
     # if node['data']['config']['memoryGroup']['memoryType'] =='ConversationBufferMemory': 
     code += f"""
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_aws import ChatBedrockConverse
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
 
@@ -131,9 +118,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    accessKeyId     = model_info['accessKeyId'] 
-    secretAccessKey = model_info['secretAccessKey'] 
-    region          = model_info['region'] 
+    apiKey = model_info['apiKey'] 
 
     memory = get_memory_data( state_dict[node_config_name] )
 
@@ -151,21 +136,13 @@ def node_{node_name}( state ) :
     # 답변 옵션     
     temperature = node_config['temperature']
     max_token   = node_config['maxTokens']
-    top_k       = node_config['topK']
-    top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatGoogleGenerativeAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    **aws_config
+                    max_output_tokens=max_token,
+                    google_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -174,16 +151,12 @@ def node_{node_name}( state ) :
         ("human", "{{user_prompt}}")
     ])
 
-    llm_chian = LLMChain(
-        llm=llm,
-        prompt=prompt,
-        memory=memory
-    )
+    chain = prompt | llm
 
 
     # 도구 없이 LLM 직접 호출
-    response = llm_chian.predict( **{{ "user_prompt" : user_prompt }}  )
-    node_input[output_value] = response.content if hasattr(response, 'content') else response
+    response = chain.invoke({{"user_prompt": user_prompt, "history": memory.chat_memory.messages}})
+    node_input[output_value] = response.content if hasattr(response, 'content') else str(response).encode('utf-8', errors='ignore').decode('utf-8')
 
     return_value = node_input.copy()
 
@@ -232,7 +205,7 @@ def base_tool_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
-    from langchain_aws import ChatBedrockConverse
+    from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
     my_name = "{node_name}" 
@@ -241,11 +214,10 @@ def node_{node_name}( state ) :
 
     state_dict  = state.model_dump()
     node_input  = state_dict[my_name] 
-
     if not node_input:
         print("No inputs received yet, waiting...")
         return {{}}
-
+        
     node_config = state_dict[node_config_name]['config']
     print( node_config )
 
@@ -253,9 +225,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    accessKeyId     = model_info['accessKeyId'] 
-    secretAccessKey = model_info['secretAccessKey'] 
-    region          = model_info['region'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -270,21 +240,13 @@ def node_{node_name}( state ) :
     # 답변 옵션     
     temperature = node_config['temperature']
     max_token   = node_config['maxTokens']
-    top_k       = node_config['topK']
-    top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatGoogleGenerativeAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    **aws_config
+                    max_output_tokens=max_token,
+                    google_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -301,9 +263,22 @@ def node_{node_name}( state ) :
     agent_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=False)
 
     
-    # 도구 없이 LLM 직접 호출
+    # 도구 있음 LLM 호출
     response = agent_executor.invoke({{"user_prompt": user_prompt}})
-    node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
+    
+    # Google 모델 전용 응답 파싱
+    try:
+        if isinstance(response, dict) and "output" in response:
+            output = response["output"]
+            # Google 모델의 경우 output이 문자열로 직접 반환됨
+            if isinstance(output, str):
+                node_input[output_value] = output
+            else:
+                node_input[output_value] = str(response)
+        else:
+            node_input[output_value] = str(response)
+    except Exception as e:
+        node_input[output_value] = str(response)
 
     return_value = node_input.copy()
 
@@ -413,7 +388,7 @@ def memory_tool_agent_code(node) :
 @log_node_execution("{node_id}", "{node_name}", "{node_type}")
 def node_{node_name}( state ) : 
 
-    from langchain_aws import ChatBedrockConverse
+    from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
     my_name = "{node_name}" 
@@ -433,9 +408,7 @@ def node_{node_name}( state ) :
     model_info = node_config['model']
     provider = model_info['providerName'] 
     modelName = model_info['modelName'] 
-    accessKeyId     = model_info['accessKeyId'] 
-    secretAccessKey = model_info['secretAccessKey'] 
-    region          = model_info['region'] 
+    apiKey = model_info['apiKey'] 
 
     # prompt 
     system_prompt_key = node_config['systemPromptInputKey']
@@ -452,21 +425,13 @@ def node_{node_name}( state ) :
     # 답변 옵션     
     temperature = node_config['temperature']
     max_token   = node_config['maxTokens']
-    top_k       = node_config['topK']
-    top_p       = node_config['topP']
 
-    # AWS 자격 증명 설정
-    aws_config = {{
-        'aws_access_key_id': accessKeyId,
-        'aws_secret_access_key': secretAccessKey,
-        'region_name': region
-    }}
 
-    llm  = ChatBedrockConverse(
+    llm  = ChatGoogleGenerativeAI(
                     model=modelName,
                     temperature=temperature,
-                    max_tokens=max_token,
-                    **aws_config
+                    max_output_tokens=max_token,
+                    google_api_key=apiKey
                 )
 
     prompt = ChatPromptTemplate.from_messages([
@@ -484,9 +449,22 @@ def node_{node_name}( state ) :
     agent_executor = AgentExecutor(agent=agent, tools=tool_list, memory=memory, verbose=False)
 
     
-    # 도구 없이 LLM 직접 호출
+    # 도구 있음, 메모리 있음 LLM 호출
     response = agent_executor.invoke({{"user_prompt": user_prompt}})
-    node_input[output_value] = response["output"][0]['text'].split( "</thinking>" )[1]
+    
+    # Google 모델 전용 응답 파싱
+    try:
+        if isinstance(response, dict) and "output" in response:
+            output = response["output"]
+            # Google 모델의 경우 output이 문자열로 직접 반환됨
+            if isinstance(output, str):
+                node_input[output_value] = output
+            else:
+                node_input[output_value] = str(response)
+        else:
+            node_input[output_value] = str(response)
+    except Exception as e:
+        node_input[output_value] = str(response)
 
     return_value = node_input.copy()
 
