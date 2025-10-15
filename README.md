@@ -1,11 +1,380 @@
 
-![LangStar Project Logo](./ReadMe/langstar1.png)+
+![LangStar Project Logo](./ReadMe/langstar1.png)
 
+# 🌟 LangStar
+
+[English](#english) | [한국어](#korean)
+
+---
+
+<a name="english"></a>
+## English Version
 
 > 🚧 **LangStar is currently under development.**
 > This project is currently in active development. Features, structure, and documentation may change frequently.
 
-# 🌟 LangStar
+**LangStar** is a visual no-code/low-code platform that enables both developers and non-developers to easily build **LLM-based agents** through a **drag-and-drop** interface. Built workflows are automatically converted to **Python code** and can be deployed.
+
+---
+
+### 🎯 Project Goals
+
+- Lower the barrier to entry for LLM agent development
+- Provide intuitive drag-and-drop based visual modeling
+- Automatically generate clean, modularized Python code
+- Provide one-click deployment and testing environment
+- Save development time and improve accessibility
+
+---
+
+### 📤 Key Features
+
+#### 🎨 Visual Workflow Builder
+- Compose LLM agent workflows with **drag-and-drop interface**
+- **Real-time node connection** and data flow visualization
+- Support for **individual node execution** and debugging
+
+#### 🔧 Various Node Types
+- **Start Node**: Workflow starting point and initial variable setup
+- **Prompt Node**: Prompt template creation and variable substitution
+- **Agent Node**: LLM model execution (AWS Bedrock support)
+- **Function Node**: User-defined Python function execution
+- **User Node**: Custom Python code blocks
+- **Condition Node**: Conditional branching
+- **Merge Node**: Multi-input data merging
+- **End Node**: Workflow termination point
+
+#### 🤖 AI Model Connection Management
+- **AWS Bedrock** fully supported (Claude, Nova, etc.)
+- **OpenAI, Google, Anthropic** UI support (backend integration in progress)
+- **API key and configuration management**
+- **Model parameter adjustment** (temperature, max tokens, etc.)
+
+#### 🚀 Local Execution and Testing
+- **Automatic LangGraph code generation**
+- **Local execution environment** and testing
+- **Execution version management** and history
+- **Real-time execution monitoring**
+- **Execution log tracking**
+
+#### 💾 Import/Export Features
+- **Workflow JSON export/import**
+- **AI connection settings backup/restore**
+- **User node sharing**
+
+#### 💬 Real-time Chat Interface
+- **Real-time conversation with locally running agents**
+- **Immediate workflow execution result confirmation**
+
+---
+
+### 🚀 Installation and Setup
+
+#### System Requirements
+- **Node.js** (v16 or higher)
+- **Python 3.11 or higher**
+- **npm** or **yarn**
+
+#### Required Software Installation
+
+**1. Node.js Installation**
+
+**macOS (using Homebrew):**
+```bash
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js
+brew install node
+
+# Check version
+node --version
+npm --version
+```
+
+**Ubuntu/Debian:**
+```bash
+# Add NodeSource repository
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+
+# Install Node.js
+sudo apt-get install -y nodejs
+
+# Check version
+node --version
+npm --version
+```
+
+**Windows:**
+1. Download LTS version from [Node.js official website](https://nodejs.org/)
+2. Run installer
+3. Check version in command prompt:
+```cmd
+node --version
+npm --version
+```
+
+**2. Python 3.11+ Installation**
+
+**macOS (using Homebrew):**
+```bash
+# Python 3.12 (recommended)
+brew install python@3.12
+
+# Or Python 3.11
+brew install python@3.11
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+
+# Python 3.12 (recommended)
+sudo apt install python3.12 python3.12-venv python3.12-pip
+
+# Or Python 3.11
+sudo apt install python3.11 python3.11-venv python3.11-pip
+```
+
+**Windows:**
+Download Python 3.11 or higher from [Python.org](https://www.python.org/downloads/)
+
+#### Quick Start
+
+1. **Clone repository**
+   ```bash
+   git clone <repository-url>
+   cd langstar
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+   This command will automatically:
+   - Install frontend dependencies (React)
+   - Detect and use optimal Python version (3.11+)
+   - Create Python virtual environment (`server/venv/`)
+   - Install Python dependencies in virtual environment
+
+3. **Run development server**
+   ```bash
+   npm run dev
+   ```
+   The following servers will be running:
+   - **Frontend server** (React): `http://localhost:5173`
+   - **Backend server** (FastAPI): `http://localhost:8000`
+
+#### Safely Stop Server
+
+**Recommended method (Ctrl+C):**
+```bash
+# In the terminal where langstar-dev is running
+Ctrl + C
+```
+
+**Alternative method:**
+```bash
+# Stop all development processes
+npm run stop-dev
+
+# Clean ports when processes are stuck
+npm run clean-ports
+
+# Check port usage
+npm run clean-ports:win32  # Windows
+lsof -i:8000 -i:5173       # macOS/Linux
+```
+
+#### Individual Execution Commands
+
+- **Frontend only**: `npm run dev --prefix ui`
+- **Backend only**: `npm run server-dev`
+- **Frontend dependencies only**: `npm install --prefix ui`
+- **Backend dependencies only**: `npm run setup-python:darwin` (macOS/Linux) or `npm run setup-python:win32` (Windows)
+- **Check Python version**: `npm run check-python`
+
+#### Docker Execution (Optional)
+
+```bash
+# Run container environment
+docker-compose up -d
+
+# Access: http://localhost
+```
+
+> **Note**: For detailed Docker guide, see [DOCKER_README.md](DOCKER_README.md). Includes Windows support, production deployment, troubleshooting, and more.
+
+#### Manual Python Setup (If Needed)
+If you want to manually set up Python:
+
+```bash
+# Setup script automatically detects optimal Python version (3.11+)
+npm run setup-python:darwin  # macOS/Linux
+npm run setup-python:win32   # Windows
+
+# Or manually:
+# Create virtual environment with available Python 3.11+
+python3.12 -m venv server/venv  # or python3.11, python3, python
+
+# Activate virtual environment
+# macOS/Linux:
+source server/venv/bin/activate
+# Windows:
+server\venv\Scripts\activate
+
+# Ensure pip installation and upgrade
+python -m ensurepip --upgrade
+python -m pip install --upgrade pip
+
+# Install dependencies
+pip install -r server/requirements.txt
+```
+
+#### Troubleshooting
+
+**1. Node.js version too low:**
+```bash
+# Check current version
+node --version
+
+# If below v16, update Node.js using installation methods above
+```
+
+**2. Cannot find Python 3.11+:**
+```bash
+# Check available Python versions
+python3.12 --version
+python3.11 --version
+python3 --version
+python --version
+
+# If not available, install using methods above
+```
+
+**3. Port already in use:**
+```bash
+# Check port usage
+lsof -i:8000 -i:5173
+
+# Kill processes using those ports
+npm run clean-ports
+```
+
+**4. Permission errors (Linux/macOS):**
+```bash
+# Fix npm permissions
+sudo chown -R $USER:$GROUP ~/.npm
+sudo chown -R $USER:$GROUP ~/.config
+```
+
+**5. Virtual environment issues:**
+```bash
+# Delete existing venv and recreate
+rm -rf server/venv
+npm run setup-python:darwin  # setup-python:win32 for Windows
+```
+
+---
+
+### 🖼️ Screenshots
+
+1. **Workflow Creation**  
+   Build LLM agent pipelines with drag-and-drop.
+
+   ![Workflow Creation](./ReadMe/langstar2.png)
+
+2. **Workflow and AI Connection Management**  
+   Systematically manage agent flows, API keys, and execution settings.
+
+   ![Settings Management](./ReadMe/langstar3.png)
+
+3. **Real-time Agent Chat**  
+   Chat in real-time with locally running agents based on completed workflows.
+
+   ![Chat Interface](./ReadMe/langstar4.png)
+
+4. **Real-time Debugging - Individual Node Execution**  
+   Execute and inspect each node individually during the design phase.  
+   Check intermediate outputs and resolve issues early.
+
+   ![Node Debugging](./ReadMe/langstar5.png)
+
+---
+
+### 🏗️ Tech Stack
+
+#### Frontend
+- **React 18** + **TypeScript** + **Vite**
+- **TailwindCSS** - Styling
+- **Zustand** - State management
+- **ReactFlow** - Visual workflow editing
+- **Monaco Editor** - Code editing
+
+#### Backend
+- **FastAPI** + **Python 3.11+**
+- **LangChain** + **LangGraph** - AI agent framework
+- **AWS Bedrock** - Primary LLM model support
+- **Uvicorn** - ASGI web server
+
+> **Note**: AWS Bedrock models are fully supported. Other AI models (OpenAI, Google, etc.) will be supported gradually.
+
+#### Deployment & Infrastructure
+- **Docker** + **Docker Compose**
+- **Cross-platform** development script support
+
+---
+
+### ⚠️ Current Limitations
+
+#### 🔧 Features in Development
+- **AI Model Support**: OpenAI, Google, Anthropic UI implemented, backend integration in progress
+- **Cloud Deployment**: Currently only local execution supported, actual cloud deployment features planned
+- **RAG Settings**: Basic UI exists, detailed features partially implemented
+
+#### ✅ Fully Supported Features
+- **AWS Bedrock** models (Claude, Nova, etc.)
+- **Visual workflow builder** and all node types
+- **Custom node** creation and management
+- **Import/Export** features
+- **Real-time debugging** and individual node execution
+- **Local execution** environment
+
+---
+
+### 🎯 Project Story
+
+Recently, our company went through a major restructuring. Many colleagues left during the process, and we found ourselves at the center of change. We also considered changing jobs, and many organizations wanted us. But somehow, we couldn't take that step.
+
+The answer was simpler than we thought. What we truly wanted wasn't a new job. What we really wanted was to work together. So we started thinking about how we could survive and thrive together.
+
+This project started that way. We needed a small space where we could work together. We didn't try to create something grand, but the goal was simple. To work in a way we enjoy, learn from each other, and create opportunities to grow together.
+
+We don't want to lose any more colleagues. So we're creating a space where we work together, gather our energy, and build this project as a result.
+
+---
+
+### 📄 License and Contributing
+
+#### License
+This project is distributed under the **MIT License**. See [LICENSE](LICENSE) file for details.
+
+#### Contributing
+If you want to contribute to LangStar, please refer to [CONTRIBUTING.md](CONTRIBUTING.md). Detailed guidelines on contribution guidelines, development environment setup, coding styles, and more are provided.
+
+#### Community Guidelines
+All contributors must comply with our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+#### Third-Party Licenses
+For license information on open source libraries used in this project, see [NOTICE](NOTICE) file.
+
+---
+
+<a name="korean"></a>
+## 한국어 버전
+
+> 🚧 **LangStar는 현재 개발 중입니다.**
+> 이 프로젝트는 활발히 개발 중이며, 기능, 구조, 문서가 자주 변경될 수 있습니다.
 
 **LangStar**는 개발자와 비개발자 모두가 **드래그 앤 드롭** 방식으로 **LLM 기반 에이전트**를 쉽게 구축할 수 있는 시각적 노코드/로우코드 플랫폼입니다. 구축된 워크플로우는 자동으로 **Python 코드**로 변환되어 배포할 수 있습니다.
 
@@ -197,7 +566,7 @@ docker-compose up -d
 # 접속: http://localhost
 ```
 
-> **참고**: Docker 환경은 로컬 개발/테스트용으로, 실제 클라우드 배포는 현재 지원하지 않습니다.
+> **참고**: Docker 상세 가이드는 [DOCKER_README.md](DOCKER_README.md)를 참조하세요. Windows 지원, 프로덕션 배포, 문제 해결 등이 상세히 안내되어 있습니다.
 
 ### 수동 Python 설정 (필요시)
 수동으로 Python을 설정하고 싶다면:
@@ -358,24 +727,16 @@ npm run setup-python:darwin  # Windows의 경우 setup-python:win32
 
 ---
 
-## 📄 라이센스
+## 📄 라이센스 및 기여
 
-이 프로젝트는 [MIT 라이센스](LICENSE) 하에 배포됩니다.
-
-### 라이센스 주요 내용
-MIT 라이센스는 다음과 같은 권리를 제공합니다:
-- ✅ **자유로운 사용**: 개인 및 상업적 목적으로 자유롭게 사용 가능
-- ✅ **수정 및 배포**: 코드를 수정하고 재배포 가능
-- ✅ **기여**: 누구나 기여할 수 있음
-- ✅ **최소한의 제약**: 저작권 표시만 유지하면 됨
+### 라이센스
+이 프로젝트는 **MIT 라이센스** 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 
 ### 기여하기
-이 프로젝트에 기여하고 싶으시다면:
-1. 이 저장소를 포크하세요
-2. 새로운 기능 브랜치를 생성하세요 (`git checkout -b feature/amazing-feature`)
-3. 변경사항을 커밋하세요 (`git commit -m 'Add amazing feature'`)
-4. 브랜치에 푸시하세요 (`git push origin feature/amazing-feature`)
-5. Pull Request를 생성하세요
+LangStar에 기여하고 싶으시다면 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요. 기여 가이드라인, 개발 환경 설정, 코딩 스타일 등이 상세히 안내되어 있습니다.
 
-### 면책 조항
-이 소프트웨어는 "있는 그대로" 제공되며, 명시적이거나 묵시적인 어떠한 보증도 하지 않습니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+### 커뮤니티 가이드라인
+모든 기여자는 우리의 [행동 강령(Code of Conduct)](CODE_OF_CONDUCT.md)을 준수해야 합니다.
+
+### 서드파티 라이센스
+이 프로젝트에서 사용하는 오픈소스 라이브러리의 라이센스 정보는 [NOTICE](NOTICE) 파일을 참조하세요.
