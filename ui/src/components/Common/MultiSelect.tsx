@@ -5,6 +5,8 @@ interface MultiSelectOption {
   value: string;
   label: string;
   description?: string;
+  nodeName?: string;
+  nodeId?: string;
 }
 
 interface MultiSelectProps {
@@ -14,6 +16,7 @@ interface MultiSelectProps {
   placeholder?: string;
   disabled?: boolean;
   maxHeight?: string;
+  singleSelection?: boolean; // 단일 선택 모드
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -22,7 +25,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   options,
   placeholder = 'Select options...',
   disabled = false,
-  maxHeight = 'max-h-48'
+  maxHeight = 'max-h-48',
+  singleSelection = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,19 +85,47 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   }, [isOpen, highlightedIndex, options]);
 
   const toggleOption = (optionValue: string) => {
-    const newValue = value.includes(optionValue)
-      ? value.filter(v => v !== optionValue)
-      : [...value, optionValue];
-    onChange(newValue);
+    if (singleSelection) {
+      // 단일 선택 모드: 다른 값 선택 시 기존 선택 해제
+      if (value.includes(optionValue)) {
+        // 이미 선택된 값을 다시 클릭하면 해제
+        onChange([]);
+      } else {
+        // 새로운 값 선택 (기존 선택 자동 해제)
+        onChange([optionValue]);
+      }
+    } else {
+      // 다중 선택 모드: 기존 로직 유지
+      const newValue = value.includes(optionValue)
+        ? value.filter(v => v !== optionValue)
+        : [...value, optionValue];
+      onChange(newValue);
+    }
   };
 
   const removeOption = (optionValue: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    const newValue = value.filter(v => v !== optionValue);
-    onChange(newValue);
+    if (singleSelection) {
+      // 단일 선택 모드에서는 선택 해제
+      onChange([]);
+    } else {
+      // 다중 선택 모드에서는 해당 항목만 제거
+      const newValue = value.filter(v => v !== optionValue);
+      onChange(newValue);
+    }
   };
 
   const selectedOptions = options.filter(option => value.includes(option.value));
+
+  // 노드별로 그룹핑
+  const groupedOptions = options.reduce((acc, option) => {
+    const nodeName = option.nodeName || 'Unknown Node';
+    if (!acc[nodeName]) {
+      acc[nodeName] = [];
+    }
+    acc[nodeName].push(option);
+    return acc;
+  }, {} as Record<string, MultiSelectOption[]>);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -116,6 +148,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
               className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm flex items-center gap-1"
             >
               <span className="truncate max-w-[120px]">{option.label}</span>
+              {option.nodeName && (
+                <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-200 dark:bg-blue-800 px-1 rounded">
+                  {option.nodeName}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={(e) => removeOption(option.value, e)}
@@ -154,41 +191,60 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
               No options available
             </div>
           ) : (
-            options.map((option, index) => {
-              const isSelected = value.includes(option.value);
-              const isHighlighted = index === highlightedIndex;
-              
-              return (
-                <div
-                  key={option.value}
-                  className={`px-4 py-2 cursor-pointer text-sm flex items-center gap-2 transition-colors ${
-                    isSelected 
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                      : isHighlighted
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                      : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                  onClick={() => toggleOption(option.value)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  role="option"
-                  aria-selected={isSelected}
-                >
-                  <div className="flex items-center justify-center w-4 h-4">
-                    {isSelected && (
-                      <Check size={14} className="text-blue-600 dark:text-blue-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{option.label}</div>
-                    {option.description && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {option.description}
-                      </div>
-                    )}
+            Object.entries(groupedOptions).map(([nodeName, nodeOptions]) => (
+              <div key={nodeName} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                {/* 노드 헤더 */}
+                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {nodeName}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      ({nodeOptions.length} items)
+                    </span>
                   </div>
                 </div>
-              );
-            })
+                
+                {/* 노드의 옵션들 */}
+                {nodeOptions.map((option) => {
+                  const globalIndex = options.findIndex(opt => opt.value === option.value);
+                  const isSelected = value.includes(option.value);
+                  const isHighlighted = globalIndex === highlightedIndex;
+                  
+                  return (
+                    <div
+                      key={option.value}
+                      className={`px-6 py-2 cursor-pointer text-sm flex items-center gap-2 transition-colors ${
+                        isSelected 
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                          : isHighlighted
+                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                          : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                      onClick={() => toggleOption(option.value)}
+                      onMouseEnter={() => setHighlightedIndex(globalIndex)}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <div className="flex items-center justify-center w-4 h-4">
+                        {isSelected && (
+                          <Check size={14} className="text-blue-600 dark:text-blue-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{option.label}</div>
+                        {option.description && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {option.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       )}
