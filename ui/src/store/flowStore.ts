@@ -151,6 +151,7 @@ export interface FlowState {
   // 노드 연결 제약 조건 검사 함수들
   calculateInDegree: (nodeId: string, edges: Edge[]) => number;
   isMergeNode: (nodeId: string, nodes: Node<NodeData>[]) => boolean;
+  isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => boolean;
   hasPathFromTargetToSource: (targetId: string, sourceId: string, edges: Edge[]) => boolean;
   canConnect: (connection: Connection) => { allowed: boolean; reason?: string };
   findViolatingEdges: () => string[];
@@ -654,6 +655,98 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     return node?.type === 'mergeNode';
   },
 
+  // 2-1. condition 분기 합류 노드인지 확인
+  // condition 노드에서 분기된 여러 경로가 이 노드로 합쳐지는 경우를 감지
+  isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
+    const node = nodes.find(n => n.id === nodeId);
+    
+    // merge 노드는 이미 다중 입력을 허용하므로 제외
+    if (node?.type === 'mergeNode') {
+      return false;
+    }
+    
+    // 현재 노드로 들어오는 모든 edge 확인
+    const incomingEdges = edges.filter(edge => edge.target === nodeId);
+    
+    // 2개 미만의 입력이면 convergence가 아님
+    if (incomingEdges.length < 2) {
+      return false;
+    }
+    
+    // 각 incoming edge의 source에서 역으로 거슬러 올라가서 condition 노드를 찾는 함수
+    const findConditionNodeInPath = (currentNodeId: string, visited: Set<string> = new Set()): string | null => {
+      if (visited.has(currentNodeId)) {
+        return null; // 순환 방지
+      }
+      visited.add(currentNodeId);
+      
+      const currentNode = nodes.find(n => n.id === currentNodeId);
+      
+      // condition 노드를 찾았으면 반환
+      if (currentNode?.type === 'conditionNode') {
+        return currentNodeId;
+      }
+      
+      // 상위 노드들을 재귀적으로 탐색
+      const parentEdges = edges.filter(edge => edge.target === currentNodeId);
+      
+      for (const parentEdge of parentEdges) {
+        const conditionNodeId = findConditionNodeInPath(parentEdge.source, new Set(visited));
+        if (conditionNodeId) {
+          return conditionNodeId;
+        }
+      }
+      
+      return null;
+    };
+    
+    // 각 incoming edge의 source에서 condition 노드 찾기
+    const conditionNodeIds = new Set<string>();
+    let edgesFromConditionPaths = 0;
+    
+    for (const edge of incomingEdges) {
+      const conditionNodeId = findConditionNodeInPath(edge.source);
+      if (conditionNodeId) {
+        conditionNodeIds.add(conditionNodeId);
+        edgesFromConditionPaths++;
+      }
+    }
+    
+    // 기본 조건 체크
+    if (conditionNodeIds.size < 1 || 
+        edgesFromConditionPaths !== incomingEdges.length || 
+        incomingEdges.length < 2) {
+      return false;
+    }
+    
+    // 추가 검증: 모든 incoming edges가 서로 "배타적인" 경로에서 와야 함
+    // 즉, 두 source 노드 사이에 경로가 있으면 안 됨 (하나가 다른 하나의 선행/후행 노드면 안 됨)
+    // 이렇게 해야 condition 분기의 "중간 노드"가 아닌 "합류점"만 허용됨
+    const sources = incomingEdges.map(e => e.source);
+    
+    for (let i = 0; i < sources.length; i++) {
+      for (let j = i + 1; j < sources.length; j++) {
+        const sourceA = sources[i];
+        const sourceB = sources[j];
+        
+        // sourceA에서 sourceB로 가는 경로가 있는지 확인
+        const hasPathAtoB = get().hasPathFromTargetToSource(sourceB, sourceA, edges);
+        // sourceB에서 sourceA로 가는 경로가 있는지 확인
+        const hasPathBtoA = get().hasPathFromTargetToSource(sourceA, sourceB, edges);
+        
+        if (hasPathAtoB || hasPathBtoA) {
+          // 두 source 사이에 경로가 있으면, 이는 진짜 convergence가 아님
+          // (하나가 다른 하나의 중간 노드이거나 선행 노드)
+          console.log(`🚫 [isConditionConvergenceNode] Sources ${sourceA} and ${sourceB} are not mutually exclusive - path exists between them`);
+          return false;
+        }
+      }
+    }
+    
+    // 모든 조건을 만족하면 condition convergence 노드
+    return true;
+  },
+
   // 3. 순환 경로 검사 (DFS를 사용하여 target에서 source로 가는 경로가 있는지 확인)
   hasPathFromTargetToSource: (targetId: string, sourceId: string, edges: Edge[]) => {
     const visited = new Set<string>();
@@ -702,6 +795,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       return { allowed: true };
     }
     
+    // condition convergence 노드인지 확인 (새로 연결했을 때를 가정)
+    const simulatedEdges = [...edges, { 
+      id: 'temp', 
+      source: source!, 
+      target: target,
+      type: 'default'
+    } as Edge];
+    const isConditionConvergence = get().isConditionConvergenceNode(target, nodes, simulatedEdges);
+    
+    // condition 분기 합류 노드는 여러 입력을 허용
+    if (isConditionConvergence) {
+      console.log(`🔀 [Connection] ${target} is a condition convergence node - allowing multiple inputs`);
+      return { allowed: true };
+    }
+    
     // 일반 노드의 경우, 이미 1개 이상의 입력이 있으면 순환 여부 검사
     if (currentInDegree >= 1) {
       // 순환 경로가 있는지 확인 (target -> ... -> source)
@@ -712,7 +820,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       } else {
         return { 
           allowed: false, 
-          reason: "일반 노드는 동시에 2개 이상의 직접 입력을 받을 수 없습니다. (순환 연결은 예외)" 
+          reason: "일반 노드는 동시에 2개 이상의 직접 입력을 받을 수 없습니다. (순환 연결 또는 condition 분기 합류는 예외)" 
         };
       }
     }
@@ -732,6 +840,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       
       // merge 노드는 다수 입력 허용하므로 제외
       if (get().isMergeNode(nodeId, nodes)) {
+        return;
+      }
+      
+      // condition convergence 노드는 다수 입력 허용하므로 제외
+      if (get().isConditionConvergenceNode(nodeId, nodes, edges)) {
         return;
       }
       
@@ -1385,29 +1498,67 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
     let input: Record<string, any> = {};
     
+    // condition convergence 노드인지 확인
+    const isConditionConvergence = get().isConditionConvergenceNode(nodeId, get().nodes, get().edges);
+    
     if (incomingEdges.length > 0) {
-      // 수동으로 선택된 edge가 있는지 확인
-      const manuallySelectedEdgeId = get().manuallySelectedEdges[nodeId];
-      
-      if (manuallySelectedEdgeId) {
-        // 수동으로 선택된 edge의 데이터 사용
-        const selectedEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
-        if (selectedEdge && selectedEdge.data?.output && typeof selectedEdge.data.output === 'object') {
-          input = selectedEdge.data.output;
+      // condition convergence 노드의 경우 특별 처리
+      if (isConditionConvergence) {
+        console.log(`🔀 [executeNode] ${nodeName} is a condition convergence node`);
+        
+        // null/undefined가 아닌 실제 데이터를 가진 edge만 필터링
+        const edgesWithValidData = incomingEdges.filter(edge => {
+          const hasOutput = edge.data?.output !== null && 
+                           edge.data?.output !== undefined && 
+                           typeof edge.data.output === 'object';
+          if (hasOutput) {
+            console.log(`🔀 [executeNode] Valid data from edge ${edge.id}:`, edge.data.output);
+          }
+          return hasOutput;
+        });
+        
+        console.log(`🔀 [executeNode] ${edgesWithValidData.length}/${incomingEdges.length} edges have valid data`);
+        
+        // 실제 데이터가 있는 edge 중 가장 최근 것 사용
+        if (edgesWithValidData.length > 0) {
+          const sortedEdges = edgesWithValidData
+            .map(edge => ({
+              edge,
+              timestamp: edge.data?.timestamp || 0,
+              output: edge.data.output
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp);
+          
+          input = sortedEdges[0].output;
+          console.log(`🔀 [executeNode] Using data from most recent edge:`, input);
+        } else {
+          console.warn(`🔀 [executeNode] No valid data found in any incoming edges`);
         }
       } else {
-        // 수동 선택이 없으면 가장 최근에 실행된 노드의 데이터 사용
-        const edgesWithTimestamps = incomingEdges
-          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-          .map(edge => ({
-            edge,
-            timestamp: edge.data?.timestamp || 0,
-            output: edge.data.output
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+        // 일반 노드의 기존 로직
+        // 수동으로 선택된 edge가 있는지 확인
+        const manuallySelectedEdgeId = get().manuallySelectedEdges[nodeId];
+        
+        if (manuallySelectedEdgeId) {
+          // 수동으로 선택된 edge의 데이터 사용
+          const selectedEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
+          if (selectedEdge && selectedEdge.data?.output && typeof selectedEdge.data.output === 'object') {
+            input = selectedEdge.data.output;
+          }
+        } else {
+          // 수동 선택이 없으면 가장 최근에 실행된 노드의 데이터 사용
+          const edgesWithTimestamps = incomingEdges
+            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+            .map(edge => ({
+              edge,
+              timestamp: edge.data?.timestamp || 0,
+              output: edge.data.output
+            }))
+            .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
 
-        if (edgesWithTimestamps.length > 0) {
-          input = edgesWithTimestamps[0].output;
+          if (edgesWithTimestamps.length > 0) {
+            input = edgesWithTimestamps[0].output;
+          }
         }
       }
     }
@@ -2323,6 +2474,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 next.push(targetNodeId);
               } else {
                 console.log(`[Frontier] Merge 노드 ${targetNode.data.label} 대기 (${readyEdges.length}/${allIncomingEdges.length})`);
+              }
+            } else if (get().isConditionConvergenceNode(targetNodeId, get().nodes, latestEdges)) {
+              // condition convergence 노드는 하나의 edge라도 데이터가 있으면 실행 가능
+              const allIncomingEdges = latestEdges.filter(e => e.target === targetNodeId);
+              const readyEdges = allIncomingEdges.filter(hasValidEdgeData);
+              
+              if (readyEdges.length > 0) {
+                console.log(`🔀 [Frontier] Condition convergence 노드 ${targetNode?.data.label} 준비 완료 (${readyEdges.length}/${allIncomingEdges.length} edges ready) - 실행 큐 추가`);
+                next.push(targetNodeId);
+              } else {
+                console.log(`🔀 [Frontier] Condition convergence 노드 ${targetNode?.data.label} 대기 중 - 아직 데이터가 없음`);
               }
             } else {
               // 일반 노드는 기존 로직대로
