@@ -920,27 +920,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       classType: 'TypedDict' as const,
       variables: []
     } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
-      outputVariable: 'python_function_output',
+      outputVariable: uniqueLabel,
       // code는 newNode 생성 시 data에 직접 설정합니다.
     } : type === 'loopNode' ? {
       repetitions: 1
     } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
       template: 'User: {{user_input}}\n\nAssistant:',
-      outputVariable: 'user_input'
+      outputVariable: uniqueLabel
     } : type === 'agentNode' ? {
       model: '',
       userPromptInputKey: '',
       systemPromptInputKey: '',
       memoryGroup: '',
       tools: [],
-      agentOutputVariable: 'agent_response'
+      agentOutputVariable: uniqueLabel
     } : type === 'mergeNode' ? {
       mergeMappings: []
     } : type === 'endNode' ? {
       receiveKey: ''
     } : type === 'userNode' ? {
       // UserNode의 경우 data.config에서 가져온 설정을 사용하되, 기본값도 제공
-      outputVariable: 'result',
+      outputVariable: uniqueLabel,
       ...data.config
     } : {};
 
