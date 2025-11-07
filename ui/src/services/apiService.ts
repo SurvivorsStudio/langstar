@@ -6,6 +6,13 @@ import {
   DeploymentEnvironment 
 } from '../types/deployment';
 import { Workflow } from '../store/flowStore';
+import {
+  Schedule,
+  CreateScheduleRequest,
+  UpdateScheduleRequest,
+  ScheduleResponse,
+  SchedulesListResponse,
+} from '../types/schedule';
 
 // API 응답 타입들
 interface ApiResponse<T> {
@@ -353,6 +360,140 @@ class ApiService {
     );
 
     return response.langgraph;
+  }
+
+  // 스케줄 관련 API 메서드들
+
+  /**
+   * 새 스케줄 생성
+   */
+  async createSchedule(request: CreateScheduleRequest): Promise<ScheduleResponse> {
+    const response = await this.request<ScheduleResponse>('/api/schedules', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 모든 스케줄 조회
+   */
+  async getSchedules(): Promise<SchedulesListResponse> {
+    const response = await this.request<SchedulesListResponse>('/api/schedules', {
+      method: 'GET'
+    });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 특정 스케줄 조회
+   */
+  async getSchedule(scheduleId: string): Promise<ScheduleResponse> {
+    const response = await this.request<ScheduleResponse>(`/api/schedules/${scheduleId}`, {
+      method: 'GET'
+    });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 특정 배포의 스케줄 목록 조회
+   */
+  async getSchedulesByDeployment(deploymentId: string): Promise<SchedulesListResponse> {
+    const response = await this.request<SchedulesListResponse>(
+      `/api/deployments/${deploymentId}/schedules`,
+      {
+        method: 'GET'
+      }
+    );
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 스케줄 업데이트
+   */
+  async updateSchedule(scheduleId: string, request: UpdateScheduleRequest): Promise<ScheduleResponse> {
+    const response = await this.request<ScheduleResponse>(`/api/schedules/${scheduleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(request)
+    });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 스케줄 삭제
+   */
+  async deleteSchedule(scheduleId: string): Promise<void> {
+    const response = await this.request<{ success: boolean; message: string }>(
+      `/api/schedules/${scheduleId}`,
+      {
+        method: 'DELETE'
+      }
+    );
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+  }
+
+  /**
+   * 스케줄 일시 중지
+   */
+  async pauseSchedule(scheduleId: string): Promise<ScheduleResponse> {
+    const response = await this.request<ScheduleResponse>(
+      `/api/schedules/${scheduleId}/pause`,
+      {
+        method: 'POST'
+      }
+    );
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
+  }
+
+  /**
+   * 스케줄 재개
+   */
+  async resumeSchedule(scheduleId: string): Promise<ScheduleResponse> {
+    const response = await this.request<ScheduleResponse>(
+      `/api/schedules/${scheduleId}/resume`,
+      {
+        method: 'POST'
+      }
+    );
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    return response;
   }
 }
 
