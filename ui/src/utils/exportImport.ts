@@ -1,66 +1,8 @@
 import { Node, Edge, Viewport } from 'reactflow';
 import { Workflow } from '../store/flowStore';
 import { Deployment } from '../types/deployment';
+import * as storageService from '../services/storageService';
 
-// IndexedDB 설정
-const DB_NAME = 'WorkflowDatabase';
-const WORKFLOWS_STORE_NAME = 'WorkflowsStore';
-const AI_CONNECTIONS_STORE_NAME = 'AIConnectionsStore';
-const USER_NODES_STORE_NAME = 'UserNodesStore';
-
-const DEPLOYMENT_DB_NAME = 'LangStarDeploymentDB';
-const DEPLOYMENTS_STORE_NAME = 'deployments';
-const DEPLOYMENT_VERSIONS_STORE_NAME = 'deployment_versions';
-
-// IndexedDB 열기 함수
-const openWorkflowDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 3);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const openDeploymentDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DEPLOYMENT_DB_NAME, 1);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-// 안전한 데이터 가져오기 함수
-const safeGetAll = (store: IDBObjectStore): Promise<any[]> => {
-  return new Promise((resolve, reject) => {
-    try {
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => {
-        console.warn('Store getAll failed, returning empty array');
-        resolve([]);
-      };
-    } catch (error) {
-      console.warn('Store operation failed, returning empty array:', error);
-      resolve([]);
-    }
-  });
-};
-
-const safeGet = (store: IDBObjectStore, key: string): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    try {
-      const request = store.get(key);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => {
-        console.warn(`Store get failed for key: ${key}`);
-        resolve(null);
-      };
-    } catch (error) {
-      console.warn(`Store get operation failed for key: ${key}:`, error);
-      resolve(null);
-    }
-  });
-};
 
 // Export 데이터 타입 정의
 export interface ChatflowExportData {
@@ -77,12 +19,6 @@ export interface ChatflowExportData {
 export const exportChatflow = async (projectName?: string): Promise<ChatflowExportData> => {
   try {
     console.log('Starting export process...');
-    
-    const workflowDB = await openWorkflowDB();
-    console.log('WorkflowDB opened successfully');
-    
-    const deploymentDB = await openDeploymentDB();
-    console.log('DeploymentDB opened successfully');
 
     const exportData: ChatflowExportData = {
       version: '1.0.0',
@@ -96,92 +32,65 @@ export const exportChatflow = async (projectName?: string): Promise<ChatflowExpo
 
     // 워크플로우 데이터 가져오기
     try {
-      if (workflowDB.objectStoreNames.contains(WORKFLOWS_STORE_NAME)) {
-        const workflowTransaction = workflowDB.transaction([WORKFLOWS_STORE_NAME], 'readonly');
-        const workflowStore = workflowTransaction.objectStore(WORKFLOWS_STORE_NAME);
-        
-        if (projectName) {
-          // 특정 프로젝트만 export
-          console.log(`Exporting specific workflow: ${projectName}`);
-          const workflow = await safeGet(workflowStore, projectName);
-          if (workflow) {
-            exportData.workflows.push(workflow);
-            console.log(`Found workflow: ${projectName}`);
-          } else {
-            console.log(`Workflow not found: ${projectName}`);
-          }
+      if (projectName) {
+        // 특정 프로젝트만 export
+        console.log(`Exporting specific workflow: ${projectName}`);
+        const workflow = await storageService.getWorkflowByName(projectName);
+        if (workflow) {
+          exportData.workflows.push(workflow);
+          console.log(`Found workflow: ${projectName}`);
         } else {
-          // 모든 워크플로우 export
-          console.log('Exporting all workflows');
-          exportData.workflows = await safeGetAll(workflowStore);
-          console.log(`Found ${exportData.workflows.length} workflows`);
+          console.log(`Workflow not found: ${projectName}`);
         }
       } else {
-        console.log('WorkflowsStore not found in database');
+        // 모든 워크플로우 export
+        console.log('Exporting all workflows');
+        exportData.workflows = await storageService.getAllWorkflows();
+        console.log(`Found ${exportData.workflows.length} workflows`);
       }
     } catch (error) {
       console.error('Error exporting workflows:', error);
-      // 워크플로우 에러가 있어도 계속 진행
     }
 
     // AI 연결 데이터 가져오기
     try {
-      if (workflowDB.objectStoreNames.contains(AI_CONNECTIONS_STORE_NAME)) {
-        const aiTransaction = workflowDB.transaction([AI_CONNECTIONS_STORE_NAME], 'readonly');
-        const aiStore = aiTransaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-        exportData.aiConnections = await safeGetAll(aiStore);
-        console.log(`Found ${exportData.aiConnections.length} AI connections`);
-      } else {
-        console.log('AIConnectionsStore not found in database');
-      }
+      exportData.aiConnections = await storageService.getAllAIConnections();
+      console.log(`Found ${exportData.aiConnections.length} AI connections`);
     } catch (error) {
       console.error('Error exporting AI connections:', error);
-      // AI 연결 에러가 있어도 계속 진행
     }
 
     // 사용자 노드 데이터 가져오기
     try {
-      if (workflowDB.objectStoreNames.contains(USER_NODES_STORE_NAME)) {
-        const userNodeTransaction = workflowDB.transaction([USER_NODES_STORE_NAME], 'readonly');
-        const userNodeStore = userNodeTransaction.objectStore(USER_NODES_STORE_NAME);
-        exportData.userNodes = await safeGetAll(userNodeStore);
-        console.log(`Found ${exportData.userNodes.length} user nodes`);
-      } else {
-        console.log('UserNodesStore not found in database');
-      }
+      exportData.userNodes = await storageService.getAllUserNodes();
+      console.log(`Found ${exportData.userNodes.length} user nodes`);
     } catch (error) {
       console.error('Error exporting user nodes:', error);
-      // 사용자 노드 에러가 있어도 계속 진행
     }
 
     // 배포 데이터 가져오기
     try {
-      if (deploymentDB.objectStoreNames.contains(DEPLOYMENTS_STORE_NAME)) {
-        const deploymentTransaction = deploymentDB.transaction([DEPLOYMENTS_STORE_NAME], 'readonly');
-        const deploymentStore = deploymentTransaction.objectStore(DEPLOYMENTS_STORE_NAME);
-        exportData.deployments = await safeGetAll(deploymentStore);
-        console.log(`Found ${exportData.deployments.length} deployments`);
-      } else {
-        console.log('DeploymentsStore not found in database');
-      }
+      exportData.deployments = await storageService.getAllDeployments();
+      console.log(`Found ${exportData.deployments.length} deployments`);
     } catch (error) {
       console.error('Error exporting deployments:', error);
-      // 배포 에러가 있어도 계속 진행
     }
 
-    // 배포 버전 데이터 가져오기
+    // 배포 버전 데이터 가져오기 (모든 deployment의 버전들을 수집)
     try {
-      if (deploymentDB.objectStoreNames.contains(DEPLOYMENT_VERSIONS_STORE_NAME)) {
-        const versionTransaction = deploymentDB.transaction([DEPLOYMENT_VERSIONS_STORE_NAME], 'readonly');
-        const versionStore = versionTransaction.objectStore(DEPLOYMENT_VERSIONS_STORE_NAME);
-        exportData.deploymentVersions = await safeGetAll(versionStore);
-        console.log(`Found ${exportData.deploymentVersions.length} deployment versions`);
-      } else {
-        console.log('DeploymentVersionsStore not found in database');
+      const allVersions: any[] = [];
+      for (const deployment of exportData.deployments) {
+        try {
+          const versions = await storageService.getDeploymentVersions(deployment.id);
+          allVersions.push(...versions);
+        } catch (err) {
+          console.warn(`Failed to get versions for deployment ${deployment.id}:`, err);
+        }
       }
+      exportData.deploymentVersions = allVersions;
+      console.log(`Found ${exportData.deploymentVersions.length} deployment versions`);
     } catch (error) {
       console.error('Error exporting deployment versions:', error);
-      // 배포 버전 에러가 있어도 계속 진행
     }
 
     console.log('Export completed successfully');
@@ -267,142 +176,87 @@ export const importChatflow = async (file: File): Promise<{ success: boolean; me
       throw new Error('Invalid import file format');
     }
 
-    const workflowDB = await openWorkflowDB();
-    console.log('WorkflowDB opened for import');
-
     // 워크플로우 데이터 import (필수)
-    try {
-      if (workflowDB.objectStoreNames.contains(WORKFLOWS_STORE_NAME)) {
-        const workflowTransaction = workflowDB.transaction([WORKFLOWS_STORE_NAME], 'readwrite');
-        const workflowStore = workflowTransaction.objectStore(WORKFLOWS_STORE_NAME);
-        
-        let importedCount = 0;
-        for (const workflow of importData.workflows) {
-          try {
-            await new Promise<void>((resolve, reject) => {
-              const request = workflowStore.put(workflow);
-              request.onsuccess = () => {
-                importedCount++;
-                resolve();
-              };
-              request.onerror = () => reject(request.error);
-            });
-          } catch (error) {
-            console.warn(`Failed to import workflow: ${workflow.projectName}`, error);
-          }
-        }
-        console.log(`Imported ${importedCount} workflows`);
-      } else {
-        console.log('WorkflowsStore not found in database');
+    let importedWorkflowsCount = 0;
+    for (const workflow of importData.workflows) {
+      try {
+        await storageService.updateWorkflow(workflow.projectName, workflow);
+        importedWorkflowsCount++;
+      } catch (error) {
+        console.warn(`Failed to import workflow: ${workflow.projectName}`, error);
       }
-    } catch (error) {
-      console.error('Error importing workflows:', error);
-      throw new Error('Failed to import workflows');
     }
+    console.log(`Imported ${importedWorkflowsCount} workflows`);
 
     // 전체 export 형식인 경우에만 추가 데이터 import
     if (importData.aiConnections && importData.userNodes && importData.deployments && importData.deploymentVersions) {
       console.log('Importing additional data (full export format)');
       
       // AI 연결 데이터 import
-      try {
-        if (workflowDB.objectStoreNames.contains(AI_CONNECTIONS_STORE_NAME)) {
-          const aiTransaction = workflowDB.transaction([AI_CONNECTIONS_STORE_NAME], 'readwrite');
-          const aiStore = aiTransaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-          
-          for (const connection of importData.aiConnections) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const request = aiStore.put(connection);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-              });
-            } catch (error) {
-              console.warn('Failed to import AI connection:', error);
-            }
+      for (const connection of importData.aiConnections) {
+        try {
+          await storageService.updateAIConnection(connection.id, connection);
+        } catch (error) {
+          try {
+            // 존재하지 않으면 생성
+            await storageService.createAIConnection(connection);
+          } catch (createError) {
+            console.warn('Failed to import AI connection:', createError);
           }
-          console.log(`Imported ${importData.aiConnections.length} AI connections`);
         }
-      } catch (error) {
-        console.error('Error importing AI connections:', error);
       }
+      console.log(`Imported ${importData.aiConnections.length} AI connections`);
 
       // 사용자 노드 데이터 import
-      try {
-        if (workflowDB.objectStoreNames.contains(USER_NODES_STORE_NAME)) {
-          const userNodeTransaction = workflowDB.transaction([USER_NODES_STORE_NAME], 'readwrite');
-          const userNodeStore = userNodeTransaction.objectStore(USER_NODES_STORE_NAME);
-          
-          for (const userNode of importData.userNodes) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const request = userNodeStore.put(userNode);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-              });
-            } catch (error) {
-              console.warn('Failed to import user node:', error);
-            }
+      for (const userNode of importData.userNodes) {
+        try {
+          await storageService.updateUserNode(userNode.id, userNode);
+        } catch (error) {
+          try {
+            // 존재하지 않으면 생성
+            await storageService.createUserNode(userNode);
+          } catch (createError) {
+            console.warn('Failed to import user node:', createError);
           }
-          console.log(`Imported ${importData.userNodes.length} user nodes`);
         }
-      } catch (error) {
-        console.error('Error importing user nodes:', error);
       }
+      console.log(`Imported ${importData.userNodes.length} user nodes`);
 
       // 배포 데이터 import
-      try {
-        const deploymentDB = await openDeploymentDB();
-        if (deploymentDB.objectStoreNames.contains(DEPLOYMENTS_STORE_NAME)) {
-          const deploymentTransaction = deploymentDB.transaction([DEPLOYMENTS_STORE_NAME], 'readwrite');
-          const deploymentStore = deploymentTransaction.objectStore(DEPLOYMENTS_STORE_NAME);
-          
-          for (const deployment of importData.deployments) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const request = deploymentStore.put(deployment);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-              });
-            } catch (error) {
-              console.warn('Failed to import deployment:', error);
-            }
+      for (const deployment of importData.deployments) {
+        try {
+          await storageService.updateDeployment(deployment.id, deployment);
+        } catch (error) {
+          try {
+            // 존재하지 않으면 생성
+            await storageService.createDeployment(deployment);
+          } catch (createError) {
+            console.warn('Failed to import deployment:', createError);
           }
-          console.log(`Imported ${importData.deployments.length} deployments`);
         }
-      } catch (error) {
-        console.error('Error importing deployments:', error);
       }
+      console.log(`Imported ${importData.deployments.length} deployments`);
 
       // 배포 버전 데이터 import
-      try {
-        const deploymentDB = await openDeploymentDB();
-        if (deploymentDB.objectStoreNames.contains(DEPLOYMENT_VERSIONS_STORE_NAME)) {
-          const versionTransaction = deploymentDB.transaction([DEPLOYMENT_VERSIONS_STORE_NAME], 'readwrite');
-          const versionStore = versionTransaction.objectStore(DEPLOYMENT_VERSIONS_STORE_NAME);
-          
-          for (const version of importData.deploymentVersions) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const request = versionStore.put(version);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-              });
-            } catch (error) {
-              console.warn('Failed to import deployment version:', error);
-            }
+      for (const version of importData.deploymentVersions) {
+        try {
+          await storageService.updateDeploymentVersion(version.id, version);
+        } catch (error) {
+          try {
+            // 존재하지 않으면 생성
+            await storageService.createDeploymentVersion(version);
+          } catch (createError) {
+            console.warn('Failed to import deployment version:', createError);
           }
-          console.log(`Imported ${importData.deploymentVersions.length} deployment versions`);
         }
-      } catch (error) {
-        console.error('Error importing deployment versions:', error);
       }
+      console.log(`Imported ${importData.deploymentVersions.length} deployment versions`);
     }
 
     console.log('Import completed successfully');
     return {
       success: true,
-      message: `Successfully imported ${importData.workflows.length} workflows${importData.aiConnections ? ' and related data' : ''}`
+      message: `Successfully imported ${importedWorkflowsCount} workflows${importData.aiConnections ? ' and related data' : ''}`
     };
   } catch (error) {
     console.error('Import failed:', error);
@@ -435,44 +289,23 @@ export const importWorkflowOnly = async (file: File): Promise<{ success: boolean
       throw new Error('No workflows found in the file');
     }
 
-    const workflowDB = await openWorkflowDB();
-    console.log('WorkflowDB opened for import');
-
     // 워크플로우 데이터만 import
-    try {
-      if (workflowDB.objectStoreNames.contains(WORKFLOWS_STORE_NAME)) {
-        const workflowTransaction = workflowDB.transaction([WORKFLOWS_STORE_NAME], 'readwrite');
-        const workflowStore = workflowTransaction.objectStore(WORKFLOWS_STORE_NAME);
-        
-        let importedCount = 0;
-        for (const workflow of importData.workflows) {
-          try {
-            await new Promise<void>((resolve, reject) => {
-              const request = workflowStore.put(workflow);
-              request.onsuccess = () => {
-                importedCount++;
-                console.log(`Imported workflow: ${workflow.projectName}`);
-                resolve();
-              };
-              request.onerror = () => reject(request.error);
-            });
-          } catch (error) {
-            console.warn(`Failed to import workflow: ${workflow.projectName}`, error);
-          }
-        }
-        console.log(`Successfully imported ${importedCount} workflows`);
-        
-        return {
-          success: true,
-          message: `Successfully imported ${importedCount} workflows`
-        };
-      } else {
-        throw new Error('WorkflowsStore not found in database');
+    let importedCount = 0;
+    for (const workflow of importData.workflows) {
+      try {
+        await storageService.updateWorkflow(workflow.projectName, workflow);
+        importedCount++;
+        console.log(`Imported workflow: ${workflow.projectName}`);
+      } catch (error) {
+        console.warn(`Failed to import workflow: ${workflow.projectName}`, error);
       }
-    } catch (error) {
-      console.error('Error importing workflows:', error);
-      throw error;
     }
+    console.log(`Successfully imported ${importedCount} workflows`);
+    
+    return {
+      success: true,
+      message: `Successfully imported ${importedCount} workflows`
+    };
   } catch (error) {
     console.error('Simple workflow import failed:', error);
     return {
@@ -490,17 +323,8 @@ export const exportSingleWorkflow = async (projectName: string): Promise<void> =
 // 워크플로우 목록 가져오기
 export const getWorkflowList = async (): Promise<string[]> => {
   try {
-    const db = await openWorkflowDB();
-    const transaction = db.transaction([WORKFLOWS_STORE_NAME], 'readonly');
-    const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-    const request = store.getAllKeys();
-    
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => {
-        resolve(request.result as string[]);
-      };
-      request.onerror = () => reject(request.error);
-    });
+    const workflows = await storageService.getAllWorkflows();
+    return workflows.map(wf => wf.projectName);
   } catch (error) {
     console.error('Failed to get workflow list:', error);
     return [];
@@ -511,9 +335,6 @@ export const getWorkflowList = async (): Promise<string[]> => {
 export const exportWorkflowOnly = async (projectName?: string): Promise<void> => {
   try {
     console.log('Starting simple workflow export...');
-    
-    const workflowDB = await openWorkflowDB();
-    console.log('WorkflowDB opened successfully');
 
     const exportData = {
       version: '1.0.0',
@@ -523,35 +344,21 @@ export const exportWorkflowOnly = async (projectName?: string): Promise<void> =>
     };
 
     // 워크플로우 데이터만 가져오기
-    try {
-      if (workflowDB.objectStoreNames.contains(WORKFLOWS_STORE_NAME)) {
-        const workflowTransaction = workflowDB.transaction([WORKFLOWS_STORE_NAME], 'readonly');
-        const workflowStore = workflowTransaction.objectStore(WORKFLOWS_STORE_NAME);
-        
-        if (projectName) {
-          // 특정 프로젝트만 export
-          console.log(`Exporting specific workflow: ${projectName}`);
-          const workflow = await safeGet(workflowStore, projectName);
-          if (workflow) {
-            exportData.workflows.push(workflow);
-            console.log(`Found workflow: ${projectName}`);
-          } else {
-            console.log(`Workflow not found: ${projectName}`);
-            throw new Error(`Workflow "${projectName}" not found`);
-          }
-        } else {
-          // 모든 워크플로우 export
-          console.log('Exporting all workflows');
-          exportData.workflows = await safeGetAll(workflowStore);
-          console.log(`Found ${exportData.workflows.length} workflows`);
-        }
+    if (projectName) {
+      // 특정 프로젝트만 export
+      console.log(`Exporting specific workflow: ${projectName}`);
+      const workflow = await storageService.getWorkflowByName(projectName);
+      if (workflow) {
+        exportData.workflows.push(workflow);
+        console.log(`Found workflow: ${projectName}`);
       } else {
-        console.log('WorkflowsStore not found in database');
-        throw new Error('No workflows found in database');
+        throw new Error(`Workflow "${projectName}" not found`);
       }
-    } catch (error) {
-      console.error('Error exporting workflows:', error);
-      throw error;
+    } else {
+      // 모든 워크플로우 export
+      console.log('Exporting all workflows');
+      exportData.workflows = await storageService.getAllWorkflows();
+      console.log(`Found ${exportData.workflows.length} workflows`);
     }
 
     // 파일로 다운로드
@@ -575,67 +382,22 @@ export const exportWorkflowOnly = async (projectName?: string): Promise<void> =>
   }
 };
 
-// IndexedDB 상태 확인 (디버깅용)
-export const checkIndexedDBStatus = async (): Promise<void> => {
+// MongoDB 상태 확인 (디버깅용)
+export const checkMongoDBStatus = async (): Promise<void> => {
   try {
-    console.log('=== IndexedDB Status Check ===');
+    console.log('=== MongoDB Storage Status Check ===');
     
-    // WorkflowDatabase 확인
-    const workflowDB = await openWorkflowDB();
-    console.log('WorkflowDatabase opened successfully');
-    console.log('Available stores:', Array.from(workflowDB.objectStoreNames));
+    const workflows = await storageService.getAllWorkflows();
+    console.log(`Workflows: ${workflows.length} items`);
     
-    // 각 저장소의 데이터 개수 확인
-    for (const storeName of workflowDB.objectStoreNames) {
-      try {
-        const transaction = workflowDB.transaction([storeName], 'readonly');
-        const store = transaction.objectStore(storeName);
-        const countRequest = store.count();
-        
-        await new Promise<void>((resolve, reject) => {
-          countRequest.onsuccess = () => {
-            console.log(`${storeName}: ${countRequest.result} items`);
-            resolve();
-          };
-          countRequest.onerror = () => {
-            console.log(`${storeName}: Error getting count`);
-            resolve();
-          };
-        });
-      } catch (error) {
-        console.log(`${storeName}: Error accessing store`);
-      }
-    }
+    const aiConnections = await storageService.getAllAIConnections();
+    console.log(`AI Connections: ${aiConnections.length} items`);
     
-    // DeploymentDatabase 확인
-    try {
-      const deploymentDB = await openDeploymentDB();
-      console.log('DeploymentDatabase opened successfully');
-      console.log('Available stores:', Array.from(deploymentDB.objectStoreNames));
-      
-      for (const storeName of deploymentDB.objectStoreNames) {
-        try {
-          const transaction = deploymentDB.transaction([storeName], 'readonly');
-          const store = transaction.objectStore(storeName);
-          const countRequest = store.count();
-          
-          await new Promise<void>((resolve, reject) => {
-            countRequest.onsuccess = () => {
-              console.log(`${storeName}: ${countRequest.result} items`);
-              resolve();
-            };
-            countRequest.onerror = () => {
-              console.log(`${storeName}: Error getting count`);
-              resolve();
-            };
-          });
-        } catch (error) {
-          console.log(`${storeName}: Error accessing store`);
-        }
-      }
-    } catch (error) {
-      console.log('DeploymentDatabase not available:', error);
-    }
+    const userNodes = await storageService.getAllUserNodes();
+    console.log(`User Nodes: ${userNodes.length} items`);
+    
+    const deployments = await storageService.getAllDeployments();
+    console.log(`Deployments: ${deployments.length} items`);
     
     console.log('=== End Status Check ===');
   } catch (error) {
