@@ -10,3 +10,6 @@ langchain_anthropic==0.3.22
 langgraph==0.5.4
 httpx==0.27.0
 boto3>=1.37.0
+youtube-search-python==1.6.6
+youtube-transcript-api==1.2.3
+apscheduler==3.10.4

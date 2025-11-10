@@ -12,6 +12,7 @@ import AIConnectionWizard from '../components/workspace/AIConnectionWizard';
 import NodeCreation from '../components/workspace/NodeCreation';
 import NodeManagement from '../components/workspace/NodeManagement';
 import ImportExportModal from '../components/workspace/ImportExportModal';
+import ScheduleManagement from '../components/workspace/ScheduleManagement';
 import Footer from '../components/Footer';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
 import { Deployment } from '../types/deployment';
@@ -333,7 +334,9 @@ const WorkspacePage: React.FC = () => {
             handleActivateDeployment={handleActivateDeployment}
             handleDeactivateDeployment={handleDeactivateDeployment}
           />
-        );        
+        );
+      case 'schedule':
+        return <ScheduleManagement />;
       case 'rag':
         return selectedRag ? (
           <RagConfigForm
