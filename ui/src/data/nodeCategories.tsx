@@ -78,7 +78,7 @@ export const nodeCategories: NodeCategory[] = [
       },
       {
         type: 'toolsMemoryNode',
-        label: 'Tools&Memory',
+        label: 'Tools and Memory',
         description: getNodeCategoryDescription('toolsMemoryNode'),
         icon: (className = '', isDarkMode = false) => (
           <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />

@@ -701,7 +701,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                   className="text-xs"
                   style={{ color: nodeStyle.textColor }}
                 >
-                  Tools & Memory Configuration
+                  Tools and Memory Configuration
                 </p>
               </div>
             </div>
