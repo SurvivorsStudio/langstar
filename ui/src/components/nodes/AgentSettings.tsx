@@ -127,10 +127,38 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     setCurrentSelectingKey(null);
   };
 
-  // Get all groups nodes and extract memory and tools groups
-  const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
-  const memoryGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'memory') || [];
-  const toolsGroups: GroupData[] = toolsMemoryNode?.data.config?.groups?.filter((g: GroupData) => g.type === 'tools') || [];
+  // Get all groups nodes and extract memory and tools groups from all toolsMemoryNode instances
+  const toolsMemoryNodes = nodes.filter(n => n.type === 'toolsMemoryNode');
+  
+  // Collect all memory and tools groups from all toolsMemoryNode instances with node source info
+  const allMemoryGroups: (GroupData & { nodeName: string; nodeId: string })[] = [];
+  const allToolsGroups: (GroupData & { nodeName: string; nodeId: string })[] = [];
+  
+  toolsMemoryNodes.forEach(node => {
+    const groups = node?.data.config?.groups || [];
+    const memoryGroups = groups.filter((g: GroupData) => g.type === 'memory');
+    const toolsGroups = groups.filter((g: GroupData) => g.type === 'tools');
+    
+    // Add node source information to each group
+    memoryGroups.forEach((group: GroupData) => {
+      allMemoryGroups.push({
+        ...group,
+        nodeName: node.data.label || `Node ${node.id.slice(0, 8)}`,
+        nodeId: node.id
+      });
+    });
+    
+    toolsGroups.forEach((group: GroupData) => {
+      allToolsGroups.push({
+        ...group,
+        nodeName: node.data.label || `Node ${node.id.slice(0, 8)}`,
+        nodeId: node.id
+      });
+    });
+  });
+  
+  const memoryGroups: (GroupData & { nodeName: string; nodeId: string })[] = allMemoryGroups;
+  const toolsGroups: (GroupData & { nodeName: string; nodeId: string })[] = allToolsGroups;
 
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
@@ -217,18 +245,6 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   };
 
 
-  const handleMemoryGroupChange = (groupId: string) => {
-    const selectedGroup = memoryGroups.find(g => g.id === groupId);
-    const memoryTypeString = selectedGroup?.memoryType || '';
-
-    updateNodeData(nodeId, {
-      config: {
-        ...node?.data.config, // 기존 값 보존
-        memoryGroup: groupId,
-        memoryTypeString: memoryTypeString
-      }
-    });
-  };
 
 
 
@@ -249,27 +265,20 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
   const selectedMemoryGroup = memoryGroups.find(g => g.id === node?.data.config?.memoryGroup);
 
-  // OpenAI mini 모델 체크 (provider가 openai이고 model name에 mini가 포함된 경우)
-  const isOpenAiMiniModel = selectedConnection?.provider === 'openai' && 
-                            selectedConnection?.model?.toLowerCase().includes('mini');
-
-  // OpenAI mini 모델일 때 자동으로 값 설정
+  // 메모리 그룹이 삭제된 경우 자동으로 선택 해제
   useEffect(() => {
-    if (isOpenAiMiniModel && node) {
-      const needsUpdate = 
-        node.data.config?.maxTokens !== null || 
-        node.data.config?.temperature !== 1;
-      
-      if (needsUpdate) {
+    if (node?.data.config?.memoryGroup && memoryGroups.length > 0) {
+      const isMemoryGroupValid = memoryGroups.some(g => g.id === node.data.config?.memoryGroup);
+      if (!isMemoryGroupValid) {
+        // 유효하지 않은 메모리 그룹이 선택되어 있으면 선택 해제
         updateNodeData(nodeId, {
           config: {
-            maxTokens: null,
-            temperature: 1,
-          },
+            memoryGroup: undefined
+          }
         });
       }
     }
-  }, [isOpenAiMiniModel, nodeId, node, updateNodeData]);
+  }, [memoryGroups, node?.data.config?.memoryGroup, nodeId, updateNodeData]);
 
   return (
     <div className="space-y-6">
@@ -503,25 +512,44 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Memory Group
           </label>
-          <CustomSelect
-            value={node?.data.config?.memoryGroup || ''}
-            onChange={handleMemoryGroupChange}
-            options={memoryGroups.map(group => ({ value: group.id, label: group.name }))}
+          <MultiSelect
+            value={node?.data.config?.memoryGroup ? [node.data.config.memoryGroup] : []}
+            onChange={(selectedGroups) => {
+              updateNodeData(nodeId, {
+                config: {
+                  memoryGroup: selectedGroups.length > 0 ? selectedGroups[0] : undefined
+                }
+              });
+            }}
+            options={memoryGroups.map(group => ({ 
+              value: group.id, 
+              label: group.name,
+              description: group.description,
+              nodeName: group.nodeName,
+              nodeId: group.nodeId
+            }))}
             placeholder="Select memory group"
             disabled={memoryGroups.length === 0}
+            singleSelection={true}
           />
-          {node?.data.config?.memoryGroup && (
+          {node?.data.config?.memoryGroup && selectedMemoryGroup && (
             <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500 dark:text-gray-400 font-medium">Source Node</span>
+                <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
+                  {selectedMemoryGroup.nodeName}
+                </span>
+              </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Name</span>
                 <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
-                  {selectedMemoryGroup?.name || 'Unknown'}
+                  {selectedMemoryGroup.name}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 dark:text-gray-400 font-medium">Memory Type</span>
                 <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
-                  {selectedMemoryGroup?.memoryType || 'Unknown'}
+                  {selectedMemoryGroup.memoryType || 'Unknown'}
                 </span>
               </div>
             </div>
@@ -546,10 +574,12 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                 }
               });
             }}
-            options={toolsGroups.map((tool: GroupData) => ({
+            options={toolsGroups.map((tool) => ({
               value: tool.id,
               label: tool.name,
-              description: tool.description
+              description: tool.description,
+              nodeName: tool.nodeName,
+              nodeId: tool.nodeId
             }))}
             placeholder="Select tools"
             disabled={toolsGroups.length === 0}
@@ -596,56 +626,32 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
 
         {/* Temperature Section */}
         <div className="space-y-2">
-          <label htmlFor="temperature" className={`block text-sm font-medium ${
-            isOpenAiMiniModel 
-              ? 'text-gray-400 dark:text-gray-500' 
-              : 'text-gray-600 dark:text-gray-300'
-          }`}>
+          <label htmlFor="temperature" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Temperature
-            {isOpenAiMiniModel && (
-              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 1로 고정)</span>
-            )}
           </label>
           <input
             type="number"
             id="temperature"
-            value={isOpenAiMiniModel ? 1 : (node?.data.config?.temperature ?? DEFAULT_TEMPERATURE)}
+            value={node?.data.config?.temperature ?? DEFAULT_TEMPERATURE}
             onChange={(e) => handleTemperatureChange(e.target.value)}
             placeholder="e.g., 0.7 (usually 0-1)"
-            step="0.1"
-            disabled={isOpenAiMiniModel}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-              isOpenAiMiniModel
-                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
-                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
-            }`}
+            step="0.1" // Optional: for fine-grained control with number input arrows
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
         
         {/* Max Token Size Section */}
         <div className="space-y-2">
-          <label htmlFor="maxTokens" className={`block text-sm font-medium ${
-            isOpenAiMiniModel 
-              ? 'text-gray-400 dark:text-gray-500' 
-              : 'text-gray-600 dark:text-gray-300'
-          }`}>
+          <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Max Token Size
-            {isOpenAiMiniModel && (
-              <span className="ml-2 text-xs text-amber-500">(OpenAI mini 모델은 사용 불가)</span>
-            )}
           </label>
           <input
             type="number"
             id="maxTokens"
-            value={isOpenAiMiniModel ? '' : (node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS)}
+            value={node?.data.config?.maxTokens ?? DEFAULT_MAX_TOKENS}
             onChange={(e) => handleMaxTokensChange(e.target.value)}
-            placeholder={isOpenAiMiniModel ? "N/A" : "e.g., 1000"}
-            disabled={isOpenAiMiniModel}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-              isOpenAiMiniModel
-                ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 cursor-not-allowed'
-                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600'
-            }`}
+            placeholder="e.g., 1000"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
       </div>
