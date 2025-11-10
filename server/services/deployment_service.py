@@ -11,6 +11,10 @@ from server.models.deployment import (
 from server.services.workflow_service import WorkflowService
 from server.services.code_excute import flower_manager
 from server.utils.execution_logger import create_langgraph_with_logging, execution_logger
+from server.config.database import (
+    get_deployments_collection,
+    get_deployment_versions_collection
+)
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -74,10 +78,10 @@ class DeploymentService:
             # 5. Python 코드 생성
             langgraph_code = self._generate_and_deploy_code(deployment_id, workflow_data)
             
-            # 6. 파일 시스템에 저장
-            self._save_deployment_to_file(deployment, deployment_version)
+            # 6. MongoDB에 저장
+            self._save_deployment_to_db(deployment, deployment_version)
             
-            # 7. 코드 파일 저장
+            # 7. 코드 파일 저장 (실행을 위해 필요)
             self._save_deployment_code(deployment_id, langgraph_code)
             
             logger.info(f"Created deployment: {deployment_id}")
@@ -470,23 +474,26 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
         """모든 배포 목록을 반환합니다."""
         try:
             deployments = []
-            if not os.path.exists(self.deployments_dir):
+            collection = get_deployments_collection()
+            
+            if collection is None:
+                logger.warning("Deployments collection not available")
                 return deployments
             
-            for filename in os.listdir(self.deployments_dir):
-                if filename.endswith('.json'):
-                    file_path = os.path.join(self.deployments_dir, filename)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            deployment_data = json.load(f)
-                            deployment = Deployment(**deployment_data)
-                            deployments.append(deployment)
-                    except Exception as e:
-                        logger.warning(f"Error loading deployment from {filename}: {str(e)}")
-                        continue
+            # MongoDB에서 모든 배포 조회
+            deployment_docs = collection.find({}).sort("createdAt", -1)
             
-            # 생성일 기준으로 정렬 (최신순)
-            deployments.sort(key=lambda x: x.createdAt, reverse=True)
+            for doc in deployment_docs:
+                try:
+                    # MongoDB _id 제거
+                    if '_id' in doc:
+                        del doc['_id']
+                    deployment = Deployment(**doc)
+                    deployments.append(deployment)
+                except Exception as e:
+                    logger.warning(f"Error loading deployment {doc.get('id', 'unknown')}: {str(e)}")
+                    continue
+            
             return deployments
             
         except Exception as e:
@@ -496,13 +503,23 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
     def get_deployment_by_id(self, deployment_id: str) -> Optional[Deployment]:
         """ID로 배포를 조회합니다."""
         try:
-            file_path = os.path.join(self.deployments_dir, f"{deployment_id}.json")
-            if not os.path.exists(file_path):
+            collection = get_deployments_collection()
+            
+            if collection is None:
+                logger.warning("Deployments collection not available")
                 return None
             
-            with open(file_path, 'r', encoding='utf-8') as f:
-                deployment_data = json.load(f)
-                return Deployment(**deployment_data)
+            # MongoDB에서 배포 조회
+            deployment_doc = collection.find_one({"id": deployment_id})
+            
+            if not deployment_doc:
+                return None
+            
+            # MongoDB _id 제거
+            if '_id' in deployment_doc:
+                del deployment_doc['_id']
+            
+            return Deployment(**deployment_doc)
                 
         except Exception as e:
             logger.error(f"Error getting deployment {deployment_id}: {str(e)}")
@@ -511,25 +528,27 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
     def get_deployment_versions(self, deployment_id: str) -> List[DeploymentVersion]:
         """배포의 모든 버전을 반환합니다."""
         try:
-            versions_dir = os.path.join(self.deployments_dir, deployment_id, "versions")
-            if not os.path.exists(versions_dir):
-                return []
-            
             versions = []
-            for filename in os.listdir(versions_dir):
-                if filename.endswith('.json'):
-                    file_path = os.path.join(versions_dir, filename)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            version_data = json.load(f)
-                            version = DeploymentVersion(**version_data)
-                            versions.append(version)
-                    except Exception as e:
-                        logger.warning(f"Error loading version from {filename}: {str(e)}")
-                        continue
+            collection = get_deployment_versions_collection()
             
-            # 버전 기준으로 정렬
-            versions.sort(key=lambda x: x.version, reverse=True)
+            if collection is None:
+                logger.warning("Deployment versions collection not available")
+                return versions
+            
+            # MongoDB에서 배포 버전 조회
+            version_docs = collection.find({"deploymentId": deployment_id}).sort("createdAt", -1)
+            
+            for doc in version_docs:
+                try:
+                    # MongoDB _id 제거
+                    if '_id' in doc:
+                        del doc['_id']
+                    version = DeploymentVersion(**doc)
+                    versions.append(version)
+                except Exception as e:
+                    logger.warning(f"Error loading version {doc.get('id', 'unknown')}: {str(e)}")
+                    continue
+            
             return versions
             
         except Exception as e:
@@ -555,7 +574,7 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
                         logger.info(f"Deactivating other deployment {other_deployment.id} for same ChatFlow {deployment.workflowName} in {deployment.environment} environment")
                         other_deployment.status = DeploymentStatus.INACTIVE
                         other_deployment.updatedAt = datetime.now(timezone.utc).isoformat()
-                        self._save_deployment_to_file(other_deployment)
+                        self._save_deployment_to_db(other_deployment)
             
             deployment.status = status
             deployment.updatedAt = datetime.now(timezone.utc).isoformat()
@@ -563,7 +582,7 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             if status == DeploymentStatus.ACTIVE:
                 deployment.deployedAt = deployment.updatedAt
             
-            self._save_deployment_to_file(deployment)
+            self._save_deployment_to_db(deployment)
             
             logger.info(f"Updated deployment {deployment_id} status to {status}")
             return deployment
@@ -585,7 +604,7 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             for existing_version in existing_versions:
                 if existing_version.isActive:
                     existing_version.isActive = False
-                    self._save_deployment_version_to_file(existing_version)
+                    self._save_deployment_version_to_db(existing_version)
             
             # 워크플로우 스냅샷 생성
             workflow_snapshot = WorkflowSnapshot(
@@ -611,13 +630,13 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
                 isActive=True
             )
             
-            # 버전 정보를 파일로 저장
-            self._save_deployment_version_to_file(deployment_version)
+            # 버전 정보를 MongoDB에 저장
+            self._save_deployment_version_to_db(deployment_version)
             
             # 배포 정보 업데이트
             deployment.version = version
             deployment.updatedAt = now
-            self._save_deployment_to_file(deployment)
+            self._save_deployment_to_db(deployment)
             
             logger.info(f"Created deployment version {version} for deployment {deployment_id}")
             return deployment_version
@@ -684,42 +703,59 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             logger.error(f"Error generating deployment code: {str(e)}")
             raise
     
-    def _save_deployment_to_file(self, deployment: Deployment, version: Optional[DeploymentVersion] = None):
-        """배포 정보를 파일로 저장합니다."""
+    def _save_deployment_to_db(self, deployment: Deployment, version: Optional[DeploymentVersion] = None):
+        """배포 정보를 MongoDB에 저장합니다."""
         try:
-            # 배포 디렉토리 생성
+            collection = get_deployments_collection()
+            
+            if collection is None:
+                logger.error("Deployments collection not available")
+                raise Exception("MongoDB connection not available")
+            
+            # 배포 디렉토리 생성 (코드 파일 저장용)
             deployment_dir = os.path.join(self.deployments_dir, deployment.id)
             if not os.path.exists(deployment_dir):
                 os.makedirs(deployment_dir)
             
-            # 배포 정보 저장
-            deployment_file = os.path.join(self.deployments_dir, f"{deployment.id}.json")
-            with open(deployment_file, 'w', encoding='utf-8') as f:
-                json.dump(deployment.dict(), f, indent=2, ensure_ascii=False)
+            # MongoDB에 배포 정보 저장 (upsert)
+            deployment_dict = deployment.dict()
+            collection.update_one(
+                {"id": deployment.id},
+                {"$set": deployment_dict},
+                upsert=True
+            )
+            
+            logger.info(f"Saved deployment {deployment.id} to MongoDB")
             
             # 첫 번째 버전이 있다면 함께 저장
             if version:
-                self._save_deployment_version_to_file(version)
+                self._save_deployment_version_to_db(version)
                 
         except Exception as e:
-            logger.error(f"Error saving deployment to file: {str(e)}")
+            logger.error(f"Error saving deployment to MongoDB: {str(e)}")
             raise
     
-    def _save_deployment_version_to_file(self, version: DeploymentVersion):
-        """배포 버전 정보를 파일로 저장합니다."""
+    def _save_deployment_version_to_db(self, version: DeploymentVersion):
+        """배포 버전 정보를 MongoDB에 저장합니다."""
         try:
-            # 버전 디렉토리 생성
-            versions_dir = os.path.join(self.deployments_dir, version.deploymentId, "versions")
-            if not os.path.exists(versions_dir):
-                os.makedirs(versions_dir)
+            collection = get_deployment_versions_collection()
             
-            # 버전 정보 저장
-            version_file = os.path.join(versions_dir, f"{version.id}.json")
-            with open(version_file, 'w', encoding='utf-8') as f:
-                json.dump(version.dict(), f, indent=2, ensure_ascii=False)
+            if collection is None:
+                logger.error("Deployment versions collection not available")
+                raise Exception("MongoDB connection not available")
+            
+            # MongoDB에 버전 정보 저장 (upsert)
+            version_dict = version.dict()
+            collection.update_one(
+                {"id": version.id},
+                {"$set": version_dict},
+                upsert=True
+            )
+            
+            logger.info(f"Saved deployment version {version.id} to MongoDB")
                 
         except Exception as e:
-            logger.error(f"Error saving deployment version to file: {str(e)}")
+            logger.error(f"Error saving deployment version to MongoDB: {str(e)}")
             raise
 
     def delete_deployment(self, deployment_id: str) -> bool:
@@ -729,40 +765,24 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             if not deployment:
                 return False
             
-            # 1. 관련된 실행 기록 삭제
-            executions_dir = os.path.join(self.deployments_dir, "executions")
-            if os.path.exists(executions_dir):
-                # 해당 배포의 실행 기록들을 찾아서 삭제
-                for filename in os.listdir(executions_dir):
-                    if filename.endswith('.json'):
-                        execution_file = os.path.join(executions_dir, filename)
-                        try:
-                            with open(execution_file, 'r', encoding='utf-8') as f:
-                                execution_data = json.load(f)
-                                if execution_data.get('deployment_id') == deployment_id:
-                                    os.remove(execution_file)
-                                    logger.info(f"Deleted execution record: {filename}")
-                        except Exception as e:
-                            logger.warning(f"Error reading execution file {filename}: {str(e)}")
-                            continue
+            # 1. MongoDB에서 배포 버전 삭제
+            versions_collection = get_deployment_versions_collection()
+            if versions_collection:
+                result = versions_collection.delete_many({"deploymentId": deployment_id})
+                logger.info(f"Deleted {result.deleted_count} deployment versions from MongoDB")
             
-            # 2. 관련된 실행 로그 삭제 (deployments/{deployment_id}/executions 디렉토리)
-            deployment_executions_dir = os.path.join("deployments", deployment_id, "executions")
-            if os.path.exists(deployment_executions_dir):
-                import shutil
-                shutil.rmtree(deployment_executions_dir)
-                logger.info(f"Deleted execution logs for deployment: {deployment_id}")
+            # 2. MongoDB에서 배포 삭제
+            deployments_collection = get_deployments_collection()
+            if deployments_collection:
+                deployments_collection.delete_one({"id": deployment_id})
+                logger.info(f"Deleted deployment {deployment_id} from MongoDB")
             
-            # 3. 배포 디렉토리 삭제
+            # 3. 파일 시스템에서 배포 디렉토리 삭제 (코드 파일 및 실행 로그)
             deployment_dir = os.path.join(self.deployments_dir, deployment_id)
             if os.path.exists(deployment_dir):
                 import shutil
                 shutil.rmtree(deployment_dir)
-            
-            # 4. 배포 파일 삭제
-            deployment_file = os.path.join(self.deployments_dir, f"{deployment_id}.json")
-            if os.path.exists(deployment_file):
-                os.remove(deployment_file)
+                logger.info(f"Deleted deployment directory: {deployment_dir}")
             
             logger.info(f"Deleted deployment and all related data: {deployment_id}")
             return True
