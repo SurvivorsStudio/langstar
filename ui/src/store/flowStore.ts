@@ -17,6 +17,7 @@ import { nanoid } from 'nanoid';
 import { Deployment, DeploymentVersion, DeploymentStatus, DeploymentEnvironment, DeploymentFormData } from '../types/deployment';
 import { deploymentStore } from './deploymentStore';
 import { apiService } from '../services/apiService';
+import * as storageService from '../services/storageService';
 
 // Edge 상태 상수 정의 - 순환 구조에서 명확한 대기 상태 구분
 export const EDGE_STATES = {
@@ -546,48 +547,8 @@ const isObject = (item: any): boolean => {
   return item && typeof item === 'object' && !Array.isArray(item);
 };
 
-// IndexedDB 설정
-const DB_NAME = 'WorkflowDatabase';
-const WORKFLOWS_STORE_NAME = 'WorkflowsStore';
-const AI_CONNECTIONS_STORE_NAME = 'AIConnectionsStore'; // AI 연결 정보 저장소 이름
-const USER_NODES_STORE_NAME = 'UserNodesStore'; // UserNode 저장소 이름
-const DB_VERSION = 3; // 데이터베이스 스키마 변경 시 이 버전을 올려야 합니다. (새로운 저장소 추가)
+// MongoDB Storage 설정 (IndexedDB 제거됨)
 export const DEFAULT_PROJECT_NAME = 'New Workflow'; // 기본 프로젝트 이름 상수화
-
-// IndexedDB 열기/초기화 헬퍼 함수
-const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(WORKFLOWS_STORE_NAME)) {
-        // 'projectName'을 키로 사용합니다.
-        db.createObjectStore(WORKFLOWS_STORE_NAME, { keyPath: 'projectName' });
-        console.log(`Object store "${WORKFLOWS_STORE_NAME}" created.`);
-      }      
-      if (!db.objectStoreNames.contains(AI_CONNECTIONS_STORE_NAME)) {
-        db.createObjectStore(AI_CONNECTIONS_STORE_NAME, { keyPath: 'id' });
-        console.log(`Object store "${AI_CONNECTIONS_STORE_NAME}" created.`);
-      }
-      if (!db.objectStoreNames.contains(USER_NODES_STORE_NAME)) {
-        db.createObjectStore(USER_NODES_STORE_NAME, { keyPath: 'id' });
-        console.log(`Object store "${USER_NODES_STORE_NAME}" created.`);
-      }
-      // 예: if (event.oldVersion < 2) { /* 스키마 변경 로직 */ }
-    };
-
-    request.onsuccess = (event) => {
-      console.log(`Database "${DB_NAME}" opened successfully.`);
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onerror = (event) => {
-      console.error('Error opening IndexedDB:', (event.target as IDBOpenDBRequest).error);
-      reject((event.target as IDBOpenDBRequest).error);
-    };
-  });
-};
 
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: initialNodes,
@@ -2540,7 +2501,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw new Error(errorMsg);
     }
     
-    console.log(`FlowStore: Saving workflow "${projectName}" to IndexedDB...`);
+    console.log(`FlowStore: Saving workflow "${projectName}" to MongoDB...`);
 
     const nodesToSave = nodes.map(node => {
       const { icon, ...restOfData } = node.data;
@@ -2551,10 +2512,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-
       const workflowData = {
         projectName,
         nodes: nodesToSave,
@@ -2564,120 +2521,81 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         lastModified: new Date().toISOString(),
       };
 
-      const request = store.put(workflowData);
-
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          set({ isSaving: false, lastSaved: new Date(), saveError: null });
-          console.log(`FlowStore: Workflow "${projectName}" saved successfully to IndexedDB.`);
-          get().fetchAvailableWorkflows(); // 저장 후 목록 새로고침
-          resolve();
-        };
-
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ isSaving: false, saveError: error?.message || 'Failed to save workflow' });
-          console.error('FlowStore: Error saving workflow to IndexedDB:', error);
-          reject(error);
-        };
-      });
+      // MongoDB API 호출 (upsert)
+      await storageService.updateWorkflow(projectName, workflowData);
+      
+      set({ isSaving: false, lastSaved: new Date(), saveError: null });
+      console.log(`FlowStore: Workflow "${projectName}" saved successfully to MongoDB.`);
+      get().fetchAvailableWorkflows(); // 저장 후 목록 새로고침
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ isSaving: false, saveError: errorMessage });
-      console.error('FlowStore: Failed to initiate save operation or open DB:', error);
+      console.error('FlowStore: Failed to save workflow to MongoDB:', error);
       throw error;
     }
   },
 
   loadWorkflow: async (projectName: string) => {
     set({ isLoading: true, loadError: null });
-    console.log(`FlowStore: Loading workflow "${projectName}" from IndexedDB...`);
+    console.log(`FlowStore: Loading workflow "${projectName}" from MongoDB...`);
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readonly');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      const request = store.get(projectName);
-
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          const workflowData = request.result;
-          if (workflowData) {
-            set({
-              projectName: workflowData.projectName,
-              nodes: workflowData.nodes || [],
-              edges: workflowData.edges || [],
-              viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
-              manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
-              isLoading: false, loadError: null,
-              lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
-            });
-            console.log(`FlowStore: Workflow "${projectName}" loaded successfully.`);
-            resolve();
-          } else {
-            const errorMsg = `Workflow "${projectName}" not found.`;
-            set({ isLoading: false, loadError: errorMsg });
-            console.warn(`FlowStore: ${errorMsg}`);
-            reject(new Error(errorMsg));
-          }
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ isLoading: false, loadError: error?.message || 'Failed to load workflow' });
-          console.error('FlowStore: Error loading workflow from IndexedDB:', error);
-          reject(error);
-        };
-      });
+      const workflowData = await storageService.getWorkflowByName(projectName);
+      
+      if (workflowData) {
+        set({
+          projectName: workflowData.projectName,
+          nodes: workflowData.nodes || [],
+          edges: workflowData.edges || [],
+          viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
+          manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
+          isLoading: false, 
+          loadError: null,
+          lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
+        });
+        console.log(`FlowStore: Workflow "${projectName}" loaded successfully.`);
+      } else {
+        const errorMsg = `Workflow "${projectName}" not found.`;
+        set({ isLoading: false, loadError: errorMsg });
+        console.warn(`FlowStore: ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ isLoading: false, loadError: errorMessage });
-      console.error('FlowStore: Failed to initiate load operation or open DB:', error);
+      console.error('FlowStore: Failed to load workflow from MongoDB:', error);
       throw error;
     }
   },
 
   fetchAvailableWorkflows: async () => {
-    set({ isLoading: true, loadError: null }); // 로딩 시작 상태 설정
+    set({ isLoading: true, loadError: null });
     console.log('[FlowStore/fetch] ➡️ 워크플로우 목록 로딩을 시작합니다...');
     try {
-      const db = await openDB();
-      // 'readwrite' 트랜잭션을 사용하여 오래된 데이터에 projectId를 추가하는 마이그레이션을 수행합니다.
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      const request = store.getAll();
+      const workflows = await storageService.getAllWorkflows();
+      console.log(`[FlowStore/fetch] ✅ MongoDB에서 데이터를 성공적으로 가져왔습니다. (총 ${workflows.length}개)`);
+      console.table(workflows.map(wf => ({ projectName: wf.projectName, projectId: wf.projectId || 'N/A', lastModified: wf.lastModified })));
 
-      request.onsuccess = () => {
-        const rawWorkflows = request.result as Workflow[];
-        console.log(`[FlowStore/fetch] ✅ IndexedDB에서 데이터를 성공적으로 가져왔습니다. (총 ${rawWorkflows.length}개)`);
-        // 보기 쉬운 테이블 형태로 주요 정보를 출력합니다.
-        console.table(rawWorkflows.map(wf => ({ projectName: wf.projectName, projectId: wf.projectId || 'N/A', lastModified: wf.lastModified })));
-        // 전체 값(value)을 확인하기 위해 객체 전체를 로그로 남깁니다.
-        console.log('[FlowStore/fetch] 🕵️  가져온 전체 워크플로우 값(value) 목록:', JSON.parse(JSON.stringify(rawWorkflows)));
+      // projectId가 없는 워크플로우에 자동으로 할당 (마이그레이션)
+      const migratedWorkflows = workflows.map(wf => {
+        if (!wf.projectId) {
+          console.warn(`[FlowStore/fetch] ⚠️ 워크플로우 "${wf.projectName}"에 projectId가 없습니다. 새로 할당합니다.`);
+          const newWf = { ...wf, projectId: nanoid() };
+          // MongoDB에 업데이트 (비동기로 처리하여 blocking 방지)
+          storageService.updateWorkflow(wf.projectName, newWf).catch(err => 
+            console.error('Failed to update workflow with projectId:', err)
+          );
+          return newWf;
+        }
+        return wf;
+      });
 
-        console.log('[FlowStore/fetch] 🔄 데이터 마이그레이션을 확인하고 필요한 경우 projectId를 할당합니다...');
-        // projectId가 없는 워크플로우가 있는지 확인하고, 있다면 새로 할당하고 DB를 업데이트합니다.
-        const migratedWorkflows = rawWorkflows.map(wf => {
-          if (!wf.projectId) {
-            console.warn(`[FlowStore/fetch] ⚠️ 워크플로우 "${wf.projectName}"에 projectId가 없습니다. 새로 할당하고 DB를 업데이트합니다.`);
-            const newWf = { ...wf, projectId: nanoid() };
-            store.put(newWf); // IndexedDB에 업데이트된 레코드 저장
-            return newWf;
-          }
-          return wf;
-        });
-
-        set({ availableWorkflows: migratedWorkflows, isLoading: false, loadError: null });
-        console.log(`[FlowStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, migratedWorkflows);
-      };
-      request.onerror = (event) => {
-        const error = (event.target as IDBRequest).error;
-        set({ loadError: error?.message || 'Failed to fetch workflow list', isLoading: false });
-        console.error('[FlowStore/fetch] ❌ 워크플로우 목록을 가져오는 중 오류 발생:', error);
-      };
+      set({ availableWorkflows: migratedWorkflows, isLoading: false, loadError: null });
+      console.log(`[FlowStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, migratedWorkflows);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadError: errorMessage || 'Failed to open DB to fetch list', isLoading: false });
-      console.error('[FlowStore/fetch] ❌ DB를 열거나 트랜잭션을 시작하는 중 오류 발생:', error);
+      set({ loadError: errorMessage || 'Failed to fetch workflow list', isLoading: false });
+      console.error('[FlowStore/fetch] ❌ 워크플로우 목록을 가져오는 중 오류 발생:', error);
     }
   },
 
@@ -2685,32 +2603,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
     console.log('FlowStore: Fetching AI connections...');
     try {
-      const db = await openDB();
-      const transaction = db.transaction(AI_CONNECTIONS_STORE_NAME, 'readonly');
-      const store = transaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-      const request = store.getAll();
-
-      request.onsuccess = () => {
-        // 마이그레이션: type 필드 소문자화 및 기본값 보정
-        const normalized = (request.result as AIConnection[]).map(conn => {
-          let type = (conn.type || '').toLowerCase();
-          if (type !== 'language' && type !== 'embedding') {
-            type = 'embedding'; // 잘못된 값이면 기본값
-          }
-          return { ...conn, type: type as 'language' | 'embedding' };
-        });
-        set({ aiConnections: normalized, isLoadingAIConnections: false, loadErrorAIConnections: null });
-        console.log(`FlowStore: Found ${normalized.length} AI connections:`, normalized);
-      };
-      request.onerror = (event) => {
-        const error = (event.target as IDBRequest).error;
-        set({ loadErrorAIConnections: error?.message || 'Failed to fetch AI connections list', isLoadingAIConnections: false });
-        console.error('FlowStore: Error fetching AI connections list:', error);
-      };
+      const connections = await storageService.getAllAIConnections();
+      
+      // 마이그레이션: type 필드 소문자화 및 기본값 보정
+      const normalized = connections.map(conn => {
+        let type = (conn.type || '').toLowerCase();
+        if (type !== 'language' && type !== 'embedding') {
+          type = 'embedding'; // 잘못된 값이면 기본값
+        }
+        return { ...conn, type: type as 'language' | 'embedding' };
+      });
+      
+      set({ aiConnections: normalized, isLoadingAIConnections: false, loadErrorAIConnections: null });
+      console.log(`FlowStore: Found ${normalized.length} AI connections:`, normalized);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadErrorAIConnections: errorMessage || 'Failed to open DB to fetch AI connections list', isLoadingAIConnections: false });
-      console.error('FlowStore: Error opening DB for fetching AI connections list:', error);
+      set({ loadErrorAIConnections: errorMessage || 'Failed to fetch AI connections list', isLoadingAIConnections: false });
+      console.error('FlowStore: Error fetching AI connections list:', error);
     }
   },
     getWorkflowAsJSONString: (deploymentData?: Workflow) => {
@@ -2932,28 +2841,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     console.log('FlowStore: Adding new AI connection:', newConnection);
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(AI_CONNECTIONS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-      const request = store.add(newConnection);
-
-      return new Promise<AIConnection>((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('FlowStore: AI connection added successfully.');
-          get().fetchAIConnections(); // 목록 새로고침
-          resolve(newConnection);
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadErrorAIConnections: error?.message || 'Failed to add AI connection', isLoadingAIConnections: false });
-          console.error('FlowStore: Error adding AI connection:', error);
-          reject(error);
-        };
-      });
+      await storageService.createAIConnection(newConnection);
+      console.log('FlowStore: AI connection added successfully.');
+      get().fetchAIConnections(); // 목록 새로고침
+      return newConnection;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorAIConnections: errorMessage, isLoadingAIConnections: false });
-      console.error('FlowStore: Failed to initiate add AI connection operation:', error);
+      console.error('FlowStore: Failed to add AI connection:', error);
       throw error;
     }
   },
@@ -2965,41 +2860,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     console.log(`FlowStore: Updating AI connection ID ${connectionId} with:`, updates);
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(AI_CONNECTIONS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-      const getRequest = store.get(connectionId);
+      // 기존 연결 정보 가져오기
+      const existingConnection = await storageService.getAIConnectionById(connectionId);
+      if (!existingConnection) {
+        const errorMsg = `AI connection with ID ${connectionId} not found.`;
+        set({ loadErrorAIConnections: errorMsg, isLoadingAIConnections: false });
+        throw new Error(errorMsg);
+      }
 
-      return new Promise<AIConnection>((resolve, reject) => {
-        getRequest.onsuccess = () => {
-          const existingConnection = getRequest.result as AIConnection | undefined;
-          if (!existingConnection) {
-            const errorMsg = `AI connection with ID ${connectionId} not found.`;
-            set({ loadErrorAIConnections: errorMsg, isLoadingAIConnections: false });
-            console.error(`FlowStore: ${errorMsg}`);
-            return reject(new Error(errorMsg));
-          }
+      const updatedConnection: AIConnection = {
+        ...existingConnection,
+        ...updates,
+        lastModified: new Date().toISOString(),
+      };
 
-          const updatedConnection: AIConnection = {
-            ...existingConnection,
-            ...updates,
-            lastModified: new Date().toISOString(),
-          };
-
-          const putRequest = store.put(updatedConnection);
-          putRequest.onsuccess = () => {
-            console.log('FlowStore: AI connection updated successfully.');
-            get().fetchAIConnections(); // 목록 새로고침
-            resolve(updatedConnection);
-          };
-          putRequest.onerror = (event) => reject((event.target as IDBRequest).error);
-        };
-        getRequest.onerror = (event) => reject((event.target as IDBRequest).error);
-      });
+      await storageService.updateAIConnection(connectionId, updatedConnection);
+      console.log('FlowStore: AI connection updated successfully.');
+      get().fetchAIConnections(); // 목록 새로고침
+      return updatedConnection;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorAIConnections: errorMessage, isLoadingAIConnections: false });
-      console.error('FlowStore: Failed to initiate update AI connection operation:', error);
+      console.error('FlowStore: Failed to update AI connection:', error);
       throw error;
     }
   },
@@ -3008,49 +2890,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
     console.log(`FlowStore: Deleting AI connection ID ${connectionId}...`);
     try {
-      const db = await openDB();
-      const transaction = db.transaction(AI_CONNECTIONS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(AI_CONNECTIONS_STORE_NAME);
-      const request = store.delete(connectionId);
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('FlowStore: AI connection deleted successfully.');
-          get().fetchAIConnections();
-          resolve();
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadErrorAIConnections: error?.message || 'Failed to delete AI connection', isLoadingAIConnections: false });
-          console.error('FlowStore: Error deleting AI connection:', error);
-          reject(error);
-        };
-      });
+      await storageService.deleteAIConnection(connectionId);
+      console.log('FlowStore: AI connection deleted successfully.');
+      get().fetchAIConnections();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorAIConnections: errorMessage, isLoadingAIConnections: false });
-      console.error('FlowStore: Failed to initiate delete AI connection operation:', error);
+      console.error('FlowStore: Failed to delete AI connection:', error);
       throw error;
     }
   },
 
   deleteWorkflow: async (projectName: string) => {
     try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      const request = store.delete(projectName);
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          // 삭제 후 워크플로우 목록 새로고침
-          get().fetchAvailableWorkflows();
-          resolve();
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadError: error?.message || 'Failed to delete workflow' });
-          reject(error);
-        };
-      });
+      await storageService.deleteWorkflow(projectName);
+      // 삭제 후 워크플로우 목록 새로고침
+      get().fetchAvailableWorkflows();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadError: errorMessage });
@@ -3060,55 +2915,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   renameWorkflow: async (oldName: string, newName: string) => {
     try {
-      const db = await openDB();
-      const transaction = db.transaction(WORKFLOWS_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(WORKFLOWS_STORE_NAME);
-      
-      const getRequest = store.get(oldName);
-      return new Promise<void>((resolve, reject) => {
-        getRequest.onsuccess = () => {
-          const data = getRequest.result;
-          
-          if (!data) {
-            // 이미 변경된 경우 성공으로 처리 (race condition 방지)
-            if (oldName !== newName) {
-              get().fetchAvailableWorkflows();
-              resolve();
-              return;
-            }
-            set({ loadError: `Workflow '${oldName}' not found.` });
-            return reject(new Error(`Workflow '${oldName}' not found.`));
-          }
-          
-          // 이름 변경
-          data.projectName = newName;
-          
-          const addRequest = store.add(data);
-          addRequest.onsuccess = () => {
-            // 기존 워크플로우 삭제
-            const deleteRequest = store.delete(oldName);
-            deleteRequest.onsuccess = () => {
-              get().fetchAvailableWorkflows();
-              resolve();
-            };
-            deleteRequest.onerror = (event) => {
-              const error = (event.target as IDBRequest).error;
-              set({ loadError: error?.message || 'Failed to delete old workflow after rename' });
-              reject(error);
-            };
-          };
-          addRequest.onerror = (event) => {
-            const error = (event.target as IDBRequest).error;
-            set({ loadError: error?.message || 'Failed to add renamed workflow' });
-            reject(error);
-          };
-        };
-        getRequest.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadError: error?.message || 'Failed to get workflow for rename' });
-          reject(error);
-        };
-      });
+      await storageService.renameWorkflow(oldName, newName);
+      get().fetchAvailableWorkflows();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadError: errorMessage });
@@ -3302,25 +3110,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
     console.log('FlowStore: Fetching user nodes...');
     try {
-      const db = await openDB();
-      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readonly');
-      const store = transaction.objectStore(USER_NODES_STORE_NAME);
-      const request = store.getAll();
-
-      request.onsuccess = () => {
-        const userNodes = request.result as UserNode[];
-        set({ userNodes, isLoadingUserNodes: false, loadErrorUserNodes: null });
-        console.log(`FlowStore: Found ${userNodes.length} user nodes:`, userNodes);
-      };
-      request.onerror = (event) => {
-        const error = (event.target as IDBRequest).error;
-        set({ loadErrorUserNodes: error?.message || 'Failed to fetch user nodes list', isLoadingUserNodes: false });
-        console.error('FlowStore: Error fetching user nodes list:', error);
-      };
+      const userNodes = await storageService.getAllUserNodes();
+      set({ userNodes, isLoadingUserNodes: false, loadErrorUserNodes: null });
+      console.log(`FlowStore: Found ${userNodes.length} user nodes:`, userNodes);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadErrorUserNodes: errorMessage || 'Failed to open DB to fetch user nodes list', isLoadingUserNodes: false });
-      console.error('FlowStore: Error opening DB for fetching user nodes list:', error);
+      set({ loadErrorUserNodes: errorMessage || 'Failed to fetch user nodes list', isLoadingUserNodes: false });
+      console.error('FlowStore: Error fetching user nodes list:', error);
     }
   },
 
@@ -3334,28 +3130,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     console.log('FlowStore: Adding new user node:', newUserNode);
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(USER_NODES_STORE_NAME);
-      const request = store.add(newUserNode);
-
-      return new Promise<UserNode>((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('FlowStore: User node added successfully.');
-          get().fetchUserNodes(); // 목록 새로고침
-          resolve(newUserNode);
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadErrorUserNodes: error?.message || 'Failed to add user node', isLoadingUserNodes: false });
-          console.error('FlowStore: Error adding user node:', error);
-          reject(error);
-        };
-      });
+      await storageService.createUserNode(newUserNode);
+      console.log('FlowStore: User node added successfully.');
+      get().fetchUserNodes(); // 목록 새로고침
+      return newUserNode;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
-      console.error('FlowStore: Failed to initiate add user node operation:', error);
+      console.error('FlowStore: Failed to add user node:', error);
       throw error;
     }
   },
@@ -3365,41 +3147,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     console.log(`FlowStore: Updating user node ID ${userNodeId} with:`, updates);
 
     try {
-      const db = await openDB();
-      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(USER_NODES_STORE_NAME);
-      const getRequest = store.get(userNodeId);
+      const existingUserNode = await storageService.getUserNodeById(userNodeId);
+      if (!existingUserNode) {
+        const errorMsg = `User node with ID ${userNodeId} not found.`;
+        set({ loadErrorUserNodes: errorMsg, isLoadingUserNodes: false });
+        throw new Error(errorMsg);
+      }
 
-      return new Promise<UserNode>((resolve, reject) => {
-        getRequest.onsuccess = () => {
-          const existingUserNode = getRequest.result as UserNode | undefined;
-          if (!existingUserNode) {
-            const errorMsg = `User node with ID ${userNodeId} not found.`;
-            set({ loadErrorUserNodes: errorMsg, isLoadingUserNodes: false });
-            console.error(`FlowStore: ${errorMsg}`);
-            return reject(new Error(errorMsg));
-          }
+      const updatedUserNode: UserNode = {
+        ...existingUserNode,
+        ...updates,
+        lastModified: new Date().toISOString(),
+      };
 
-          const updatedUserNode: UserNode = {
-            ...existingUserNode,
-            ...updates,
-            lastModified: new Date().toISOString(),
-          };
-
-          const putRequest = store.put(updatedUserNode);
-          putRequest.onsuccess = () => {
-            console.log('FlowStore: User node updated successfully.');
-            get().fetchUserNodes(); // 목록 새로고침
-            resolve(updatedUserNode);
-          };
-          putRequest.onerror = (event) => reject((event.target as IDBRequest).error);
-        };
-        getRequest.onerror = (event) => reject((event.target as IDBRequest).error);
-      });
+      await storageService.updateUserNode(userNodeId, updatedUserNode);
+      console.log('FlowStore: User node updated successfully.');
+      get().fetchUserNodes(); // 목록 새로고침
+      return updatedUserNode;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
-      console.error('FlowStore: Failed to initiate update user node operation:', error);
+      console.error('FlowStore: Failed to update user node:', error);
       throw error;
     }
   },
@@ -3408,27 +3176,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ isLoadingUserNodes: true, loadErrorUserNodes: null });
     console.log(`FlowStore: Deleting user node ID ${userNodeId}...`);
     try {
-      const db = await openDB();
-      const transaction = db.transaction(USER_NODES_STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(USER_NODES_STORE_NAME);
-      const request = store.delete(userNodeId);
-      return new Promise<void>((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('FlowStore: User node deleted successfully.');
-          get().fetchUserNodes();
-          resolve();
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          set({ loadErrorUserNodes: error?.message || 'Failed to delete user node', isLoadingUserNodes: false });
-          console.error('FlowStore: Error deleting user node:', error);
-          reject(error);
-        };
-      });
+      await storageService.deleteUserNode(userNodeId);
+      console.log('FlowStore: User node deleted successfully.');
+      get().fetchUserNodes();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadErrorUserNodes: errorMessage, isLoadingUserNodes: false });
-      console.error('FlowStore: Failed to initiate delete user node operation:', error);
+      console.error('FlowStore: Failed to delete user node:', error);
       throw error;
     }
   },
