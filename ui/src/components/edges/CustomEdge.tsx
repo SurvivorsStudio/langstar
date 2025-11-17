@@ -382,13 +382,16 @@ const CustomEdge = ({
     console.log('[CustomEdge] Direct state update - setting selectedNode to:', target);
     console.log('[CustomEdge] Direct state update - edge element:', edgeElement);
     
-    setSelectedNode(target);
-    
-    // NodeInspector 활성화를 위한 전역 이벤트 발생
-    const showInspectorEvent = new CustomEvent('show-node-inspector', {
-      detail: { nodeId: target, edge: edgeElement }
-    });
-    window.dispatchEvent(showInspectorEvent);
+    // 상태 업데이트를 다음 틱으로 지연 (React 경고 해결)
+    setTimeout(() => {
+      setSelectedNode(target);
+      
+      // NodeInspector 활성화를 위한 전역 이벤트 발생
+      const showInspectorEvent = new CustomEvent('show-node-inspector', {
+        detail: { nodeId: target, edge: edgeElement }
+      });
+      window.dispatchEvent(showInspectorEvent);
+    }, 0);
     
     // 클릭 후 즉시 포커스 설정
     const targetElement = e.currentTarget as HTMLElement;
