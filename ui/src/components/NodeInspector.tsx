@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X, Settings, Code, AlertCircle, LogIn, Play, Maximize2, Database } from 'lucide-react';
 import JsonViewer from './Common/JsonViewer';
+import JsonPopupModal from './Common/JsonPopupModal';
 import { useFlowStore } from '../store/flowStore';
 import CodeEditor from './CodeEditor';
 import CodeEditorPopup from './nodes/CodeEditorPopup';
@@ -39,6 +40,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [hasValidInputData, setHasValidInputData] = useState<boolean>(false);
   const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
   const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
+  
+  // JSON 팝업 상태
+  const [isJsonPopupOpen, setIsJsonPopupOpen] = useState<boolean>(false);
+  const [jsonPopupData, setJsonPopupData] = useState<any>(null);
+  const [jsonPopupTitle, setJsonPopupTitle] = useState<string>('JSON Data Viewer');
 
   // 크기 조절을 위한 상태와 ref
   const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
@@ -388,6 +394,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     }
   };
 
+  // JSON 팝업 열기 핸들러
+  const handleOpenJsonPopup = (data: any, title: string = 'JSON Data Viewer') => {
+    setJsonPopupData(data);
+    setJsonPopupTitle(title);
+    setIsJsonPopupOpen(true);
+  };
+
 
 
 
@@ -646,19 +659,121 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                 Connected node(s) have not produced output or output is empty. Execute preceding nodes.
               </div>
             ) : (
-              <div
-                className="space-y-3"
-                tabIndex={0}
-                onKeyDownCapture={(e) => {
-                  const target = e.target as HTMLElement;
-                  const tag = target && target.tagName;
-                  const isEditable = (target as any)?.isContentEditable;
-                  if ((e.key === 'Backspace' || e.key === 'Delete') && tag !== 'INPUT' && tag !== 'TEXTAREA' && !isEditable) {
-                    e.preventDefault();
-                    e.stopPropagation();
+              <div className="space-y-4">
+                {/* Output Variables 섹션 - 이전 노드의 output variable만 표시 */}
+                {(() => {
+                  const outputVariables: Array<{
+                    sourceNodeLabel: string;
+                    variableName: string;
+                    value: any;
+                    edgeId: string;
+                  }> = [];
+
+                  if (isMergeNode) {
+                    // Merge 노드: 모든 incoming edge의 output variable 수집
+                    incomingEdges.forEach(edge => {
+                      const sourceNode = nodes.find(n => n.id === edge.source);
+                      const outputVariable = sourceNode?.data?.config?.outputVariable;
+                      if (outputVariable && edge.data?.output && edge.data.output[outputVariable] !== undefined) {
+                        outputVariables.push({
+                          sourceNodeLabel: sourceNode?.data?.label || edge.source,
+                          variableName: outputVariable,
+                          value: edge.data.output[outputVariable],
+                          edgeId: edge.id
+                        });
+                      }
+                    });
+                  } else if (selectedEdgeInfo) {
+                    // 일반 노드: 선택된 edge의 output variable만
+                    const sourceNode = nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId);
+                    const outputVariable = sourceNode?.data?.config?.outputVariable;
+                    if (outputVariable && mergedInputData[outputVariable] !== undefined) {
+                      outputVariables.push({
+                        sourceNodeLabel: sourceNode?.data?.label || selectedEdgeInfo.sourceNodeId,
+                        variableName: outputVariable,
+                        value: mergedInputData[outputVariable],
+                        edgeId: selectedEdgeInfo.edgeId
+                      });
+                    }
                   }
-                }}
-              >
+
+                  return outputVariables.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-400">
+                          📤 Output Variables
+                        </h3>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          ({outputVariables.length})
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {outputVariables.map((ov, index) => (
+                          <div 
+                            key={`${ov.edgeId}-${index}`}
+                            className="border border-purple-200 dark:border-purple-700 rounded-lg p-2.5 bg-purple-50 dark:bg-purple-900/20 cursor-pointer hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all"
+                            onClick={() => {
+                              handleOpenJsonPopup(
+                                ov.value,
+                                `Output Variable: ${ov.variableName} from ${ov.sourceNodeLabel}`
+                              );
+                            }}
+                            title="클릭하여 확대 보기"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                <span className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                                  {ov.sourceNodeLabel}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">→</span>
+                                <code className="text-xs font-mono bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded">
+                                  {ov.variableName}
+                                </code>
+                              </div>
+                              <span className="text-xs text-purple-500 dark:text-purple-400 ml-2 flex-shrink-0">
+                                🔍
+                              </span>
+                            </div>
+                            <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400 truncate">
+                              {typeof ov.value === 'string' ? (
+                                <span className="italic">"{ov.value.length > 50 ? ov.value.substring(0, 50) + '...' : ov.value}"</span>
+                              ) : typeof ov.value === 'number' || typeof ov.value === 'boolean' ? (
+                                <span className="font-mono text-purple-600 dark:text-purple-400">{String(ov.value)}</span>
+                              ) : Array.isArray(ov.value) ? (
+                                <span className="text-orange-600 dark:text-orange-400">Array ({ov.value.length} items)</span>
+                              ) : typeof ov.value === 'object' && ov.value !== null ? (
+                                <span className="text-blue-600 dark:text-blue-400">Object ({Object.keys(ov.value).length} properties)</span>
+                              ) : (
+                                <span className="text-gray-500">Click to view</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* 기존 전체 데이터 섹션 */}
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      📊 All Input Data
+                    </h3>
+                  </div>
+                  <div
+                    className="space-y-3"
+                    tabIndex={0}
+                    onKeyDownCapture={(e) => {
+                      const target = e.target as HTMLElement;
+                      const tag = target && target.tagName;
+                      const isEditable = (target as any)?.isContentEditable;
+                      if ((e.key === 'Backspace' || e.key === 'Delete') && tag !== 'INPUT' && tag !== 'TEXTAREA' && !isEditable) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }
+                    }}
+                  >
                 {/* merge 노드일 때는 모든 incoming 노드들을 표시 (단, Edge Inspector 모드가 아닐 때만) */}
                 {isMergeNode && !selectedEdge ? (
                   <div className="space-y-3">
@@ -722,6 +837,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 data={edge.data.output} 
                                 maxHeight="200px"
                                 className="text-xs"
+                                onExpand={() => {
+                                  const sourceNode = nodes.find(n => n.id === edge.source);
+                                  handleOpenJsonPopup(
+                                    edge.data.output, 
+                                    `Input Data from ${sourceNode?.data?.label || edge.source}`
+                                  );
+                                }}
                               />
                             ) : (
                               <div className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -794,6 +916,12 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                             data={selectedEdge.data.output} 
                             maxHeight="300px"
                             className="text-xs"
+                            onExpand={() => {
+                              handleOpenJsonPopup(
+                                selectedEdge.data.output, 
+                                `Edge Data: ${selectedEdge.source} → ${selectedEdge.target}`
+                              );
+                            }}
                           />
                         </div>
                       </div>
@@ -846,12 +974,21 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                           data={mergedInputData} 
                           maxHeight="300px"
                           className="text-xs"
+                          onExpand={() => {
+                            const sourceNode = nodes.find(n => n.id === selectedEdgeInfo?.sourceNodeId);
+                            handleOpenJsonPopup(
+                              mergedInputData, 
+                              `Input Data from ${sourceNode?.data?.label || selectedEdgeInfo?.sourceNodeId || 'Source'}`
+                            );
+                          }}
                         />
                       </div>
                     </div>
                     );
                   })()
                 )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -902,6 +1039,61 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
               </p>
             </div>
 
+            {/* Output Variable 섹션 - Edge에서도 표시 */}
+            {(() => {
+              const sourceNode = nodes.find(n => n.id === selectedEdge.source);
+              const outputVariable = sourceNode?.data?.config?.outputVariable;
+              const hasOutputVariable = outputVariable && selectedEdge.data?.output && selectedEdge.data.output[outputVariable] !== undefined;
+
+              return hasOutputVariable ? (
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-400">
+                      📤 Output Variable
+                    </h3>
+                  </div>
+                  <div 
+                    className="border border-purple-200 dark:border-purple-700 rounded-lg p-2.5 bg-purple-50 dark:bg-purple-900/20 cursor-pointer hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all"
+                    onClick={() => {
+                      handleOpenJsonPopup(
+                        selectedEdge.data.output[outputVariable],
+                        `Output Variable: ${outputVariable} from ${sourceNode?.data?.label || selectedEdge.source}`
+                      );
+                    }}
+                    title="클릭하여 확대 보기"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <span className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                          {sourceNode?.data?.label || selectedEdge.source}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">→</span>
+                        <code className="text-xs font-mono bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded">
+                          {outputVariable}
+                        </code>
+                      </div>
+                      <span className="text-xs text-purple-500 dark:text-purple-400 ml-2 flex-shrink-0">
+                        🔍
+                      </span>
+                    </div>
+                    <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400 truncate">
+                      {typeof selectedEdge.data.output[outputVariable] === 'string' ? (
+                        <span className="italic">"{selectedEdge.data.output[outputVariable].length > 50 ? selectedEdge.data.output[outputVariable].substring(0, 50) + '...' : selectedEdge.data.output[outputVariable]}"</span>
+                      ) : typeof selectedEdge.data.output[outputVariable] === 'number' || typeof selectedEdge.data.output[outputVariable] === 'boolean' ? (
+                        <span className="font-mono text-purple-600 dark:text-purple-400">{String(selectedEdge.data.output[outputVariable])}</span>
+                      ) : Array.isArray(selectedEdge.data.output[outputVariable]) ? (
+                        <span className="text-orange-600 dark:text-orange-400">Array ({selectedEdge.data.output[outputVariable].length} items)</span>
+                      ) : typeof selectedEdge.data.output[outputVariable] === 'object' && selectedEdge.data.output[outputVariable] !== null ? (
+                        <span className="text-blue-600 dark:text-blue-400">Object ({Object.keys(selectedEdge.data.output[outputVariable]).length} properties)</span>
+                      ) : (
+                        <span className="text-gray-500">Click to view</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connection Information</h4>
               <div className="space-y-2">
@@ -921,7 +1113,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             </div>
 
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Transfer</h3>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">📊 All Data Transfer</h3>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                 {selectedEdge.data?.output ? (
                   <div>
@@ -1125,6 +1317,14 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         sourceNode={selectedEdgeInfo ? nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId) : null}
         availableVariables={Object.keys(mergedInputData)}
         readOnly={isUserNode}
+      />
+
+      {/* JSON Popup Modal */}
+      <JsonPopupModal
+        isOpen={isJsonPopupOpen}
+        onClose={() => setIsJsonPopupOpen(false)}
+        data={jsonPopupData}
+        title={jsonPopupTitle}
       />
     </div>
   );
