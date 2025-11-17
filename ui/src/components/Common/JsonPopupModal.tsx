@@ -1,12 +1,14 @@
 import React from 'react';
-import { X, Maximize2, Minimize2, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { X, Maximize2, Minimize2, Copy, Check, ChevronDown, ChevronRight, Edit3, Save, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface JsonPopupModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: any;
   title?: string;
+  onSave?: (newData: any) => void;
+  editable?: boolean;
 }
 
 interface JsonNodeProps {
@@ -20,16 +22,43 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
   isOpen, 
   onClose, 
   data,
-  title = 'JSON Data Viewer'
+  title = 'JSON Data Viewer',
+  onSave,
+  editable = true
 }) => {
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedJson, setEditedJson] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  // data가 변경되면 편집 모드 종료 (저장 후 자동으로 보기 모드로 전환)
+  useEffect(() => {
+    if (isEditing) {
+      setIsEditing(false);
+      setEditedJson('');
+      setJsonError(null);
+    }
+  }, [data]);
+
+  // 팝업이 닫힐 때 상태 초기화
+  useEffect(() => {
+    if (!isOpen) {
+      setIsEditing(false);
+      setEditedJson('');
+      setJsonError(null);
+      setCopied(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const jsonString = JSON.stringify(data, null, 2);
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      const textToCopy = isEditing ? editedJson : jsonString;
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -37,7 +66,44 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
     }
   };
 
-  const jsonString = JSON.stringify(data, null, 2);
+  const handleEditClick = () => {
+    setEditedJson(jsonString);
+    setJsonError(null);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedJson('');
+    setJsonError(null);
+  };
+
+  const handleSave = () => {
+    try {
+      const parsedData = JSON.parse(editedJson);
+      setJsonError(null);
+      
+      if (onSave) {
+        onSave(parsedData);
+      }
+      
+      setIsEditing(false);
+      setEditedJson('');
+    } catch (err) {
+      setJsonError(err instanceof Error ? err.message : 'Invalid JSON format');
+    }
+  };
+
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedJson(e.target.value);
+    // 실시간 유효성 검사
+    try {
+      JSON.parse(e.target.value);
+      setJsonError(null);
+    } catch (err) {
+      setJsonError(err instanceof Error ? err.message : 'Invalid JSON format');
+    }
+  };
 
   return (
     <div 
@@ -54,51 +120,135 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-            {title}
-          </h2>
+          <div className="flex items-center space-x-3">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+              {title}
+            </h2>
+            {isEditing && (
+              <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-1 rounded">
+                편집 모드
+              </span>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-            </button>
-            <button
-              onClick={handleCopy}
-              className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-              title="Copy JSON"
-            >
-              {copied ? (
-                <>
-                  <Check size={16} />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={16} />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Close"
-            >
-              <X size={20} />
-            </button>
+            {!isEditing ? (
+              <>
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                  title="Copy JSON"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={16} />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={16} />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                {editable && onSave && (
+                  <button
+                    onClick={handleEditClick}
+                    className="flex items-center space-x-2 px-3 py-2 text-sm bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+                    title="Edit JSON"
+                  >
+                    <Edit3 size={16} />
+                    <span>Edit</span>
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
+                  title="Copy JSON"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={16} />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={16} />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
+                  title="Cancel"
+                >
+                  <XCircle size={16} />
+                  <span>Cancel</span>
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={jsonError !== null}
+                  className={`flex items-center space-x-2 px-3 py-2 text-sm rounded transition-colors ${
+                    jsonError !== null
+                      ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 cursor-not-allowed'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                  title={jsonError !== null ? 'Fix JSON errors before saving' : 'Save changes'}
+                >
+                  <Save size={16} />
+                  <span>Save</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden p-6">
-          <div className="h-full bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto p-4">
-            <div className="font-mono text-base">
-              <JsonNode data={data} level={0} />
+        <div className="flex-1 overflow-hidden p-6 flex flex-col">
+          {isEditing ? (
+            <>
+              <textarea
+                value={editedJson}
+                onChange={handleJsonChange}
+                className="flex-1 w-full h-full bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4 font-mono text-sm text-gray-800 dark:text-gray-200 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                spellCheck={false}
+              />
+              {jsonError && (
+                <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <XCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">JSON 형식 오류</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">{jsonError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="h-full bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto p-4">
+              <div className="font-mono text-base">
+                <JsonNode data={data} level={0} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -138,7 +288,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, name, level = 0, isLast = tru
     return (
       <div className="text-green-600 dark:text-green-400 leading-relaxed">
         {name && <span className="text-blue-600 dark:text-blue-400 font-semibold">"{name}": </span>}
-        <span className="break-words">"{data}"</span>
+        <span className="break-words whitespace-pre-wrap">"{data}"</span>
         {!isLast && <span className="text-gray-600 dark:text-gray-400">,</span>}
       </div>
     );
