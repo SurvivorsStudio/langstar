@@ -45,6 +45,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [isJsonPopupOpen, setIsJsonPopupOpen] = useState<boolean>(false);
   const [jsonPopupData, setJsonPopupData] = useState<any>(null);
   const [jsonPopupTitle, setJsonPopupTitle] = useState<string>('JSON Data Viewer');
+  const [isJsonPopupEditable, setIsJsonPopupEditable] = useState<boolean>(true);
 
   // 크기 조절을 위한 상태와 ref
   const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
@@ -395,9 +396,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   };
 
   // JSON 팝업 열기 핸들러
-  const handleOpenJsonPopup = (data: any, title: string = 'JSON Data Viewer') => {
+  const handleOpenJsonPopup = (data: any, title: string = 'JSON Data Viewer', editable: boolean = true) => {
     setJsonPopupData(data);
     setJsonPopupTitle(title);
+    setIsJsonPopupEditable(editable);
     setIsJsonPopupOpen(true);
   };
 
@@ -740,7 +742,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                             onClick={() => {
                               handleOpenJsonPopup(
                                 ov.value,
-                                `Output Variable: ${ov.variableName} from ${ov.sourceNodeLabel}`
+                                `Output Variable: ${ov.variableName} from ${ov.sourceNodeLabel}`,
+                                false  // 읽기 전용
                               );
                             }}
                             title="클릭하여 확대 보기"
@@ -1085,7 +1088,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     onClick={() => {
                       handleOpenJsonPopup(
                         selectedEdge.data.output[outputVariable],
-                        `Output Variable: ${outputVariable} from ${sourceNode?.data?.label || selectedEdge.source}`
+                        `Output Variable: ${outputVariable} from ${sourceNode?.data?.label || selectedEdge.source}`,
+                        false  // 읽기 전용
                       );
                     }}
                     title="클릭하여 확대 보기"
@@ -1355,8 +1359,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         onClose={() => setIsJsonPopupOpen(false)}
         data={jsonPopupData}
         title={jsonPopupTitle}
-        onSave={handleSaveJsonData}
-        editable={true}
+        onSave={isJsonPopupEditable ? handleSaveJsonData : undefined}
+        editable={isJsonPopupEditable}
       />
     </div>
   );
