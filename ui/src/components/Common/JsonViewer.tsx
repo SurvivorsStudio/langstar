@@ -5,6 +5,7 @@ interface JsonViewerProps {
   data: any;
   maxHeight?: string;
   className?: string;
+  onExpand?: () => void;
 }
 
 interface JsonNodeProps {
@@ -17,7 +18,8 @@ interface JsonNodeProps {
 const JsonViewer: React.FC<JsonViewerProps> = ({ 
   data, 
   maxHeight = "400px", 
-  className = "" 
+  className = "",
+  onExpand
 }) => {
   const [copied, setCopied] = useState(false);
   
@@ -32,13 +34,24 @@ const JsonViewer: React.FC<JsonViewerProps> = ({
   };
 
   return (
-    <div className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg border ${className}`}>
+    <div 
+      className={`relative bg-gray-50 dark:bg-gray-900 rounded-lg border ${className} ${
+        onExpand ? 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all' : ''
+      }`}
+      onClick={onExpand}
+      title={onExpand ? "클릭하여 확대 보기" : undefined}
+    >
       {/* Header with copy button */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 rounded-t-lg">
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">JSON Data</span>
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          JSON Data {onExpand && <span className="text-xs text-blue-500 dark:text-blue-400 ml-2">🔍 클릭하여 확대</span>}
+        </span>
         <button
-          onClick={handleCopy}
-          className="flex items-center space-x-1 px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCopy();
+          }}
+          className="flex items-center space-x-1 px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10"
         >
           {copied ? (
             <>
@@ -125,7 +138,10 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, name, level = 0, isLast = tru
       <div>
         <div className="flex items-center">
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
             className="flex items-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-1 mr-1 transition-colors"
           >
             {isExpanded ? (
@@ -178,7 +194,10 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, name, level = 0, isLast = tru
       <div>
         <div className="flex items-center">
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
             className="flex items-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-1 mr-1 transition-colors"
           >
             {isExpanded ? (
