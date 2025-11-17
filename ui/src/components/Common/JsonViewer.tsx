@@ -97,7 +97,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, name, level = 0, isLast = tru
     return (
       <div className="text-green-600 dark:text-green-400">
         {name && <span className="text-blue-600 dark:text-blue-400">"{name}": </span>}
-        <span>"{data}"</span>
+        <span className="whitespace-pre-wrap break-words">"{data}"</span>
         {!isLast && <span className="text-gray-600 dark:text-gray-400">,</span>}
       </div>
     );
