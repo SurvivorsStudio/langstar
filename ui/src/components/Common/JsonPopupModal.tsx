@@ -1,14 +1,18 @@
 import React from 'react';
+
 import { X, Maximize2, Minimize2, Copy, Check, ChevronDown, ChevronRight, Edit3, Save, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
 
 interface JsonPopupModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: any;
   title?: string;
+
   onSave?: (newData: any) => void;
   editable?: boolean;
+
 }
 
 interface JsonNodeProps {
@@ -22,6 +26,7 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
   isOpen, 
   onClose, 
   data,
+
   title = 'JSON Data Viewer',
   onSave,
   editable = true
@@ -59,12 +64,15 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
     try {
       const textToCopy = isEditing ? editedJson : jsonString;
       await navigator.clipboard.writeText(textToCopy);
+
+
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
   };
+
 
   const handleEditClick = () => {
     setEditedJson(jsonString);
@@ -105,6 +113,8 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
     }
   };
 
+
+
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
@@ -120,6 +130,7 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+
           <div className="flex items-center space-x-3">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
               {title}
@@ -217,10 +228,12 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
                 </button>
               </>
             )}
+
           </div>
         </div>
 
         {/* Content */}
+
         <div className="flex-1 overflow-hidden p-6 flex flex-col">
           {isEditing ? (
             <>
@@ -249,6 +262,7 @@ const JsonPopupModal: React.FC<JsonPopupModalProps> = ({
               </div>
             </div>
           )}
+
         </div>
 
         {/* Footer */}
@@ -288,7 +302,9 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, name, level = 0, isLast = tru
     return (
       <div className="text-green-600 dark:text-green-400 leading-relaxed">
         {name && <span className="text-blue-600 dark:text-blue-400 font-semibold">"{name}": </span>}
+
         <span className="break-words whitespace-pre-wrap">"{data}"</span>
+
         {!isLast && <span className="text-gray-600 dark:text-gray-400">,</span>}
       </div>
     );
