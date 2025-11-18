@@ -1,13 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Maximize2, Save, Database, Variable, Search, TreePine } from 'lucide-react';
+import { X, Maximize2, Save, Database, Variable, Search, Plus, Trash2 } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
 import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
+
+interface PromptConfig {
+  template: string;
+}
+
+interface PromptsData {
+  [key: string]: PromptConfig;
+}
 
 interface PromptTemplatePopupProps {
   isOpen: boolean;
   onClose: () => void;
-  value: string;
-  onChange: (value: string) => void;
+  prompts: PromptsData;
+  activePromptKey: string;
+  onChange: (promptKey: string, value: string) => void;
+  onBulkChange?: (updates: Record<string, string>) => void;
+  onBulkSave?: (newPrompts: PromptsData) => void; // 전체 prompts 구조를 한 번에 저장
+  onChangeActivePrompt?: (key: string) => void;
   edgeData?: any;
   sourceNode?: any;
   availableVariables?: string[];
@@ -16,15 +28,21 @@ interface PromptTemplatePopupProps {
 const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
   isOpen,
   onClose,
-  value,
+  prompts,
+  activePromptKey,
   onChange,
+  onBulkChange,
+  onBulkSave,
+  onChangeActivePrompt,
   edgeData,
   sourceNode,
   availableVariables = []
 }) => {
-  const [tempValue, setTempValue] = useState(value);
+  const [tempValues, setTempValues] = useState<PromptsData>(prompts);
+  const [currentPromptKey, setCurrentPromptKey] = useState(activePromptKey);
   const [hasChanges, setHasChanges] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState(0);
+  const [isEditingKey, setIsEditingKey] = useState(false);
+  const [editingKeyValue, setEditingKeyValue] = useState('');
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const cursorPositionRef = useRef(0);
   const isInsertingVariable = useRef(false);
@@ -35,10 +53,17 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
   const [sidebarWidth, setSidebarWidth] = useState(320); // 초기 사이드바 너비
   const [isResizing, setIsResizing] = useState(false);
 
-  // 팝업이 열릴 때마다 초기값으로 리셋
+  const keyInputRef = useRef<HTMLInputElement>(null);
+  const promptKeys = Object.keys(tempValues); // tempValues 기반으로 탭 표시
+
+  // 팝업이 열릴 때만 초기값으로 리셋 (activePromptKey 제거하여 탭 전환 시 리셋 방지)
+  const isOpenRef = useRef(false);
+  
   useEffect(() => {
-    if (isOpen) {
-      setTempValue(value);
+    // 팝업이 막 열렸을 때만 초기화
+    if (isOpen && !isOpenRef.current) {
+      setTempValues(prompts);
+      setCurrentPromptKey(activePromptKey);
       setHasChanges(false);
       
       // 트리를 기본으로 모두 펼치기
@@ -51,12 +76,58 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
         setAllExpanded(false);
       }
     }
-  }, [isOpen, value, edgeData]);
+    
+    isOpenRef.current = isOpen;
+  }, [isOpen, prompts, edgeData]);
+  
+  // activePromptKey가 외부에서 변경될 때 currentPromptKey 동기화 (리셋 없이)
+  useEffect(() => {
+    if (isOpen && activePromptKey && activePromptKey !== currentPromptKey) {
+      setCurrentPromptKey(activePromptKey);
+    }
+  }, [activePromptKey, isOpen]);
 
   // 임시 값이 변경될 때마다 변경사항 체크
   useEffect(() => {
-    setHasChanges(tempValue !== value);
-  }, [tempValue, value]);
+    if (!isOpen) return;
+    
+    const tempKeys = Object.keys(tempValues);
+    const originalKeys = Object.keys(prompts);
+    
+    // 1. 키 개수가 다른 경우 (추가/삭제)
+    if (tempKeys.length !== originalKeys.length) {
+      setHasChanges(true);
+      return;
+    }
+    
+    // 2. 키 이름이 다른 경우 (이름 변경)
+    const tempKeysSet = new Set(tempKeys);
+    const originalKeysSet = new Set(originalKeys);
+    const hasKeyDifference = tempKeys.some(key => !originalKeysSet.has(key)) || 
+                             originalKeys.some(key => !tempKeysSet.has(key));
+    if (hasKeyDifference) {
+      setHasChanges(true);
+      return;
+    }
+    
+    // 3. 템플릿 내용이 다른 경우
+    const hasContentChanges = tempKeys.some(key => {
+      const tempTemplate = tempValues[key]?.template || '';
+      const originalTemplate = prompts[key]?.template || '';
+      return tempTemplate !== originalTemplate;
+    });
+    
+    setHasChanges(hasContentChanges);
+  }, [tempValues, prompts, isOpen]);
+
+  // Auto focus for key editing
+  useEffect(() => {
+    if (isEditingKey && keyInputRef.current) {
+      keyInputRef.current.focus();
+      const value = keyInputRef.current.value;
+      keyInputRef.current.setSelectionRange(value.length, value.length);
+    }
+  }, [isEditingKey]);
 
   // expandedPaths가 변경될 때마다 allExpanded 상태 업데이트
   useEffect(() => {
@@ -68,14 +139,131 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
   }, [expandedPaths, edgeData]);
 
   const handleSave = () => {
-    onChange(tempValue);
-    setHasChanges(false);
+    console.log('[PromptTemplatePopup] Saving changes...');
+    
+    // onBulkSave가 있으면 전체 구조를 한 번에 저장 (추가/삭제/이름변경/내용변경 모두 포함)
+    if (onBulkSave) {
+      console.log('[PromptTemplatePopup] Saving entire prompts structure:', Object.keys(tempValues));
+      onBulkSave(tempValues);
+    } else {
+      // fallback: 변경된 템플릿만 개별 업데이트
+      console.warn('[PromptTemplatePopup] onBulkSave is not provided, falling back to partial update');
+      
+      const updates: Record<string, string> = {};
+      
+      Object.keys(tempValues).forEach(key => {
+        const tempTemplate = tempValues[key]?.template || '';
+        const originalTemplate = prompts[key]?.template || '';
+        
+        if (tempTemplate !== originalTemplate) {
+          updates[key] = tempTemplate;
+        }
+      });
+      
+      if (Object.keys(updates).length > 0) {
+        if (onBulkChange) {
+          onBulkChange(updates);
+        } else {
+          Object.entries(updates).forEach(([key, template]) => {
+            onChange(key, template);
+          });
+        }
+      }
+    }
+    
+    console.log('[PromptTemplatePopup] Save complete');
+  };
+
+  const handleRenamePromptKey = (oldKey: string, newKey: string) => {
+    setIsEditingKey(false);
+    
+    if (oldKey === newKey) {
+      return;
+    }
+    
+    // tempValues 내에서 중복 체크 (Save 전까지는 tempValues 기준으로 체크)
+    if (tempValues[newKey]) {
+      setEditingKeyValue(oldKey);
+      alert('이미 존재하는 key입니다.');
+      return;
+    }
+    
+    if (!newKey.trim()) {
+      setEditingKeyValue(oldKey);
+      alert('key는 비어있을 수 없습니다.');
+      return;
+    }
+    
+    // tempValues에서만 키 이름 변경 (Save 시 실제 반영)
+    const newTempValues: PromptsData = {};
+    Object.keys(tempValues).forEach(k => {
+      if (k === oldKey) {
+        newTempValues[newKey] = tempValues[k];
+      } else {
+        newTempValues[k] = tempValues[k];
+      }
+    });
+    setTempValues(newTempValues);
+    setCurrentPromptKey(newKey);
+    
+    console.log(`[PromptTemplatePopup] Renamed key from "${oldKey}" to "${newKey}" (not saved yet)`);
+  };
+
+  const handleChangePrompt = (key: string) => {
+    setCurrentPromptKey(key);
+    if (onChangeActivePrompt) {
+      onChangeActivePrompt(key);
+    }
+  };
+
+  const handleAddPrompt = () => {
+    let newKeyNumber = 1;
+    let newKey = `prompt_${newKeyNumber}`;
+    
+    // tempValues 내에서 중복되지 않는 키 찾기
+    while (tempValues[newKey]) {
+      newKeyNumber++;
+      newKey = `prompt_${newKeyNumber}`;
+    }
+    
+    // tempValues에만 추가 (Save 시 실제 반영)
+    const newTempValues = {
+      ...tempValues,
+      [newKey]: { template: '' }
+    };
+    setTempValues(newTempValues);
+    setCurrentPromptKey(newKey);
+    
+    console.log(`[PromptTemplatePopup] Added new prompt "${newKey}" (not saved yet)`);
+  };
+
+  const handleDeletePrompt = (key: string) => {
+    if (promptKeys.length <= 1) {
+      alert('최소 1개의 프롬프트가 필요합니다.');
+      return;
+    }
+    
+    // tempValues에서만 삭제 (Save 시 실제 반영)
+    const newTempValues = { ...tempValues };
+    delete newTempValues[key];
+    setTempValues(newTempValues);
+    
+    // 삭제된 키가 현재 활성화된 키라면 다른 키로 전환
+    if (currentPromptKey === key) {
+      const remainingKeys = Object.keys(newTempValues);
+      if (remainingKeys.length > 0) {
+        setCurrentPromptKey(remainingKeys[0]);
+      }
+    }
+    
+    console.log(`[PromptTemplatePopup] Deleted prompt "${key}" (not saved yet)`);
   };
 
   const insertVariableAtCursor = (variableName: string) => {
     const currentPosition = cursorPositionRef.current;
-    const beforeCursor = tempValue.substring(0, currentPosition);
-    const afterCursor = tempValue.substring(currentPosition);
+    const currentTemplate = tempValues[currentPromptKey]?.template || '';
+    const beforeCursor = currentTemplate.substring(0, currentPosition);
+    const afterCursor = currentTemplate.substring(currentPosition);
     const newValue = beforeCursor + `{{${variableName}}}` + afterCursor;
     
     // 커서 위치를 삽입된 변수 뒤로 이동
@@ -83,7 +271,13 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
     
     // 변수 삽입 플래그 설정
     isInsertingVariable.current = true;
-    setTempValue(newValue);
+    setTempValues({
+      ...tempValues,
+      [currentPromptKey]: {
+        ...tempValues[currentPromptKey],
+        template: newValue
+      }
+    });
     
     // 다음 렌더링 사이클에서 커서 위치를 설정
     setTimeout(() => {
@@ -93,7 +287,6 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
         editorInstance.setPosition(position);
         editorInstance.focus();
         cursorPositionRef.current = newCursorPosition;
-        setCursorPosition(newCursorPosition);
         isInsertingVariable.current = false;
       }
     }, 10);
@@ -196,7 +389,7 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
       ? obj.map((item, index) => [index.toString(), item] as [string, any])
       : Object.entries(obj);
     
-    return entries.map(([key, value], index) => {
+    return entries.map(([key, value]) => {
       const isArray = Array.isArray(obj);
       const currentPath = [...path, isArray ? `[${key}]` : key];
       const pathString = currentPath.join('.');
@@ -322,6 +515,8 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
 
   if (!isOpen) return null;
 
+  const currentTemplate = tempValues[currentPromptKey]?.template || '';
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-7xl h-[90vh] flex flex-col">
@@ -343,6 +538,76 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
           >
             <X className="h-6 w-6" />
           </button>
+        </div>
+
+        {/* Prompts Tabs */}
+        <div className="px-6 pt-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+            {promptKeys.map((key) => (
+              <div
+                key={key}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-t-md border border-b-0 cursor-pointer transition-colors ${
+                  currentPromptKey === key
+                    ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 border-b-white dark:border-b-gray-800'
+                    : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                }`}
+                onClick={() => handleChangePrompt(key)}
+              >
+                {isEditingKey && currentPromptKey === key ? (
+                  <input
+                    ref={keyInputRef}
+                    type="text"
+                    value={editingKeyValue}
+                    onChange={(e) => setEditingKeyValue(e.target.value)}
+                    onBlur={() => handleRenamePromptKey(key, editingKeyValue)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleRenamePromptKey(key, editingKeyValue);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setIsEditingKey(false);
+                        setEditingKeyValue(key);
+                      }
+                    }}
+                    className="w-24 px-2 py-1 text-sm border border-purple-300 dark:border-purple-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span
+                    className="text-sm font-medium"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditingKey(true);
+                      setEditingKeyValue(key);
+                    }}
+                  >
+                    {key}
+                  </span>
+                )}
+                {currentPromptKey === key && promptKeys.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePrompt(key);
+                    }}
+                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    title="Delete prompt"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={handleAddPrompt}
+              className="flex items-center space-x-1 px-3 py-2 rounded-t-md border border-b-0 border-dashed border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 hover:border-gray-500 dark:hover:border-gray-400 transition-colors"
+              title="Add new prompt"
+            >
+              <Plus size={16} />
+              <span className="text-sm">추가</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 p-6 overflow-hidden">
@@ -484,14 +749,21 @@ const PromptTemplatePopup: React.FC<PromptTemplatePopupProps> = ({
             {/* Code Editor */}
             <div className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md">
               <CodeEditor
-                value={tempValue}
-                onChange={setTempValue}
+                value={currentTemplate}
+                onChange={(newValue) => {
+                  setTempValues({
+                    ...tempValues,
+                    [currentPromptKey]: {
+                      ...tempValues[currentPromptKey],
+                      template: newValue
+                    }
+                  });
+                }}
                 language="markdown"
                 onCursorPositionChange={(position) => {
                   // 변수 삽입 중이 아닐 때만 커서 위치 업데이트
                   if (!isInsertingVariable.current) {
                     cursorPositionRef.current = position;
-                    setCursorPosition(position);
                   }
                 }}
                 onMount={(editor) => {
