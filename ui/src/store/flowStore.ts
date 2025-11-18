@@ -1531,31 +1531,84 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       switch (node.type) {
         case 'promptNode': {
-          const template = node.data.config?.template || '';
+          const prompts = node.data.config?.prompts || {};
           const outputVariable = node.data.config?.outputVariable || '';
           
           if (!outputVariable) {
             output = { error: 'Output variable name is required' };
             break;
           }
-          // output = processPromptTemplate(template, input, outputVariable);
+          
+          const promptKeys = Object.keys(prompts);
+          if (promptKeys.length === 0) {
+            output = { error: 'No prompts configured' };
+            break;
+          }
+          
           try {
-            const payload = {
-              prompt: template,
-              param: input,
-              return_key: outputVariable,
-            };
-            const response = await fetch('http://localhost:8000/workflow/node/promptnode', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(payload),
-            });
-            if (!response.ok) {
-              throw new Error(`API request failed with status ${response.status}`);
+            // 각 프롬프트를 순차적으로 실행
+            const promptResults: Record<string, any> = {};
+            
+            for (const promptKey of promptKeys) {
+              const template = prompts[promptKey].template || '';
+              
+              const payload = {
+                prompt: template,
+                param: input,
+                return_key: promptKey,
+              };
+              
+              console.log(`[PromptNode] Executing prompt "${promptKey}" with template:`, template);
+              
+              const response = await fetch('http://localhost:8000/workflow/node/promptnode', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status} for prompt: ${promptKey}`);
+              }
+              
+              const apiResponse = await response.json();
+              console.log(`[PromptNode] API response for "${promptKey}":`, apiResponse);
+              
+              // API 응답에서 promptKey에 해당하는 값만 추출
+              // API는 { [return_key]: "처리된 결과" } 형태로 응답
+              if (apiResponse && typeof apiResponse === 'object' && promptKey in apiResponse) {
+                const result = apiResponse[promptKey];
+                // 결과가 문자열이면 그대로 사용, 아니면 전체 객체 사용
+                promptResults[promptKey] = typeof result === 'string' ? result : result;
+              } else {
+                // return_key로 응답하지 않은 경우, 전체 응답에서 문자열 찾기
+                console.warn(`[PromptNode] API response does not contain key "${promptKey}". Using fallback.`);
+                
+                // 응답이 단순 문자열인 경우
+                if (typeof apiResponse === 'string') {
+                  promptResults[promptKey] = apiResponse;
+                } 
+                // 응답 객체에서 첫 번째 문자열 값을 찾기
+                else if (typeof apiResponse === 'object') {
+                  const firstStringValue = Object.values(apiResponse).find(val => typeof val === 'string');
+                  promptResults[promptKey] = firstStringValue || JSON.stringify(apiResponse);
+                } 
+                else {
+                  promptResults[promptKey] = String(apiResponse);
+                }
+              }
+              
+              console.log(`[PromptNode] Stored result for "${promptKey}":`, promptResults[promptKey]);
             }
-            output = await response.json();
+            
+            // 입력 데이터에 outputVariable로 프롬프트 결과들을 추가
+            output = { 
+              ...input, 
+              [outputVariable]: promptResults 
+            };
+            
+            console.log(`[PromptNode] 실행 완료. 최종 output:`, output);
           } catch (apiError) {
             console.error('PromptNode API call failed:', apiError);
             output = { error: 'Failed to connect to prompt node API', details: (apiError as Error).message };
