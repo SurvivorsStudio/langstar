@@ -13,7 +13,7 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges, isWorkflowRunning } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges, isWorkflowRunning, overlappingAgentNodes } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   
@@ -32,6 +32,18 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const [isRightHandleHovered, setIsRightHandleHovered] = useState(false);
   // 툴팁 표시 상태
   const [showTooltip, setShowTooltip] = useState(false);
+  // 우클릭 2회 감지를 위한 상태
+  const [lastRightClickTime, setLastRightClickTime] = useState<number>(0);
+  // Agent 노드 드래그 오버 상태 (확대 효과용)
+  const [isDragOver, setIsDragOver] = useState(false);
+  
+  // 노드 타입 확인 (일부는 먼저 정의되어야 함)
+  const isAgentNode = type === 'agentNode';
+  
+  // FlowStore의 overlappingAgentNodes를 확인하여 현재 노드가 포함되어 있는지 확인
+  const isNodeOverlapped = React.useMemo(() => {
+    return isAgentNode && overlappingAgentNodes.has(id);
+  }, [isAgentNode, overlappingAgentNodes, id]);
 
   // ToolsMemoryNode이고 다른 노드가 포커스되었을 때 selectedGroupId 초기화
   React.useEffect(() => {
@@ -138,9 +150,20 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   };
 
 
-  // 노드 더블클릭 핸들러 - 툴팁 토글
-  const handleNodeDoubleClick = () => {
-    setShowTooltip(!showTooltip);
+  // 노드 우클릭 2회 핸들러 - 툴팁 토글
+  const handleNodeRightClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // 기본 컨텍스트 메뉴 방지
+    
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastRightClickTime;
+    
+    // 300ms 이내에 우클릭이 2번 발생하면 툴팁 토글
+    if (timeDiff < 300 && timeDiff > 0) {
+      setShowTooltip(!showTooltip);
+      setLastRightClickTime(0); // 초기화
+    } else {
+      setLastRightClickTime(currentTime);
+    }
   };
 
   // 툴팁 닫기 핸들러
@@ -352,6 +375,56 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     if (window.confirm('Are you sure you want to delete this node?')) {
       removeNode(id);
     }
+  };
+
+  /**
+   * Agent 노드 드래그 오버 핸들러 (확대 효과)
+   */
+  const handleDragOver = (event: React.DragEvent) => {
+    if (!isAgentNode) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // 드래그 중인 데이터 확인
+    const data = event.dataTransfer.types.includes('application/reactflow');
+    if (data) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragEnter = (event: React.DragEvent) => {
+    if (!isAgentNode) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    if (!isAgentNode) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // 자식 요소로 이동하는 경우를 제외하고만 드래그 오버 해제
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    if (!isAgentNode) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+    
+    // 드롭된 데이터 처리는 FlowBuilder에서 처리됨
   };
 
   /**
@@ -667,7 +740,7 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
             minWidth: '320px',
             maxWidth: '320px'
           }}
-          onDoubleClick={handleNodeDoubleClick}
+          onContextMenu={handleNodeRightClick}
         >
           {/* 통합된 헤더 - 아이콘과 제목을 한 줄에 배치 */}
           <div 
@@ -741,15 +814,21 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
             <div
               className={`rounded-lg shadow-lg relative overflow-visible cursor-pointer transition-all duration-300 ${
                 isWorkflowRunning || isAnyOtherNodeExecuting ? 'opacity-75' : ''
-              }`}
+              } ${(isDragOver || isNodeOverlapped) && isAgentNode ? 'z-50' : ''}`}
               style={{
                 backgroundColor: nodeStyle.backgroundColor,
-                borderColor: isWorkflowRunning ? '#3b82f6' : isAnyOtherNodeExecuting ? '#6b7280' : nodeStyle.borderColor,
-                borderWidth: '2px',
-                borderStyle: 'solid',
-                position: 'relative'
+                borderColor: isWorkflowRunning ? '#3b82f6' : isAnyOtherNodeExecuting ? '#6b7280' : ((isDragOver || isNodeOverlapped) && isAgentNode ? '#3b82f6' : nodeStyle.borderColor),
+                borderWidth: (isDragOver || isNodeOverlapped) && isAgentNode ? '4px' : '2px',
+                borderStyle: (isDragOver || isNodeOverlapped) && isAgentNode ? 'dashed' : 'solid',
+                position: 'relative',
+                transform: (isDragOver || isNodeOverlapped) && isAgentNode ? 'scale(1.3)' : 'scale(1)',
+                boxShadow: (isDragOver || isNodeOverlapped) && isAgentNode ? '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)' : undefined
               }}
-              onDoubleClick={handleNodeDoubleClick}
+              onContextMenu={handleNodeRightClick}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
               {/* 워크플로우 실행 중일 때 로딩 오버레이 */}
               {isWorkflowRunning && !isExecuting && (
@@ -765,6 +844,30 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
                 </div>
               )}
               {/* 우상단 상태 점 제거 */}
+              
+              {/* Agent 노드 왼쪽 상단 도구 개수 배지 */}
+              {isAgentNode && (
+                <div className="absolute -top-2 -left-2 z-10">
+                  {(() => {
+                    const codeNodesCount = (data.codeNodes || []).length;
+                    const userNodesCount = (data.userNodes || []).length;
+                    const totalCount = codeNodesCount + userNodesCount;
+                    
+                    if (totalCount > 0) {
+                      return (
+                        <div 
+                          className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shadow-lg border-2 border-white dark:border-gray-800"
+                          style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' }}
+                          title={`${codeNodesCount} Code Node(s) + ${userNodesCount} User Node(s)`}
+                        >
+                          {totalCount}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
               
               {/* 노드 우측 상단 버튼들 (재생 버튼 이동) */}
               {!isEndNode && (

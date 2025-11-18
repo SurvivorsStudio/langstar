@@ -45,9 +45,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [isJsonPopupOpen, setIsJsonPopupOpen] = useState<boolean>(false);
   const [jsonPopupData, setJsonPopupData] = useState<any>(null);
   const [jsonPopupTitle, setJsonPopupTitle] = useState<string>('JSON Data Viewer');
-
   const [isJsonPopupEditable, setIsJsonPopupEditable] = useState<boolean>(true);
-
 
   // 크기 조절을 위한 상태와 ref
   const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
@@ -398,7 +396,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   };
 
   // JSON 팝업 열기 핸들러
-
   const handleOpenJsonPopup = (data: any, title: string = 'JSON Data Viewer', editable: boolean = true) => {
     setJsonPopupData(data);
     setJsonPopupTitle(title);
@@ -428,8 +425,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     
     console.log(`Updated edge ${edgeId} with new data:`, newData);
   };
-
-
 
 
 
@@ -702,10 +697,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     // Merge 노드: 모든 incoming edge의 output variable 수집
                     incomingEdges.forEach(edge => {
                       const sourceNode = nodes.find(n => n.id === edge.source);
-
                       // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
                       const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
                       if (outputVariable && edge.data?.output && edge.data.output[outputVariable] !== undefined) {
                         outputVariables.push({
                           sourceNodeLabel: sourceNode?.data?.label || edge.source,
@@ -718,10 +711,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                   } else if (selectedEdgeInfo) {
                     // 일반 노드: 선택된 edge의 output variable만
                     const sourceNode = nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId);
-
                     // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
                     const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
                     if (outputVariable && mergedInputData[outputVariable] !== undefined) {
                       outputVariables.push({
                         sourceNodeLabel: sourceNode?.data?.label || selectedEdgeInfo.sourceNodeId,
@@ -750,10 +741,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                             onClick={() => {
                               handleOpenJsonPopup(
                                 ov.value,
-
                                 `Output Variable: ${ov.variableName} from ${ov.sourceNodeLabel}`,
                                 false  // 읽기 전용
-
                               );
                             }}
                             title="클릭하여 확대 보기"
@@ -772,13 +761,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 🔍
                               </span>
                             </div>
-
                             <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400">
                               {typeof ov.value === 'string' ? (
                                 <div className="italic whitespace-pre-wrap break-words max-h-12 overflow-hidden line-clamp-2">
                                   "{ov.value.length > 100 ? ov.value.substring(0, 100) + '...' : ov.value}"
                                 </div>
-
                               ) : typeof ov.value === 'number' || typeof ov.value === 'boolean' ? (
                                 <span className="font-mono text-purple-600 dark:text-purple-400">{String(ov.value)}</span>
                               ) : Array.isArray(ov.value) ? (
@@ -1084,10 +1071,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             {/* Output Variable 섹션 - Edge에서도 표시 */}
             {(() => {
               const sourceNode = nodes.find(n => n.id === selectedEdge.source);
-
               // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
               const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
               const hasOutputVariable = outputVariable && selectedEdge.data?.output && selectedEdge.data.output[outputVariable] !== undefined;
 
               return hasOutputVariable ? (
@@ -1102,10 +1087,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     onClick={() => {
                       handleOpenJsonPopup(
                         selectedEdge.data.output[outputVariable],
-
                         `Output Variable: ${outputVariable} from ${sourceNode?.data?.label || selectedEdge.source}`,
                         false  // 읽기 전용
-
                       );
                     }}
                     title="클릭하여 확대 보기"
@@ -1124,13 +1107,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         🔍
                       </span>
                     </div>
-
                     <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400">
                       {typeof selectedEdge.data.output[outputVariable] === 'string' ? (
                         <div className="italic whitespace-pre-wrap break-words max-h-12 overflow-hidden line-clamp-2">
                           "{selectedEdge.data.output[outputVariable].length > 100 ? selectedEdge.data.output[outputVariable].substring(0, 100) + '...' : selectedEdge.data.output[outputVariable]}"
                         </div>
-
                       ) : typeof selectedEdge.data.output[outputVariable] === 'number' || typeof selectedEdge.data.output[outputVariable] === 'boolean' ? (
                         <span className="font-mono text-purple-600 dark:text-purple-400">{String(selectedEdge.data.output[outputVariable])}</span>
                       ) : Array.isArray(selectedEdge.data.output[outputVariable]) ? (
@@ -1377,10 +1358,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         onClose={() => setIsJsonPopupOpen(false)}
         data={jsonPopupData}
         title={jsonPopupTitle}
-
         onSave={isJsonPopupEditable ? handleSaveJsonData : undefined}
         editable={isJsonPopupEditable}
-
       />
     </div>
   );

@@ -161,6 +161,10 @@ export interface FlowState {
   // 노드 선택 상태
   selectedNode: string | null;
   setSelectedNode: (id: string | null) => void;
+  
+  // Agent 노드 확대 상태 (드래그 오버)
+  overlappingAgentNodes: Set<string>;
+  setOverlappingAgentNodes: (nodes: Set<string>) => void;
 
   // IndexedDB 저장 및 불러오기 관련 상태 및 함수
   isSaving: boolean;
@@ -573,6 +577,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 노드 선택 상태
   selectedNode: null,
   setSelectedNode: (id: string | null) => set({ selectedNode: id }),
+  
+  // Agent 노드 확대 상태 (드래그 오버)
+  overlappingAgentNodes: new Set<string>(),
+  setOverlappingAgentNodes: (nodes: Set<string>) => set({ overlappingAgentNodes: nodes }),
 
   // IndexedDB 관련 상태 초기값
   isSaving: false,
