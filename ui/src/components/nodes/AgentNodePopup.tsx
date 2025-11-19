@@ -28,7 +28,7 @@ interface AgentNodePopupProps {
 }
 
 const AgentNodePopup: React.FC<AgentNodePopupProps> = ({ isOpen, onClose, nodeData, nodeId }) => {
-  const { updateNodeData } = useFlowStore();
+  const { updateNodeData, setSelectedUserNodeInAgentPopup } = useFlowStore();
   const [isCodeEditorOpen, setIsCodeEditorOpen] = useState(false);
   const [currentCode, setCurrentCode] = useState('# Write your Python code here\n');
   const [currentTitle, setCurrentTitle] = useState('');
@@ -180,6 +180,15 @@ const AgentNodePopup: React.FC<AgentNodePopupProps> = ({ isOpen, onClose, nodeDa
     }
   };
 
+  const handleUserNodeClick = (userNode: UserNode) => {
+    console.log('[AgentNodePopup] User Node clicked:', userNode);
+    // agentNodeId와 함께 userNode를 저장
+    setSelectedUserNodeInAgentPopup({
+      userNode,
+      agentNodeId: nodeId
+    });
+  };
+
   const generateLabel = (code: string): string => {
     // 코드의 첫 줄에서 의미있는 텍스트 추출
     const lines = code.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
@@ -236,6 +245,7 @@ const AgentNodePopup: React.FC<AgentNodePopupProps> = ({ isOpen, onClose, nodeDa
                 {userNodes.map((node) => (
                   <div
                     key={node.id}
+                    onClick={() => handleUserNodeClick(node)}
                     className="relative w-32 h-32 rounded-xl border-2 border-purple-300 dark:border-purple-600 
                                bg-purple-50 dark:bg-purple-900/20
                                hover:border-purple-400 dark:hover:border-purple-500 
@@ -385,5 +395,6 @@ const AgentNodePopup: React.FC<AgentNodePopupProps> = ({ isOpen, onClose, nodeDa
 };
 
 export default AgentNodePopup;
+
 
 

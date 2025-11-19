@@ -13,6 +13,7 @@ import MergeSettings from './nodes/MergeSettings';
 import EndNodeSettings from './nodes/EndNodeSettings';
 import ToolsMemorySettings from './nodes/ToolsMemorySettings';
 import UserNodeSettings from './nodes/UserNodeSettings';
+import AgentUserNodeSettings from './nodes/AgentUserNodeSettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
 import { getNodeDescription } from '../utils/nodeDescriptions';
@@ -20,12 +21,14 @@ import { getNodeDescription } from '../utils/nodeDescriptions';
 interface NodeInspectorProps {
   nodeId: string;
   selectedEdge?: any;
+  selectedUserNode?: any;
   onClose: () => void;
 }
 
-const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onClose }) => {
+const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, selectedUserNode, onClose }) => {
   const { nodes, edges, updateNodeData, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
-  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>('input_data');
+  // UserNode인 경우 settings 탭부터 시작, 아니면 기본 로직
+  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>(selectedUserNode ? 'settings' : 'input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
@@ -116,6 +119,47 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
 
   useEffect(() => {
+    // AgentNodePopup에서 선택된 UserNode가 있는 경우
+    if (selectedUserNode) {
+      console.log(`[NodeInspector] Displaying User Node from AgentNodePopup:`, selectedUserNode);
+      // selectedUserNode가 { userNode, agentNodeId } 형태인지 확인
+      const userNodeData = selectedUserNode.userNode || selectedUserNode;
+      const agentNodeId = selectedUserNode.agentNodeId;
+      
+      // UserNode를 가상의 노드 형태로 변환
+      const virtualNode = {
+        id: userNodeData.id,
+        type: 'userNode',
+        data: {
+          label: userNodeData.name || 'Unnamed User Node',
+          code: userNodeData.code || '',
+          functionName: userNodeData.functionName || '',
+          functionDescription: userNodeData.functionDescription || '',
+          description: userNodeData.functionDescription || '',
+          config: {
+            parameters: userNodeData.parameters || [],
+            settings: {},
+            inputData: {},
+            outputVariable: 'result'
+          },
+          agentNodeId // AgentNode ID 저장
+        },
+        position: { x: 0, y: 0 }
+      };
+      setCurrentNode(virtualNode as any);
+      setCode(userNodeData.code || '');
+      lastSavedCodeRef.current = userNodeData.code || '';
+      setNodeName(userNodeData.name || 'Unnamed User Node');
+      setLastValidNodeName(userNodeData.name || 'Unnamed User Node');
+      setNodeDescription(userNodeData.functionDescription || '');
+      setIncomingEdges([]);
+      setMergedInputData({});
+      setHasValidInputData(false);
+      setSelectedEdgeInfo(null);
+      setManuallySelectedEdgeId(null);
+      return;
+    }
+    
     console.log(`[NodeInspector] useEffect triggered - nodeId: ${nodeId}, nodes count: ${nodes.length}`);
     const node = nodes.find((n: any) => n.id === nodeId);
     if (node) {
@@ -260,7 +304,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         setActiveTab(newDefaultTab);
       }
     }
-  }, [nodeId, activeTab, manuallySelectedEdges]); // edges 의존성 제거
+  }, [nodeId, activeTab, manuallySelectedEdges, selectedUserNode]); // edges 의존성 제거
 
   // 현재 노드의 데이터가 변경될 때만 코드 동기화 (임시로 비활성화)
   // useEffect(() => {
@@ -442,7 +486,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
   return (
     <div 
-      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10 relative"
+      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-[60] relative"
       style={{ width: `${width}px` }}
       data-testid="node-inspector"
     >
@@ -528,7 +572,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         ) : (
           // 노드 전용 탭들
           <>
-            {!isStartNode && (
+            {!isStartNode && !selectedUserNode && (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
@@ -1334,7 +1378,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
               {isToolsMemoryNode && <ToolsMemorySettings nodeId={nodeId} />}
               {isMergeNode && <MergeSettings nodeId={nodeId} />}
               {isEndNode && <EndNodeSettings nodeId={nodeId} />}
-              {isUserNode && <UserNodeSettings nodeId={nodeId} />}
+              {isUserNode && !currentNode?.data?.agentNodeId && <UserNodeSettings nodeId={nodeId} />}
+              {isUserNode && currentNode?.data?.agentNodeId && (
+                <AgentUserNodeSettings 
+                  agentNodeId={currentNode.data.agentNodeId} 
+                  userNode={selectedUserNode?.userNode || selectedUserNode} 
+                />
+              )}
             </div>
           </div>
         )}

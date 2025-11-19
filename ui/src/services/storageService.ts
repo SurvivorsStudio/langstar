@@ -110,6 +110,11 @@ export async function getUserNodeById(nodeId: string): Promise<any> {
   return handleResponse(response);
 }
 
+export async function getUserNodeByName(nodeName: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/user-nodes/by-name/${encodeURIComponent(nodeName)}`);
+  return handleResponse(response);
+}
+
 export async function createUserNode(nodeData: any): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/user-nodes`, {
     method: 'POST',

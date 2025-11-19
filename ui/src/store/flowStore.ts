@@ -92,12 +92,13 @@ export interface UserNode {
   code: string; // 파이썬 코드
   parameters: Array<{
     name: string;
-    inputType: string; // 'select box' 또는 'text box'
+    inputType: string; // 'select box', 'text box', 'checkbox', 'radio button'
     required: boolean;
-
     funcArgs?: string; // 매개변수별 funcArgs 추가
     matchData?: string; // 매개변수별 matchData 추가
-
+    type?: string; // 파라미터 타입 (str, any 등)
+    description?: string; // 파라미터 설명
+    options?: string[]; // checkbox, radio button 옵션
   }>;
   functionName: string;
   returnType: string;
@@ -165,6 +166,10 @@ export interface FlowState {
   // Agent 노드 확대 상태 (드래그 오버)
   overlappingAgentNodes: Set<string>;
   setOverlappingAgentNodes: (nodes: Set<string>) => void;
+  
+  // Agent 팝업에서 선택된 User Node
+  selectedUserNodeInAgentPopup: any | null;
+  setSelectedUserNodeInAgentPopup: (userNode: any | null) => void;
 
   // IndexedDB 저장 및 불러오기 관련 상태 및 함수
   isSaving: boolean;
@@ -581,6 +586,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Agent 노드 확대 상태 (드래그 오버)
   overlappingAgentNodes: new Set<string>(),
   setOverlappingAgentNodes: (nodes: Set<string>) => set({ overlappingAgentNodes: nodes }),
+  
+  // Agent 팝업에서 선택된 User Node
+  selectedUserNodeInAgentPopup: null,
+  setSelectedUserNodeInAgentPopup: (userNode: any | null) => set({ selectedUserNodeInAgentPopup: userNode }),
 
   // IndexedDB 관련 상태 초기값
   isSaving: false,

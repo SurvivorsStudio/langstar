@@ -30,7 +30,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning, setOverlappingAgentNodes, overlappingAgentNodes, updateNodeData } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning, setOverlappingAgentNodes, overlappingAgentNodes, updateNodeData, selectedUserNodeInAgentPopup, setSelectedUserNodeInAgentPopup } = useFlowStore();
   
   // 다른 노드가 실행 중인지 확인
   const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
@@ -56,6 +56,13 @@ const FlowBuilder: React.FC = () => {
   
   // 드래그 중인 노드 추적
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  
+  // selectedUserNodeInAgentPopup이 설정되면 Inspector 열기
+  useEffect(() => {
+    if (selectedUserNodeInAgentPopup) {
+      setShowInspector(true);
+    }
+  }, [selectedUserNodeInAgentPopup]);
 
   // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
   useEffect(() => {
@@ -599,15 +606,17 @@ const FlowBuilder: React.FC = () => {
 
         </ReactFlow>
       </div>
-      {showInspector && (selectedNode || selectedEdge) && (
+      {showInspector && (selectedNode || selectedEdge || selectedUserNodeInAgentPopup) && (
         <NodeInspector
           nodeId={selectedNode || ''}
           selectedEdge={selectedEdge}
+          selectedUserNode={selectedUserNodeInAgentPopup}
           onClose={() => {
             setShowInspector(false);
             setFocusedElement(null, null); // NodeInspector 닫힐 때 포커스 해제
             setSelectedNode(null);
             setSelectedEdge(null);
+            setSelectedUserNodeInAgentPopup(null);
           }}
         />
       )}
