@@ -18,6 +18,7 @@ import { Deployment, DeploymentVersion, DeploymentStatus, DeploymentEnvironment,
 import { deploymentStore } from './deploymentStore';
 import { apiService } from '../services/apiService';
 import * as storageService from '../services/storageService';
+import { getCollaborationService, CollaborationService, UserInfo as CollabUserInfo, CollaborationEvent } from '../services/collaborationService';
 
 // Edge 상태 상수 정의 - 순환 구조에서 명확한 대기 상태 구분
 export const EDGE_STATES = {
@@ -115,6 +116,7 @@ export interface Workflow {
   viewport: Viewport;
   manuallySelectedEdges?: Record<string, string | null>; // 노드별 수동 선택된 엣지 정보
   lastModified: string;
+  version?: number; // 낙관적 잠금을 위한 버전 번호
 }
 
 
@@ -234,6 +236,23 @@ export interface FlowState {
   getDeploymentVersions: (deploymentId: string) => Promise<DeploymentVersion[]>;
   createDeploymentVersion: (deploymentId: string, workflowSnapshot: Workflow, version: string, changelog?: string) => Promise<DeploymentVersion>;
   activateDeploymentVersion: (deploymentId: string, versionId: string) => Promise<void>;
+  
+  // 협업 관련 상태 및 함수
+  workflowVersion: number; // 현재 워크플로우 버전
+  collaborationService: CollaborationService | null; // 협업 서비스 인스턴스
+  activeUsers: CollabUserInfo[]; // 현재 활성 사용자 목록
+  lockedNodes: Record<string, string>; // nodeId -> userId 매핑
+  currentUserId: string; // 현재 사용자 ID
+  currentUsername: string; // 현재 사용자 이름
+  isReceivingRemoteChange: boolean; // 원격 변경 수신 중 플래그 (무한 루프 방지)
+  lastNodePositions: Map<string, { x: number; y: number }>; // 마지막 노드 위치 캐시
+  
+  // 협업 관련 함수
+  initializeCollaboration: (userId: string, username: string) => void;
+  connectCollaboration: () => Promise<void>;
+  disconnectCollaboration: () => void;
+  lockNodeForEdit: (nodeId: string) => Promise<boolean>;
+  unlockNodeAfterEdit: (nodeId: string) => Promise<void>;
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -568,8 +587,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setWorkflowRunning: (isRunning: boolean) => set({ isWorkflowRunning: isRunning }),
   
   onNodesChange: (changes: NodeChange[]) => {
+    // 먼저 로컬 상태 업데이트
     set({
       nodes: applyNodeChanges(changes, get().nodes),
+    });
+    
+    // 🆕 협업: 노드 위치 변경 브로드캐스트 (로컬 업데이트 후)
+    const { collaborationService, isReceivingRemoteChange, lastNodePositions } = get();
+    
+    changes.forEach(change => {
+      if (change.type === 'position') {
+        const dragging = (change as any).dragging;
+        
+        // 드래그 중일 때 position 저장
+        if (dragging && change.position) {
+          lastNodePositions.set(change.id, change.position);
+          console.log(`💾 [Collaboration] Cached position for ${change.id}:`, change.position);
+        }
+        
+        // 드래그 완료 시 (dragging: false)
+        if (!dragging && collaborationService?.isConnected() && !isReceivingRemoteChange) {
+          // position이 있으면 사용, 없으면 캐시된 position 사용
+          const positionToSend = change.position || lastNodePositions.get(change.id);
+          
+          if (positionToSend) {
+            console.log(`✅ [Collaboration] Broadcasting node position: ${change.id}`, positionToSend);
+            collaborationService.broadcastNodeChange(change.id, { position: positionToSend });
+            // 전송 후 캐시 삭제
+            lastNodePositions.delete(change.id);
+          } else {
+            console.log(`⚠️ [Collaboration] No position to broadcast for ${change.id}`);
+          }
+        }
+      }
     });
   },
   
@@ -615,6 +665,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 수동 선택된 edge 정보
   manuallySelectedEdges: {},
   setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => set({ manuallySelectedEdges: { ...get().manuallySelectedEdges, [nodeId]: edgeId } }),
+
+  // 협업 관련 초기 상태
+  workflowVersion: 0,
+  collaborationService: null,
+  activeUsers: [],
+  lockedNodes: {},
+  currentUserId: '',
+  currentUsername: '',
+  isReceivingRemoteChange: false, // 🆕 원격 변경 수신 중 플래그 (무한 루프 방지)
+  lastNodePositions: new Map<string, { x: number; y: number }>(), // 🆕 마지막 노드 위치 캐시
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
@@ -1034,6 +1094,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       outputVariable: uniqueLabel,
       ...data.config
     } : {};
+    
+    // 🆕 협업: 노드 추가 브로드캐스트 (나중에 추가)
+    // const { collaborationService } = get();
+    // if (collaborationService?.isConnected()) {
+    //   console.log(`[Collaboration] Broadcasting node add: ${id}`);
+    // }
 
     // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
     const initialNodeData = { ...data };
@@ -1065,12 +1131,27 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       nodes: [...get().nodes, newNode],
     });
+
+    // 🆕 협업: 노드 추가 브로드캐스트
+    const { collaborationService, isReceivingRemoteChange } = get();
+    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
+      console.log(`✅ [Collaboration] Broadcasting node add: ${id}`);
+      collaborationService.broadcastNodeAdd(newNode);
+    }
     
     return id;
   },
   
   updateNodeData: (nodeId: string, dataUpdate: Partial<NodeData>) => {
     console.log(`[FlowStore] updateNodeData called - nodeId: ${nodeId}, dataUpdate:`, dataUpdate);
+    
+    // 🆕 협업: 노드 데이터 변경 브로드캐스트 (원격 변경 수신 중이 아닐 때만)
+    const { collaborationService, isReceivingRemoteChange } = get();
+    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
+      console.log(`[Collaboration] Broadcasting node data update: ${nodeId}`);
+      collaborationService.broadcastNodeChange(nodeId, dataUpdate);
+    }
+    
     set(state => {
       const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
       if (!nodeToUpdate) {
@@ -1157,6 +1238,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         edges: updatedEdges
       };
     });
+
+    // 🆕 협업: 노드 삭제 브로드캐스트
+    const { collaborationService, isReceivingRemoteChange } = get();
+    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
+      console.log(`✅ [Collaboration] Broadcasting node remove: ${nodeId}`);
+      collaborationService.broadcastNodeRemove(nodeId);
+    }
   },
 
   removeEdge: (edgeId: string) => {
@@ -2509,7 +2597,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   saveWorkflow: async () => {
     set({ isSaving: true, saveError: null });
-    const { projectName, nodes, edges, viewport, manuallySelectedEdges } = get();
+    const { projectName, nodes, edges, viewport, manuallySelectedEdges, workflowVersion } = get();
 
     if (!projectName || projectName.trim() === "") {
       const errorMsg = "Project name cannot be empty.";
@@ -2518,7 +2606,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw new Error(errorMsg);
     }
     
-    console.log(`FlowStore: Saving workflow "${projectName}" to MongoDB...`);
+    console.log(`FlowStore: Saving workflow "${projectName}" (version ${workflowVersion}) to MongoDB...`);
 
     const nodesToSave = nodes.map(node => {
       const { icon, ...restOfData } = node.data;
@@ -2529,6 +2617,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     try {
+      // 현재 서버의 워크플로우 버전 확인 (충돌 감지)
+      const existingWorkflow = await storageService.getWorkflowByName(projectName);
+      const serverVersion = existingWorkflow?.version || 0;
+      
+      // 버전 충돌 감지 (낙관적 잠금)
+      if (existingWorkflow && serverVersion !== workflowVersion) {
+        console.warn(`[Collaboration] Version conflict detected! Local: ${workflowVersion}, Server: ${serverVersion}`);
+        
+        // 충돌 발생 - 사용자에게 알림
+        set({ isSaving: false });
+        
+        // 커스텀 이벤트 발생 (UI에서 충돌 다이얼로그 표시)
+        window.dispatchEvent(new CustomEvent('workflowVersionConflict', {
+          detail: {
+            localVersion: workflowVersion,
+            serverVersion: serverVersion,
+            serverWorkflow: existingWorkflow
+          }
+        }));
+        
+        throw new Error(`Version conflict: Your version (${workflowVersion}) is outdated. Server version: ${serverVersion}. Please reload the workflow.`);
+      }
+
+      const newVersion = workflowVersion + 1;
       const workflowData = {
         projectName,
         nodes: nodesToSave,
@@ -2536,13 +2648,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         viewport,
         manuallySelectedEdges,
         lastModified: new Date().toISOString(),
+        version: newVersion
       };
 
       // MongoDB API 호출 (upsert)
       await storageService.updateWorkflow(projectName, workflowData);
       
-      set({ isSaving: false, lastSaved: new Date(), saveError: null });
-      console.log(`FlowStore: Workflow "${projectName}" saved successfully to MongoDB.`);
+      // 버전 업데이트
+      set({ 
+        isSaving: false, 
+        lastSaved: new Date(), 
+        saveError: null,
+        workflowVersion: newVersion
+      });
+      
+      console.log(`FlowStore: Workflow "${projectName}" saved successfully (version ${newVersion})`);
       get().fetchAvailableWorkflows(); // 저장 후 목록 새로고침
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2560,17 +2680,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const workflowData = await storageService.getWorkflowByName(projectName);
       
       if (workflowData) {
+        const version = workflowData.version || 0;
         set({
           projectName: workflowData.projectName,
           nodes: workflowData.nodes || [],
           edges: workflowData.edges || [],
           viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
           manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
+          workflowVersion: version,
           isLoading: false, 
           loadError: null,
           lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
         });
-        console.log(`FlowStore: Workflow "${projectName}" loaded successfully.`);
+        console.log(`FlowStore: Workflow "${projectName}" (version ${version}) loaded successfully.`);
+        
+        // 협업 연결 (이미 초기화되어 있다면)
+        const { collaborationService } = get();
+        if (collaborationService && projectName !== DEFAULT_PROJECT_NAME) {
+          await get().connectCollaboration();
+        }
       } else {
         const errorMsg = `Workflow "${projectName}" not found.`;
         set({ isLoading: false, loadError: errorMsg });
@@ -3120,6 +3248,216 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     } finally {
       set({ isLoadingDeployments: false });
     }
+  },
+
+  // 협업 관련 함수들
+  initializeCollaboration: (userId: string, username: string) => {
+    console.log(`[Collaboration] Initializing collaboration for user: ${username} (${userId})`);
+    const service = getCollaborationService(userId, username);
+    set({ 
+      collaborationService: service,
+      currentUserId: userId,
+      currentUsername: username
+    });
+  },
+
+  connectCollaboration: async () => {
+    const { collaborationService, projectName } = get();
+    
+    if (!collaborationService) {
+      console.error('[Collaboration] Service not initialized');
+      return;
+    }
+
+    if (!projectName || projectName === DEFAULT_PROJECT_NAME) {
+      console.warn('[Collaboration] Cannot connect: invalid project name');
+      return;
+    }
+
+    try {
+      console.log(`[Collaboration] Connecting to workflow: ${projectName}`);
+      await collaborationService.connect(projectName);
+
+      // 이벤트 핸들러 등록
+      collaborationService.on('user_joined', (event: CollaborationEvent) => {
+        console.log('[Collaboration] User joined:', event.data.user_info);
+        set({ activeUsers: event.data.active_users || [] });
+      });
+
+      collaborationService.on('user_left', (event: CollaborationEvent) => {
+        console.log('[Collaboration] User left:', event.data.username);
+        set({ activeUsers: event.data.active_users || [] });
+      });
+
+      collaborationService.on('initial_state', (event: CollaborationEvent) => {
+        console.log('[Collaboration] Initial state received');
+        set({ 
+          activeUsers: event.data.active_users || [],
+          lockedNodes: event.data.locked_nodes || {}
+        });
+      });
+
+      collaborationService.on('node_locked', (event: CollaborationEvent) => {
+        const { node_id } = event.data;
+        const { user_id } = event;
+        console.log(`[Collaboration] Node ${node_id} locked by ${user_id}`);
+        set({ 
+          lockedNodes: { 
+            ...get().lockedNodes, 
+            [node_id]: user_id 
+          }
+        });
+      });
+
+      collaborationService.on('node_unlocked', (event: CollaborationEvent) => {
+        const { node_id } = event.data;
+        console.log(`[Collaboration] Node ${node_id} unlocked`);
+        const newLockedNodes = { ...get().lockedNodes };
+        delete newLockedNodes[node_id];
+        set({ lockedNodes: newLockedNodes });
+      });
+
+      collaborationService.on('node_change', (event: CollaborationEvent) => {
+        const { node_id, changes } = event.data;
+        console.log(`[Collaboration] Remote node change: ${node_id}`, changes);
+        
+        // 무한 루프 방지: 원격 변경 수신 중 플래그 설정
+        set({ isReceivingRemoteChange: true });
+        
+        try {
+          // 위치 변경인 경우 노드의 position을 직접 업데이트
+          if (changes.position) {
+            console.log(`[Collaboration] Updating node position: ${node_id}`, changes.position);
+            set(state => ({
+              nodes: state.nodes.map(node => 
+                node.id === node_id 
+                  ? { ...node, position: changes.position }
+                  : node
+              )
+            }));
+          }
+          
+          // 데이터 변경인 경우 (위치 제외한 나머지)
+          const dataChanges = { ...changes };
+          delete dataChanges.position;
+          
+          if (Object.keys(dataChanges).length > 0) {
+            const { updateNodeData, getNodeById } = get();
+            const node = getNodeById(node_id);
+            if (node) {
+              updateNodeData(node_id, dataChanges);
+            }
+          }
+        } finally {
+          // 플래그 해제
+          set({ isReceivingRemoteChange: false });
+        }
+      });
+
+      // 🆕 협업: 노드 추가 이벤트 핸들러
+      collaborationService.on('node_added', (event: CollaborationEvent) => {
+        const { node } = event.data;
+        console.log(`✅ [Collaboration] Remote node added:`, node);
+        
+        // 무한 루프 방지
+        set({ isReceivingRemoteChange: true });
+        
+        try {
+          // 이미 존재하는 노드인지 확인
+          const existingNode = get().nodes.find(n => n.id === node.id);
+          if (!existingNode) {
+            set(state => ({
+              nodes: [...state.nodes, node]
+            }));
+            console.log(`✅ [Collaboration] Node ${node.id} added to local state`);
+          } else {
+            console.log(`⚠️ [Collaboration] Node ${node.id} already exists, skipping`);
+          }
+        } finally {
+          set({ isReceivingRemoteChange: false });
+        }
+      });
+
+      // 🆕 협업: 노드 삭제 이벤트 핸들러
+      collaborationService.on('node_removed', (event: CollaborationEvent) => {
+        const { node_id } = event.data;
+        console.log(`🗑️ [Collaboration] Remote node removed: ${node_id}`);
+        
+        // 무한 루프 방지
+        set({ isReceivingRemoteChange: true });
+        
+        try {
+          set(state => ({
+            nodes: state.nodes.filter(node => node.id !== node_id),
+            edges: state.edges.filter(edge => 
+              edge.source !== node_id && edge.target !== node_id
+            )
+          }));
+          console.log(`✅ [Collaboration] Node ${node_id} removed from local state`);
+        } finally {
+          set({ isReceivingRemoteChange: false });
+        }
+      });
+
+      console.log('[Collaboration] Successfully connected');
+    } catch (error) {
+      console.error('[Collaboration] Connection error:', error);
+    }
+  },
+
+  disconnectCollaboration: () => {
+    const { collaborationService } = get();
+    if (collaborationService) {
+      console.log('[Collaboration] Disconnecting');
+      collaborationService.disconnect();
+      set({ 
+        activeUsers: [], 
+        lockedNodes: {},
+        collaborationService: null 
+      });
+    }
+  },
+
+  lockNodeForEdit: async (nodeId: string) => {
+    const { collaborationService, currentUserId, lockedNodes } = get();
+    
+    if (!collaborationService || !collaborationService.isConnected()) {
+      console.warn('[Collaboration] Service not connected, allowing local edit');
+      return true;
+    }
+
+    // 이미 자신이 잠근 노드인지 확인
+    if (lockedNodes[nodeId] === currentUserId) {
+      return true;
+    }
+
+    // 다른 사용자가 잠근 노드인지 확인
+    if (lockedNodes[nodeId]) {
+      console.warn(`[Collaboration] Node ${nodeId} is locked by another user`);
+      return false;
+    }
+
+    // 노드 잠금 요청
+    const success = await collaborationService.lockNode(nodeId);
+    console.log(`[Collaboration] Lock node ${nodeId}: ${success ? 'success' : 'failed'}`);
+    return success;
+  },
+
+  unlockNodeAfterEdit: async (nodeId: string) => {
+    const { collaborationService, currentUserId, lockedNodes } = get();
+    
+    if (!collaborationService || !collaborationService.isConnected()) {
+      return;
+    }
+
+    // 자신이 잠근 노드인지 확인
+    if (lockedNodes[nodeId] !== currentUserId) {
+      return;
+    }
+
+    // 노드 잠금 해제
+    await collaborationService.unlockNode(nodeId);
+    console.log(`[Collaboration] Unlocked node ${nodeId}`);
   },
 
   // UserNode 관련 함수들

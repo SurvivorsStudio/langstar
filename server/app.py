@@ -8,7 +8,7 @@ import atexit
 
 # Import structured modules
 from server.utils.logger import setup_logger
-from server.routes import health, workflow, deployment, execution, schedule, storage
+from server.routes import health, workflow, deployment, execution, schedule, storage, collaboration
 from server.services.schedule_service import schedule_service
 from server.config.database import mongodb, init_database
 
@@ -63,6 +63,7 @@ app.include_router(deployment.router, prefix="/api", tags=["deployment"])
 app.include_router(execution.router, prefix="/api", tags=["execution"])
 app.include_router(schedule.router, prefix="/api", tags=["schedule"])
 app.include_router(storage.router, tags=["storage"])
+app.include_router(collaboration.router, tags=["collaboration"])
 
 # 서버 시작 시 저장된 스케줄 로드
 schedule_service.load_schedules_on_startup()

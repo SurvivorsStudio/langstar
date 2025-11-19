@@ -151,6 +151,12 @@ class StorageService:
         node = collection.find_one({'id': node_id}, {'_id': 0})
         return node
     
+    def get_user_node_by_name(self, node_name: str) -> Optional[Dict[str, Any]]:
+        """Get user node by name"""
+        collection = get_user_nodes_collection()
+        node = collection.find_one({'name': node_name}, {'_id': 0})
+        return node
+    
     def create_user_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create new user node"""
         collection = get_user_nodes_collection()

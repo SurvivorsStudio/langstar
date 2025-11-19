@@ -13,7 +13,22 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges, isWorkflowRunning, overlappingAgentNodes } = useFlowStore();
+  const { 
+    removeNode, 
+    executeNode, 
+    updateNodeData, 
+    nodes, 
+    edges, 
+    focusedElement, 
+    manuallySelectedEdges, 
+    isWorkflowRunning, 
+    overlappingAgentNodes,
+    lockedNodes,
+    activeUsers,
+    currentUserId,
+    lockNodeForEdit,
+    unlockNodeAfterEdit
+  } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   
@@ -44,6 +59,14 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
   const isNodeOverlapped = React.useMemo(() => {
     return isAgentNode && overlappingAgentNodes.has(id);
   }, [isAgentNode, overlappingAgentNodes, id]);
+
+  // 🆕 협업: 노드 잠금 상태 확인
+  const lockedByUserId = lockedNodes[id];
+  const isLockedByMe = lockedByUserId === currentUserId;
+  const isLockedByOther = lockedByUserId && !isLockedByMe;
+  const lockingUser = isLockedByOther 
+    ? activeUsers.find(u => u.user_id === lockedByUserId)
+    : null;
 
   // ToolsMemoryNode이고 다른 노드가 포커스되었을 때 selectedGroupId 초기화
   React.useEffect(() => {
@@ -165,6 +188,57 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       setLastRightClickTime(currentTime);
     }
   };
+
+  // 🆕 협업: 노드 클릭 시 잠금 처리
+  const handleNodeClick = async (e: React.MouseEvent) => {
+    // 다른 사용자가 잠근 노드는 클릭 불가
+    if (isLockedByOther) {
+      e.stopPropagation();
+      return;
+    }
+
+    // 이미 내가 잠근 노드가 아니라면 잠금 시도
+    if (!isLockedByMe) {
+      const locked = await lockNodeForEdit(id);
+      if (!locked) {
+        console.log(`[Collaboration] Failed to lock node ${id}`);
+      } else {
+        console.log(`✅ [Collaboration] Node ${id} locked by me`);
+      }
+    }
+  };
+
+  // 🆕 협업: 포커스 상태에 따른 잠금 관리
+  React.useEffect(() => {
+    const isThisNodeFocused = focusedElement.type === 'node' && focusedElement.id === id;
+
+    if (isThisNodeFocused) {
+      // 현재 노드가 포커스되었을 때 - 잠금 시도 (아직 잠기지 않았다면)
+      if (!isLockedByMe && !isLockedByOther) {
+        lockNodeForEdit(id).then(locked => {
+          if (locked) {
+            console.log(`✅ [Collaboration] Node ${id} auto-locked on focus`);
+          }
+        });
+      }
+    } else {
+      // 현재 노드가 포커스를 잃었을 때 - 잠금 해제
+      if (isLockedByMe) {
+        unlockNodeAfterEdit(id);
+        console.log(`🔓 [Collaboration] Node ${id} unlocked (focus lost)`);
+      }
+    }
+  }, [focusedElement, isLockedByMe, isLockedByOther, id]);
+
+  // 🆕 협업: 언마운트 시 잠금 해제 (안전장치)
+  React.useEffect(() => {
+    return () => {
+      if (isLockedByMe) {
+        unlockNodeAfterEdit(id);
+        console.log(`🔓 [Collaboration] Node ${id} unlocked (unmount)`);
+      }
+    };
+  }, []);
 
   // 툴팁 닫기 핸들러
   const handleCloseTooltip = () => {
@@ -728,17 +802,35 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       style={{
         filter: isNodeFocused ? 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.8))' : 'none'
       }}
+      onClick={handleNodeClick}
     >
+      {/* 🆕 협업: 노드 잠금 표시 배지 */}
+      {isLockedByOther && lockingUser && (
+        <div 
+          className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-50 px-3 py-1 rounded-full text-xs font-medium shadow-lg border-2 whitespace-nowrap"
+          style={{
+            backgroundColor: lockingUser.color,
+            color: '#ffffff',
+            borderColor: '#ffffff'
+          }}
+        >
+          🔒 {lockingUser.username} 사용 중
+        </div>
+      )}
+
       {/* Tools & Memory 노드일 경우 통합된 디자인 */}
       {isToolsMemoryNode ? (
         <div 
           className="rounded-xl shadow-xl border-2 overflow-hidden cursor-pointer"
           style={{
             backgroundColor: nodeStyle.backgroundColor,
-            borderColor: nodeStyle.borderColor,
+            borderColor: isLockedByOther ? lockingUser?.color : nodeStyle.borderColor,
+            borderWidth: isLockedByOther ? '3px' : '2px',
             width: '320px',
             minWidth: '320px',
-            maxWidth: '320px'
+            maxWidth: '320px',
+            opacity: isLockedByOther ? 0.7 : 1,
+            pointerEvents: isLockedByOther ? 'none' : 'auto'
           }}
           onContextMenu={handleNodeRightClick}
         >
@@ -817,12 +909,16 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
               } ${(isDragOver || isNodeOverlapped) && isAgentNode ? 'z-50' : ''}`}
               style={{
                 backgroundColor: nodeStyle.backgroundColor,
-                borderColor: isWorkflowRunning ? '#3b82f6' : isAnyOtherNodeExecuting ? '#6b7280' : ((isDragOver || isNodeOverlapped) && isAgentNode ? '#3b82f6' : nodeStyle.borderColor),
-                borderWidth: (isDragOver || isNodeOverlapped) && isAgentNode ? '4px' : '2px',
+                borderColor: isLockedByOther 
+                  ? lockingUser?.color 
+                  : (isWorkflowRunning ? '#3b82f6' : isAnyOtherNodeExecuting ? '#6b7280' : ((isDragOver || isNodeOverlapped) && isAgentNode ? '#3b82f6' : nodeStyle.borderColor)),
+                borderWidth: isLockedByOther ? '3px' : ((isDragOver || isNodeOverlapped) && isAgentNode ? '4px' : '2px'),
                 borderStyle: (isDragOver || isNodeOverlapped) && isAgentNode ? 'dashed' : 'solid',
                 position: 'relative',
                 transform: (isDragOver || isNodeOverlapped) && isAgentNode ? 'scale(1.3)' : 'scale(1)',
-                boxShadow: (isDragOver || isNodeOverlapped) && isAgentNode ? '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)' : undefined
+                boxShadow: (isDragOver || isNodeOverlapped) && isAgentNode ? '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)' : undefined,
+                opacity: isLockedByOther ? 0.7 : 1,
+                pointerEvents: isLockedByOther ? 'none' : 'auto'
               }}
               onContextMenu={handleNodeRightClick}
               onDragOver={handleDragOver}
