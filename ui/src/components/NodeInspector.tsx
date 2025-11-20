@@ -13,6 +13,7 @@ import MergeSettings from './nodes/MergeSettings';
 import EndNodeSettings from './nodes/EndNodeSettings';
 import ToolsMemorySettings from './nodes/ToolsMemorySettings';
 import UserNodeSettings from './nodes/UserNodeSettings';
+import AgentUserNodeSettings from './nodes/AgentUserNodeSettings';
 import { Node, Edge } from 'reactflow';
 import { NodeData, VariableValue } from '../types/node';
 import { getNodeDescription } from '../utils/nodeDescriptions';
@@ -20,12 +21,14 @@ import { getNodeDescription } from '../utils/nodeDescriptions';
 interface NodeInspectorProps {
   nodeId: string;
   selectedEdge?: any;
+  selectedUserNode?: any;
   onClose: () => void;
 }
 
-const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onClose }) => {
+const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, selectedUserNode, onClose }) => {
   const { nodes, edges, updateNodeData, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
-  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>('input_data');
+  // UserNode인 경우 settings 탭부터 시작, 아니면 기본 로직
+  const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>(selectedUserNode ? 'settings' : 'input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
   const [nodeName, setNodeName] = useState<string>('');
@@ -45,9 +48,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [isJsonPopupOpen, setIsJsonPopupOpen] = useState<boolean>(false);
   const [jsonPopupData, setJsonPopupData] = useState<any>(null);
   const [jsonPopupTitle, setJsonPopupTitle] = useState<string>('JSON Data Viewer');
-
   const [isJsonPopupEditable, setIsJsonPopupEditable] = useState<boolean>(true);
-
 
   // 크기 조절을 위한 상태와 ref
   const [width, setWidth] = useState<number>(384); // 기본 너비 384px (w-96)
@@ -118,6 +119,47 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
 
   useEffect(() => {
+    // AgentNodePopup에서 선택된 UserNode가 있는 경우
+    if (selectedUserNode) {
+      console.log(`[NodeInspector] Displaying User Node from AgentNodePopup:`, selectedUserNode);
+      // selectedUserNode가 { userNode, agentNodeId } 형태인지 확인
+      const userNodeData = selectedUserNode.userNode || selectedUserNode;
+      const agentNodeId = selectedUserNode.agentNodeId;
+      
+      // UserNode를 가상의 노드 형태로 변환
+      const virtualNode = {
+        id: userNodeData.id,
+        type: 'userNode',
+        data: {
+          label: userNodeData.name || 'Unnamed User Node',
+          code: userNodeData.code || '',
+          functionName: userNodeData.functionName || '',
+          functionDescription: userNodeData.functionDescription || '',
+          description: userNodeData.functionDescription || '',
+          config: {
+            parameters: userNodeData.parameters || [],
+            settings: {},
+            inputData: {},
+            outputVariable: 'result'
+          },
+          agentNodeId // AgentNode ID 저장
+        },
+        position: { x: 0, y: 0 }
+      };
+      setCurrentNode(virtualNode as any);
+      setCode(userNodeData.code || '');
+      lastSavedCodeRef.current = userNodeData.code || '';
+      setNodeName(userNodeData.name || 'Unnamed User Node');
+      setLastValidNodeName(userNodeData.name || 'Unnamed User Node');
+      setNodeDescription(userNodeData.functionDescription || '');
+      setIncomingEdges([]);
+      setMergedInputData({});
+      setHasValidInputData(false);
+      setSelectedEdgeInfo(null);
+      setManuallySelectedEdgeId(null);
+      return;
+    }
+    
     console.log(`[NodeInspector] useEffect triggered - nodeId: ${nodeId}, nodes count: ${nodes.length}`);
     const node = nodes.find((n: any) => n.id === nodeId);
     if (node) {
@@ -262,7 +304,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         setActiveTab(newDefaultTab);
       }
     }
-  }, [nodeId, activeTab, manuallySelectedEdges]); // edges 의존성 제거
+  }, [nodeId, activeTab, manuallySelectedEdges, selectedUserNode]); // edges 의존성 제거
 
   // 현재 노드의 데이터가 변경될 때만 코드 동기화 (임시로 비활성화)
   // useEffect(() => {
@@ -398,7 +440,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   };
 
   // JSON 팝업 열기 핸들러
-
   const handleOpenJsonPopup = (data: any, title: string = 'JSON Data Viewer', editable: boolean = true) => {
     setJsonPopupData(data);
     setJsonPopupTitle(title);
@@ -432,8 +473,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
 
 
-
-
   if (!currentNode) return null;
 
   const isConditionNode = currentNode.type === 'conditionNode';
@@ -447,7 +486,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
 
   return (
     <div 
-      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-10 relative"
+      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col shadow-md z-[60] relative"
       style={{ width: `${width}px` }}
       data-testid="node-inspector"
     >
@@ -533,7 +572,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         ) : (
           // 노드 전용 탭들
           <>
-            {!isStartNode && (
+            {!isStartNode && !selectedUserNode && (
               <button
                 className={`flex-1 py-2 flex justify-center items-center ${
                   activeTab === 'input_data' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
@@ -702,10 +741,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     // Merge 노드: 모든 incoming edge의 output variable 수집
                     incomingEdges.forEach(edge => {
                       const sourceNode = nodes.find(n => n.id === edge.source);
-
                       // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
                       const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
                       if (outputVariable && edge.data?.output && edge.data.output[outputVariable] !== undefined) {
                         outputVariables.push({
                           sourceNodeLabel: sourceNode?.data?.label || edge.source,
@@ -718,10 +755,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                   } else if (selectedEdgeInfo) {
                     // 일반 노드: 선택된 edge의 output variable만
                     const sourceNode = nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId);
-
                     // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
                     const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
                     if (outputVariable && mergedInputData[outputVariable] !== undefined) {
                       outputVariables.push({
                         sourceNodeLabel: sourceNode?.data?.label || selectedEdgeInfo.sourceNodeId,
@@ -750,10 +785,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                             onClick={() => {
                               handleOpenJsonPopup(
                                 ov.value,
-
                                 `Output Variable: ${ov.variableName} from ${ov.sourceNodeLabel}`,
                                 false  // 읽기 전용
-
                               );
                             }}
                             title="클릭하여 확대 보기"
@@ -772,13 +805,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                                 🔍
                               </span>
                             </div>
-
                             <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400">
                               {typeof ov.value === 'string' ? (
                                 <div className="italic whitespace-pre-wrap break-words max-h-12 overflow-hidden line-clamp-2">
                                   "{ov.value.length > 100 ? ov.value.substring(0, 100) + '...' : ov.value}"
                                 </div>
-
                               ) : typeof ov.value === 'number' || typeof ov.value === 'boolean' ? (
                                 <span className="font-mono text-purple-600 dark:text-purple-400">{String(ov.value)}</span>
                               ) : Array.isArray(ov.value) ? (
@@ -1084,10 +1115,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
             {/* Output Variable 섹션 - Edge에서도 표시 */}
             {(() => {
               const sourceNode = nodes.find(n => n.id === selectedEdge.source);
-
               // Agent 노드는 agentOutputVariable, 다른 노드는 outputVariable 사용
               const outputVariable = sourceNode?.data?.config?.agentOutputVariable || sourceNode?.data?.config?.outputVariable;
-
               const hasOutputVariable = outputVariable && selectedEdge.data?.output && selectedEdge.data.output[outputVariable] !== undefined;
 
               return hasOutputVariable ? (
@@ -1102,10 +1131,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     onClick={() => {
                       handleOpenJsonPopup(
                         selectedEdge.data.output[outputVariable],
-
                         `Output Variable: ${outputVariable} from ${sourceNode?.data?.label || selectedEdge.source}`,
                         false  // 읽기 전용
-
                       );
                     }}
                     title="클릭하여 확대 보기"
@@ -1124,13 +1151,11 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         🔍
                       </span>
                     </div>
-
                     <div className="mt-1.5 text-xs text-gray-600 dark:text-gray-400">
                       {typeof selectedEdge.data.output[outputVariable] === 'string' ? (
                         <div className="italic whitespace-pre-wrap break-words max-h-12 overflow-hidden line-clamp-2">
                           "{selectedEdge.data.output[outputVariable].length > 100 ? selectedEdge.data.output[outputVariable].substring(0, 100) + '...' : selectedEdge.data.output[outputVariable]}"
                         </div>
-
                       ) : typeof selectedEdge.data.output[outputVariable] === 'number' || typeof selectedEdge.data.output[outputVariable] === 'boolean' ? (
                         <span className="font-mono text-purple-600 dark:text-purple-400">{String(selectedEdge.data.output[outputVariable])}</span>
                       ) : Array.isArray(selectedEdge.data.output[outputVariable]) ? (
@@ -1353,7 +1378,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
               {isToolsMemoryNode && <ToolsMemorySettings nodeId={nodeId} />}
               {isMergeNode && <MergeSettings nodeId={nodeId} />}
               {isEndNode && <EndNodeSettings nodeId={nodeId} />}
-              {isUserNode && <UserNodeSettings nodeId={nodeId} />}
+              {isUserNode && !currentNode?.data?.agentNodeId && <UserNodeSettings nodeId={nodeId} />}
+              {isUserNode && currentNode?.data?.agentNodeId && (
+                <AgentUserNodeSettings 
+                  agentNodeId={currentNode.data.agentNodeId} 
+                  userNode={selectedUserNode?.userNode || selectedUserNode} 
+                />
+              )}
             </div>
           </div>
         )}
@@ -1377,10 +1408,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         onClose={() => setIsJsonPopupOpen(false)}
         data={jsonPopupData}
         title={jsonPopupTitle}
-
         onSave={isJsonPopupEditable ? handleSaveJsonData : undefined}
         editable={isJsonPopupEditable}
-
       />
     </div>
   );
