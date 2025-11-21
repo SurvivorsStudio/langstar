@@ -5,7 +5,6 @@ import {
   EdgeChange,
   Node,
   NodeChange,
-  addEdge,
   OnNodesChange,
   OnEdgesChange,
   OnConnect,
@@ -14,18 +13,20 @@ import {
   Viewport, // Viewport 타입을 가져옵니다.
 } from 'reactflow';
 import { nanoid } from 'nanoid';
-import { Deployment, DeploymentVersion, DeploymentStatus, DeploymentEnvironment, DeploymentFormData } from '../types/deployment';
-import { deploymentStore } from './deploymentStore';
+import { Deployment, DeploymentVersion, DeploymentFormData } from '../types/deployment';
 import { apiService } from '../services/apiService';
 import * as storageService from '../services/storageService';
 import { getCollaborationService, CollaborationService, UserInfo as CollabUserInfo, CollaborationEvent } from '../services/collaborationService';
+import { createNodesSlice } from './slices/nodesSlice';
+import { createEdgesSlice } from './slices/edgesSlice';
+import { EDGE_STATES } from './constants/edges';
+import { getCircularReplacer, safeCompare } from './helpers/flowHelpers';
+import { createPersistenceSlice } from './slices/persistenceSlice';
+import { getUniqueNodeName } from './helpers/flowHelpers';
+import { initialNodes, initialEdges } from './initialState';
 
 // Edge 상태 상수 정의 - 순환 구조에서 명확한 대기 상태 구분
-export const EDGE_STATES = {
-  PENDING: 'PENDING',    // 대기 중 (merge가 기다려야 함)
-  NULL: null,            // 조건 불만족 또는 비활성화
-  // 실제 데이터는 객체 형태로 저장
-} as const;
+// EDGE_STATES는 constants/edges.ts에서 관리
 
 // 🔧 공통 함수: Edge 데이터 검증 로직 (중복 제거)
 const hasValidEdgeData = (edge: Edge | undefined): boolean => {
@@ -255,130 +256,13 @@ export interface FlowState {
   unlockNodeAfterEdit: (nodeId: string) => Promise<void>;
 }
 
-export const initialNodes: Node<NodeData>[] = [
-  {
-    id: 'start',
-    type: 'startNode',
-    position: { x: 100, y: 100 },
-    data: { 
-      label: 'Start',
-      description: 'Starting point of the workflow',
-      output: null,
-      isExecuting: false,
-      config: {
-        className: '',
-        classType: 'TypedDict',
-        variables: []
-      }
-    },
-  },
-  {
-    id: 'end',
-    type: 'endNode',
-    position: { x: 400, y: 100 },
-    data: {
-      label: 'End',
-      description: 'End point of the workflow',
-      output: null,
-      isExecuting: false,
-      config: {
-        receiveKey: ''
-      }
-    },
-  }
-];
+// 초기 상태는 initialState.ts에서 관리
 
-// 새 워크플로우를 위한 기본 초기 상태 (Start, End 노드 포함)
-export const emptyInitialNodes: Node<NodeData>[] = [
-  {
-    id: 'start',
-    type: 'startNode',
-    position: { x: 100, y: 100 },
-    data: { 
-      label: 'Start',
-      description: 'Starting point of the workflow',
-      output: null,
-      isExecuting: false,
-      config: {
-        className: '',
-        classType: 'TypedDict',
-        variables: []
-      }
-    },
-  },
-  {
-    id: 'end',
-    type: 'endNode',
-    position: { x: 400, y: 100 },
-    data: {
-      label: 'End',
-      description: 'End point of the workflow',
-      output: null,
-      isExecuting: false,
-      config: {
-        receiveKey: ''
-      }
-    },
-  }
-];
-export const emptyInitialEdges: Edge[] = [];
+// moved to helpers/flowHelpers.ts
 
-export const initialEdges: Edge[] = [];
+// validateStartNode removed (unused)
 
-const getCircularReplacer = () => {
-  const seen = new WeakSet();
-  return (key: string, value: any) => {
-    if (key === 'icon' || typeof value === 'function') {
-      return undefined;
-    }
-    if (typeof value === 'object' && value !== null) {
-      if (seen.has(value)) {
-        return '[Circular]';
-      }
-      seen.add(value);
-    }
-    return value;
-  };
-};
-
-const safeCompare = (obj1: any, obj2: any): boolean => {
-  try {
-    return JSON.stringify(obj1, getCircularReplacer()) === JSON.stringify(obj2, getCircularReplacer());
-  } catch (error) {
-    console.error('Error comparing objects:', error);
-    return false;
-  }
-};
-
-const validateStartNode = (node: Node<NodeData>): string | null => {
-  if (!node.data.config?.className?.trim()) {
-    return 'Class Name is required';
-  }
-
-  const variables = node.data.config?.variables || [];
-  for (let i = 0; i < variables.length; i++) {
-    if (!variables[i].name.trim()) {
-      return `Variable Name is required for variable ${i + 1}`;
-    }
-  }
-
-  return null;
-};
-
-const getUniqueNodeName = (nodes: Node<NodeData>[], baseLabel: string): string => {
-  const existingNames = nodes.map(node => node.data.label);
-  // 띄어쓰기를 언더스코어로 변환
-  const sanitizedBaseLabel = baseLabel.replace(/\s+/g, '_');
-  let newName = sanitizedBaseLabel;
-  let counter = 1;
-
-  while (existingNames.includes(newName)) {
-    newName = `${sanitizedBaseLabel}_${counter}`;
-    counter++;
-  }
-
-  return newName;
-};
+// moved to helpers/flowHelpers.ts
 
 interface TransformedStartNodeVariable {
   variableName: string;
@@ -438,23 +322,10 @@ const generateStartNodeOutput = (node: Node<NodeData>): TransformedStartNodeOutp
   };
 };
 
-const processPromptTemplate = (template: string, input: Record<string, any>, outputVariable: string): Record<string, any> => {
-  const output = { ...input };
-  let processedTemplate = template || '';
-  
-  processedTemplate = processedTemplate.replace(/\{([^}]+)\}/g, (match, key) => {
-    return input[key] !== undefined ? String(input[key]) : match;
-  });
-
-  if (outputVariable) {
-    output[outputVariable] = processedTemplate;
-  }
-
-  return output;
-};
+// processPromptTemplate removed (unused)
 
 // Helper to prepare a condition string from an edge label for evaluation
-const prepareConditionForEvaluation = (edgeLabel: string | undefined, defaultArgumentName: string): { body: string } => {
+const prepareConditionForEvaluation = (edgeLabel: string | undefined): { body: string } => {
   const label = (edgeLabel || '').trim();
   const lowerLabel = label.toLowerCase();
 
@@ -481,7 +352,6 @@ const prepareConditionForEvaluation = (edgeLabel: string | undefined, defaultArg
   }
 
   // At this point, coreCondition is the expression part, e.g., "data['value'] > 0"
-  // The condition string must use the 'defaultArgumentName' for the input object.
   return { body: `return ${coreCondition};` };
 };
 
@@ -540,15 +410,7 @@ const convertToPythonNotation = (keyPath: string): string => {
   return pythonNotation;
 };
 
-const generateEmbedding = (input: Record<string, any>, config: NodeData['config']): Record<string, any> => {
-  if (!config?.inputColumn || !config?.outputColumn) {
-    throw new Error('Input and output columns must be specified');
-  }
-
-  const result = { ...input };
-  result[config.outputColumn] = [1, 2, 3, 4];
-  return result;
-};
+// generateEmbedding removed (unused)
 
 // Deep merge 유틸리티 함수 (MergeNode에서 사용)
 const deepMerge = (target: any, source: any): any => {
@@ -578,7 +440,7 @@ const isObject = (item: any): boolean => {
 // MongoDB Storage 설정 (IndexedDB 제거됨)
 export const DEFAULT_PROJECT_NAME = 'New Workflow'; // 기본 프로젝트 이름 상수화
 
-export const useFlowStore = create<FlowState>((set, get) => ({
+export const useFlowStore = create<FlowState>((set, get, api) => ({
   nodes: initialNodes,
   edges: initialEdges,
   projectName: DEFAULT_PROJECT_NAME,
@@ -641,13 +503,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedUserNodeInAgentPopup: null,
   setSelectedUserNodeInAgentPopup: (userNode: any | null) => set({ selectedUserNodeInAgentPopup: userNode }),
 
-  // IndexedDB 관련 상태 초기값
-  isSaving: false,
-  saveError: null,
-  lastSaved: null,
-  isLoading: false,
-  loadError: null,
-  availableWorkflows: [],
+  // 퍼시스턴스 슬라이스 주입
+  ...(createPersistenceSlice(set, get, api) as any),
+  // 노드 슬라이스 주입
+  ...(createNodesSlice(set, get, api) as any),
+  // 엣지 슬라이스 주입
+  ...(createEdgesSlice(set, get, api) as any),
   // AI Connections 관련 초기 상태
   aiConnections: [],
   isLoadingAIConnections: false,
@@ -682,10 +543,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // 노드 연결 제약 조건 검사 함수들
   
-  // 1. 노드의 in-degree (들어오는 간선 수) 계산
-  calculateInDegree: (nodeId: string, edges: Edge[]) => {
-    return edges.filter(edge => edge.target === nodeId).length;
-  },
+  // calculateInDegree moved to edgesSlice
 
   // 2. merge 노드인지 확인
   isMergeNode: (nodeId: string, nodes: Node<NodeData>[]) => {
@@ -693,354 +551,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     return node?.type === 'mergeNode';
   },
 
-  // 2-1. condition 분기 합류 노드인지 확인
-  // condition 노드에서 분기된 여러 경로가 이 노드로 합쳐지는 경우를 감지
-  isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
-    const node = nodes.find(n => n.id === nodeId);
-    
-    // merge 노드는 이미 다중 입력을 허용하므로 제외
-    if (node?.type === 'mergeNode') {
-      return false;
-    }
-    
-    // 현재 노드로 들어오는 모든 edge 확인
-    const incomingEdges = edges.filter(edge => edge.target === nodeId);
-    
-    // 2개 미만의 입력이면 convergence가 아님
-    if (incomingEdges.length < 2) {
-      return false;
-    }
-    
-    // 각 incoming edge의 source에서 역으로 거슬러 올라가서 condition 노드를 찾는 함수
-    const findConditionNodeInPath = (currentNodeId: string, visited: Set<string> = new Set()): string | null => {
-      if (visited.has(currentNodeId)) {
-        return null; // 순환 방지
-      }
-      visited.add(currentNodeId);
-      
-      const currentNode = nodes.find(n => n.id === currentNodeId);
-      
-      // condition 노드를 찾았으면 반환
-      if (currentNode?.type === 'conditionNode') {
-        return currentNodeId;
-      }
-      
-      // 상위 노드들을 재귀적으로 탐색
-      const parentEdges = edges.filter(edge => edge.target === currentNodeId);
-      
-      for (const parentEdge of parentEdges) {
-        const conditionNodeId = findConditionNodeInPath(parentEdge.source, new Set(visited));
-        if (conditionNodeId) {
-          return conditionNodeId;
-        }
-      }
-      
-      return null;
-    };
-    
-    // 각 incoming edge의 source에서 condition 노드 찾기
-    const conditionNodeIds = new Set<string>();
-    let edgesFromConditionPaths = 0;
-    
-    for (const edge of incomingEdges) {
-      const conditionNodeId = findConditionNodeInPath(edge.source);
-      if (conditionNodeId) {
-        conditionNodeIds.add(conditionNodeId);
-        edgesFromConditionPaths++;
-      }
-    }
-    
-    // 기본 조건 체크
-    if (conditionNodeIds.size < 1 || 
-        edgesFromConditionPaths !== incomingEdges.length || 
-        incomingEdges.length < 2) {
-      return false;
-    }
-    
-    // 추가 검증: 모든 incoming edges가 서로 "배타적인" 경로에서 와야 함
-    // 즉, 두 source 노드 사이에 경로가 있으면 안 됨 (하나가 다른 하나의 선행/후행 노드면 안 됨)
-    // 이렇게 해야 condition 분기의 "중간 노드"가 아닌 "합류점"만 허용됨
-    const sources = incomingEdges.map(e => e.source);
-    
-    for (let i = 0; i < sources.length; i++) {
-      for (let j = i + 1; j < sources.length; j++) {
-        const sourceA = sources[i];
-        const sourceB = sources[j];
-        
-        // sourceA에서 sourceB로 가는 경로가 있는지 확인
-        const hasPathAtoB = get().hasPathFromTargetToSource(sourceB, sourceA, edges);
-        // sourceB에서 sourceA로 가는 경로가 있는지 확인
-        const hasPathBtoA = get().hasPathFromTargetToSource(sourceA, sourceB, edges);
-        
-        if (hasPathAtoB || hasPathBtoA) {
-          // 두 source 사이에 경로가 있으면, 이는 진짜 convergence가 아님
-          // (하나가 다른 하나의 중간 노드이거나 선행 노드)
-          console.log(`🚫 [isConditionConvergenceNode] Sources ${sourceA} and ${sourceB} are not mutually exclusive - path exists between them`);
-          return false;
-        }
-      }
-    }
-    
-    // 모든 조건을 만족하면 condition convergence 노드
-    return true;
-  },
+  // isConditionConvergenceNode moved to edgesSlice
 
-  // 3. 순환 경로 검사 (DFS를 사용하여 target에서 source로 가는 경로가 있는지 확인)
-  hasPathFromTargetToSource: (targetId: string, sourceId: string, edges: Edge[]) => {
-    const visited = new Set<string>();
-    
-    const dfs = (currentNodeId: string): boolean => {
-      if (currentNodeId === sourceId) {
-        return true; // 순환 경로 발견
-      }
-      
-      if (visited.has(currentNodeId)) {
-        return false; // 이미 방문한 노드
-      }
-      
-      visited.add(currentNodeId);
-      
-      // 현재 노드에서 출발하는 모든 간선을 확인
-      const outgoingEdges = edges.filter(edge => edge.source === currentNodeId);
-      
-      for (const edge of outgoingEdges) {
-        if (dfs(edge.target)) {
-          return true;
-        }
-      }
-      
-      return false;
-    };
-    
-    return dfs(targetId);
-  },
+  // hasPathFromTargetToSource moved to edgesSlice
 
-  // 4. 연결 가능 여부 검사
-  canConnect: (connection: Connection) => {
-    const { nodes, edges } = get();
-    const { source, target } = connection;
-    
-    if (!target) return { allowed: false, reason: "대상 노드가 없습니다." };
-    
-    // 현재 target 노드의 in-degree 계산
-    const currentInDegree = get().calculateInDegree(target, edges);
-    
-    // merge 노드인지 확인
-    const isMerge = get().isMergeNode(target, nodes);
-    
-    // merge 노드는 다수의 입력을 허용
-    if (isMerge) {
-      return { allowed: true };
-    }
-    
-    // condition convergence 노드인지 확인 (새로 연결했을 때를 가정)
-    const simulatedEdges = [...edges, { 
-      id: 'temp', 
-      source: source!, 
-      target: target,
-      type: 'default'
-    } as Edge];
-    const isConditionConvergence = get().isConditionConvergenceNode(target, nodes, simulatedEdges);
-    
-    // condition 분기 합류 노드는 여러 입력을 허용
-    if (isConditionConvergence) {
-      console.log(`🔀 [Connection] ${target} is a condition convergence node - allowing multiple inputs`);
-      return { allowed: true };
-    }
-    
-    // 일반 노드의 경우, 이미 1개 이상의 입력이 있으면 순환 여부 검사
-    if (currentInDegree >= 1) {
-      // 순환 경로가 있는지 확인 (target -> ... -> source)
-      const hasCircle = get().hasPathFromTargetToSource(target, source!, edges);
-      
-      if (hasCircle) {
-        return { allowed: true }; // 순환 경로가 있으면 허용 (회귀 허용 조건)
-      } else {
-        return { 
-          allowed: false, 
-          reason: "일반 노드는 동시에 2개 이상의 직접 입력을 받을 수 없습니다. (순환 연결 또는 condition 분기 합류는 예외)" 
-        };
-      }
-    }
-    
-    // in-degree가 1 미만이면 허용
-    return { allowed: true };
-  },
+  // canConnect moved to edgesSlice
 
-  // 5. 제약 조건을 위반하는 edge들을 찾아서 반환
-  findViolatingEdges: () => {
-    const { nodes, edges } = get();
-    const violatingEdgeIds: string[] = [];
-    
-    // 각 노드별로 제약 조건 위반 여부 검사
-    nodes.forEach(node => {
-      const nodeId = node.id;
-      
-      // merge 노드는 다수 입력 허용하므로 제외
-      if (get().isMergeNode(nodeId, nodes)) {
-        return;
-      }
-      
-      // condition convergence 노드는 다수 입력 허용하므로 제외
-      if (get().isConditionConvergenceNode(nodeId, nodes, edges)) {
-        return;
-      }
-      
-      // 현재 노드로 들어오는 모든 edge들
-      const incomingEdges = edges.filter(edge => edge.target === nodeId);
-      
-      if (incomingEdges.length > 1) {
-        // 2개 이상의 입력이 있는 경우, 순환 여부 검사
-        const hasAnyCircle = incomingEdges.some(edge => 
-          get().hasPathFromTargetToSource(nodeId, edge.source, edges)
-        );
-        
-        if (!hasAnyCircle) {
-          // 순환 경로가 없으면 모든 incoming edge가 위반
-          violatingEdgeIds.push(...incomingEdges.map(edge => edge.id));
-        }
-      }
-    });
-    
-    return violatingEdgeIds;
-  },
+  // findViolatingEdges moved to edgesSlice
 
-  // 6. 모든 edge의 경고 상태를 업데이트
-  updateEdgeWarnings: () => {
-    const violatingEdgeIds = get().findViolatingEdges();
-    
-    set(state => ({
-      edges: state.edges.map(edge => ({
-        ...edge,
-        data: {
-          ...edge.data,
-          isWarning: violatingEdgeIds.includes(edge.id)
-        }
-      }))
-    }));
-  },
+  // updateEdgeWarnings moved to edgesSlice
   
-  onConnect: (connection: Connection) => {
-    // 제약 조건 검사
-    const connectionCheck = get().canConnect(connection);
-    
-    if (!connectionCheck.allowed) {
-      // 제약 조건 위반 시 사용자에게 토스트 알림
-      window.dispatchEvent(new CustomEvent('connectionError', {
-        detail: { reason: connectionCheck.reason }
-      }));
-      return; // 연결 중단
-    }
-
-    const { nodes, edges } = get(); // Get current nodes and edges
-    const sourceNode = nodes.find(node => node.id === connection.source);
-    const targetNode = nodes.find(node => node.id === connection.target);
-    const isConditionNode = sourceNode?.type === 'conditionNode';
-    const startNode = nodes.find(node => node.type === 'startNode');
-    const className = startNode?.data.config?.className || 'data';
-
-    // 신규 엣지 초기 상태: PENDING으로 시작
-    const edgeData: any = { 
-      output: EDGE_STATES.PENDING,  // 명확한 대기 상태로 시작
-      isExecuting: false,
-      isSuccess: false,
-      isFailure: false,
-      timestamp: undefined,
-    };
-
-    if (isConditionNode) {
-      // Count existing outgoing edges from this source before adding the new one
-      const existingSourceEdgesCount = edges.filter(e => e.source === connection.source).length;
-      edgeData.label = `if ${className}['value'] > 0`; // Default 'if' condition label
-      edgeData.conditionOrderIndex = existingSourceEdgesCount; // 초기 순서 인덱스 설정
-      edgeData.conditionDescription = `Rule #${existingSourceEdgesCount + 1}`; // Default rule description
-    }
-    
-    // 연결 생성과 동시에 target 노드의 설정값 초기화
-    set(state => {
-      const updatedNodes = state.nodes.map(node => {
-        if (node.id === connection.target && targetNode) {
-          const resetConfig = { ...node.data.config };
-          
-          // 노드 타입별 설정값 초기화 (재연결시 기존값 복원 방지)
-          switch (targetNode.type) {
-            case 'endNode':
-              resetConfig.receiveKey = '';
-              break;
-            case 'promptNode':
-              // 프롬프트 노드의 입력 관련 설정 초기화
-              if (resetConfig.inputVariable) {
-                resetConfig.inputVariable = '';
-              }
-              if (resetConfig.selectedKeyName) {
-                resetConfig.selectedKeyName = '';
-              }
-              break;
-            case 'agentNode':
-              // 에이전트 노드의 입력 관련 설정 초기화
-              if (resetConfig.userPromptInputKey) {
-                resetConfig.userPromptInputKey = '';
-              }
-              if (resetConfig.systemPromptInputKey) {
-                resetConfig.systemPromptInputKey = '';
-              }
-              break;
-            case 'userNode':
-              // 사용자 노드의 입력 데이터 초기화
-              if (resetConfig.inputData) {
-                resetConfig.inputData = {};
-              }
-              break;
-            case 'mergeNode':
-              // 머지 노드의 경우 기존 매핑 유지 (다중 입력 지원)
-              break;
-            default:
-              // 다른 노드 타입들의 공통 설정 초기화
-              if (resetConfig.inputKey) {
-                resetConfig.inputKey = '';
-              }
-              if (resetConfig.selectedInput) {
-                resetConfig.selectedInput = null;
-              }
-              break;
-          }
-          
-          return {
-            ...node,
-            data: { 
-              ...node.data, 
-              config: resetConfig,
-              inputData: null, // 입력 데이터 초기화
-              output: null     // 출력 데이터도 초기화
-            }
-          };
-        }
-        return node;
-      });
-      
-      return {
-        nodes: updatedNodes,
-        edges: addEdge({ 
-          ...connection, 
-          animated: true,
-          data: edgeData
-        }, state.edges),
-      };
-    });
-
-    // 수동 선택된 엣지 정보도 초기화 (재연결시 기존값 복원 방지)
-    set(state => ({
-      manuallySelectedEdges: {
-        ...state.manuallySelectedEdges,
-        [connection.target!]: null
-      }
-    }));
-
-    // 연결 후 제약 조건 재검사 및 경고 상태 업데이트
-    setTimeout(() => {
-      get().updateEdgeWarnings();
-    }, 0);
-  },
+  // onConnect moved to edgesSlice
 
   // 모든 엣지 상태 초기화 (예외 edgeId는 유지)
   resetAllEdgeStatuses: (excludeEdgeIds: string[] = []) => {
@@ -1444,27 +965,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
-  updateEdgeLabel: (edgeId: string, label: string) => {
-    get().updateEdgeData(edgeId, { label });
-  },
-
-  updateEdgeDescription: (edgeId: string, description: string) => {
-    get().updateEdgeData(edgeId, { conditionDescription: description });
-  },
-
-  updateEdgeData: (edgeId: string, dataToUpdate: Partial<Edge['data']>) => {
-    set({
-      edges: get().edges.map((edge) => {
-        if (edge.id === edgeId) {
-          return {
-            ...edge,
-            data: { ...edge.data, ...dataToUpdate }
-          };
-        }
-        return edge;
-      })
-    });
-  },
+  // updateEdgeLabel/Description/Data moved to edgesSlice
 
   setEdgeSuccess: (edgeId: string, isSuccess: boolean) => {
     set({
@@ -2055,7 +1556,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             
             // 먼저 모든 조건을 체크하여 매칭되는 첫 번째 조건 찾기
             for (const edge of sortedEdges) {
-              const { body: conditionBodyForEval } = prepareConditionForEvaluation(edge.data?.label, argumentNameForEval);
+              const { body: conditionBodyForEval } = prepareConditionForEvaluation(edge.data?.label);
               const isTrue = evaluateCondition(conditionBodyForEval, inputForBranch, argumentNameForEval);
               
               if (isTrue && !anyConditionMet) {
@@ -2595,154 +2096,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
-  saveWorkflow: async () => {
-    set({ isSaving: true, saveError: null });
-    const { projectName, nodes, edges, viewport, manuallySelectedEdges, workflowVersion } = get();
+  
 
-    if (!projectName || projectName.trim() === "") {
-      const errorMsg = "Project name cannot be empty.";
-      set({ isSaving: false, saveError: errorMsg });
-      console.error("FlowStore: Project name is empty. Cannot save.");
-      throw new Error(errorMsg);
-    }
-    
-    console.log(`FlowStore: Saving workflow "${projectName}" (version ${workflowVersion}) to MongoDB...`);
+  
 
-    const nodesToSave = nodes.map(node => {
-      const { icon, ...restOfData } = node.data;
-      return {
-        ...node,
-        data: restOfData,
-      };
-    });
-
-    try {
-      // 현재 서버의 워크플로우 버전 확인 (충돌 감지)
-      const existingWorkflow = await storageService.getWorkflowByName(projectName);
-      const serverVersion = existingWorkflow?.version || 0;
-      
-      // 버전 충돌 감지 (낙관적 잠금)
-      if (existingWorkflow && serverVersion !== workflowVersion) {
-        console.warn(`[Collaboration] Version conflict detected! Local: ${workflowVersion}, Server: ${serverVersion}`);
-        
-        // 충돌 발생 - 사용자에게 알림
-        set({ isSaving: false });
-        
-        // 커스텀 이벤트 발생 (UI에서 충돌 다이얼로그 표시)
-        window.dispatchEvent(new CustomEvent('workflowVersionConflict', {
-          detail: {
-            localVersion: workflowVersion,
-            serverVersion: serverVersion,
-            serverWorkflow: existingWorkflow
-          }
-        }));
-        
-        throw new Error(`Version conflict: Your version (${workflowVersion}) is outdated. Server version: ${serverVersion}. Please reload the workflow.`);
-      }
-
-      const newVersion = workflowVersion + 1;
-      const workflowData = {
-        projectName,
-        nodes: nodesToSave,
-        edges,
-        viewport,
-        manuallySelectedEdges,
-        lastModified: new Date().toISOString(),
-        version: newVersion
-      };
-
-      // MongoDB API 호출 (upsert)
-      await storageService.updateWorkflow(projectName, workflowData);
-      
-      // 버전 업데이트
-      set({ 
-        isSaving: false, 
-        lastSaved: new Date(), 
-        saveError: null,
-        workflowVersion: newVersion
-      });
-      
-      console.log(`FlowStore: Workflow "${projectName}" saved successfully (version ${newVersion})`);
-      get().fetchAvailableWorkflows(); // 저장 후 목록 새로고침
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ isSaving: false, saveError: errorMessage });
-      console.error('FlowStore: Failed to save workflow to MongoDB:', error);
-      throw error;
-    }
-  },
-
-  loadWorkflow: async (projectName: string) => {
-    set({ isLoading: true, loadError: null });
-    console.log(`FlowStore: Loading workflow "${projectName}" from MongoDB...`);
-
-    try {
-      const workflowData = await storageService.getWorkflowByName(projectName);
-      
-      if (workflowData) {
-        const version = workflowData.version || 0;
-        set({
-          projectName: workflowData.projectName,
-          nodes: workflowData.nodes || [],
-          edges: workflowData.edges || [],
-          viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
-          manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
-          workflowVersion: version,
-          isLoading: false, 
-          loadError: null,
-          lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
-        });
-        console.log(`FlowStore: Workflow "${projectName}" (version ${version}) loaded successfully.`);
-        
-        // 협업 연결 (이미 초기화되어 있다면)
-        const { collaborationService } = get();
-        if (collaborationService && projectName !== DEFAULT_PROJECT_NAME) {
-          await get().connectCollaboration();
-        }
-      } else {
-        const errorMsg = `Workflow "${projectName}" not found.`;
-        set({ isLoading: false, loadError: errorMsg });
-        console.warn(`FlowStore: ${errorMsg}`);
-        throw new Error(errorMsg);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ isLoading: false, loadError: errorMessage });
-      console.error('FlowStore: Failed to load workflow from MongoDB:', error);
-      throw error;
-    }
-  },
-
-  fetchAvailableWorkflows: async () => {
-    set({ isLoading: true, loadError: null });
-    console.log('[FlowStore/fetch] ➡️ 워크플로우 목록 로딩을 시작합니다...');
-    try {
-      const workflows = await storageService.getAllWorkflows();
-      console.log(`[FlowStore/fetch] ✅ MongoDB에서 데이터를 성공적으로 가져왔습니다. (총 ${workflows.length}개)`);
-      console.table(workflows.map(wf => ({ projectName: wf.projectName, projectId: wf.projectId || 'N/A', lastModified: wf.lastModified })));
-
-      // projectId가 없는 워크플로우에 자동으로 할당 (마이그레이션)
-      const migratedWorkflows = workflows.map(wf => {
-        if (!wf.projectId) {
-          console.warn(`[FlowStore/fetch] ⚠️ 워크플로우 "${wf.projectName}"에 projectId가 없습니다. 새로 할당합니다.`);
-          const newWf = { ...wf, projectId: nanoid() };
-          // MongoDB에 업데이트 (비동기로 처리하여 blocking 방지)
-          storageService.updateWorkflow(wf.projectName, newWf).catch(err => 
-            console.error('Failed to update workflow with projectId:', err)
-          );
-          return newWf;
-        }
-        return wf;
-      });
-
-      set({ availableWorkflows: migratedWorkflows, isLoading: false, loadError: null });
-      console.log(`[FlowStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, migratedWorkflows);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadError: errorMessage || 'Failed to fetch workflow list', isLoading: false });
-      console.error('[FlowStore/fetch] ❌ 워크플로우 목록을 가져오는 중 오류 발생:', error);
-    }
-  },
+  
 
   fetchAIConnections: async () => {
     set({ isLoadingAIConnections: true, loadErrorAIConnections: null });
@@ -2770,12 +2128,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     getWorkflowAsJSONString: (deploymentData?: Workflow) => {
 
     // deployment 데이터가 전달되면 해당 데이터를 사용, 그렇지 않으면 현재 상태 사용
-    const { projectName, nodes, edges, viewport, aiConnections } = deploymentData ? {
+    const { projectName, nodes, edges, viewport } = deploymentData ? {
       projectName: deploymentData.projectName,
       nodes: deploymentData.nodes,
       edges: deploymentData.edges,
-      viewport: deploymentData.viewport,
-      aiConnections: get().aiConnections // AI 연결 정보는 여전히 flowStore에서 가져옴
+      viewport: deploymentData.viewport
     } : get();
 
     // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
@@ -3046,28 +2403,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
-  deleteWorkflow: async (projectName: string) => {
-    try {
-      await storageService.deleteWorkflow(projectName);
-      // 삭제 후 워크플로우 목록 새로고침
-      get().fetchAvailableWorkflows();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadError: errorMessage });
-      throw error;
-    }
-  },
-
-  renameWorkflow: async (oldName: string, newName: string) => {
-    try {
-      await storageService.renameWorkflow(oldName, newName);
-      get().fetchAvailableWorkflows();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      set({ loadError: errorMessage });
-      throw error;
-    }
-  },
+  
 
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => set({ focusedElement: { type, id } }),
 
@@ -3665,4 +3001,4 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       throw error;
     }
   },
-}));
+})); 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // import logoImage from '../assets/common/langstar_logo.png';
-import { useFlowStore, DEFAULT_PROJECT_NAME, emptyInitialNodes, emptyInitialEdges } from '../store/flowStore';
+import { useFlowStore, DEFAULT_PROJECT_NAME } from '../store/flowStore';
+import { emptyInitialNodes, emptyInitialEdges } from '../store/initialState';
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar';
 import WorkflowList from '../components/workspace/WorkflowList';
 import RagConfigList from '../components/workspace/RagConfigList';
