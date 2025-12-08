@@ -160,30 +160,6 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
   const memoryGroups: (GroupData & { nodeName: string; nodeId: string })[] = allMemoryGroups;
   const toolsGroups: (GroupData & { nodeName: string; nodeId: string })[] = allToolsGroups;
 
-  // AgentNode에 추가된 코드 노드와 유저 노드 가져오기
-  const agentCodeNodes = node?.data?.codeNodes || [];
-  const agentUserNodes = node?.data?.userNodes || [];
-
-  // 코드 노드를 tools 형식으로 변환
-  const codeNodeTools = agentCodeNodes.map((codeNode: any) => ({
-    value: `code-${codeNode.id}`,
-    label: codeNode.label || codeNode.title || 'Unnamed Code',
-    description: `Code Node: ${codeNode.description || 'No description'}`,
-    nodeName: node?.data.label || 'Current Agent',
-    nodeId: nodeId,
-    type: 'codeNode'
-  }));
-
-  // 유저 노드를 tools 형식으로 변환
-  const userNodeTools = agentUserNodes.map((userNode: any) => ({
-    value: `user-${userNode.id}`,
-    label: userNode.name || 'Unnamed User Node',
-    description: `User Node: ${userNode.functionDescription || 'No description'}`,
-    nodeName: node?.data.label || 'Current Agent',
-    nodeId: nodeId,
-    type: 'userNode'
-  }));
-
   // Get selected tools from node config
   const currentTools = node?.data.config?.tools || []; // 'selectedTools' -> 'tools'로 변경
 
@@ -598,85 +574,20 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
                 }
               });
             }}
-            options={[
-              // Tools Memory 노드의 Tools 그룹
-              ...toolsGroups.map((tool) => ({
-                value: tool.id,
-                label: tool.name,
-                description: `Tools Group: ${tool.description || 'No description'}`,
-                nodeName: tool.nodeName,
-                nodeId: tool.nodeId
-              })),
-              // Agent 노드에 추가된 Code 노드들
-              ...codeNodeTools,
-              // Agent 노드에 추가된 User 노드들
-              ...userNodeTools
-            ]}
+            options={toolsGroups.map((tool) => ({
+              value: tool.id,
+              label: tool.name,
+              description: tool.description,
+              nodeName: tool.nodeName,
+              nodeId: tool.nodeId
+            }))}
             placeholder="Select tools"
-            disabled={toolsGroups.length === 0 && agentCodeNodes.length === 0 && agentUserNodes.length === 0}
+            disabled={toolsGroups.length === 0}
           />
-          {toolsGroups.length === 0 && agentCodeNodes.length === 0 && agentUserNodes.length === 0 && (
+          {toolsGroups.length === 0 && (
             <p className="text-xs text-amber-500">
-              No tools available. Add tools in the Groups node or add Code/User nodes to this Agent.
+              No tools available. Add tools in the Groups node.
             </p>
-          )}
-          {(agentCodeNodes.length > 0 || agentUserNodes.length > 0) && (
-            <p className="text-xs text-blue-500 mt-1">
-              💡 {agentCodeNodes.length} Code Node(s) and {agentUserNodes.length} User Node(s) available from this Agent.
-            </p>
-          )}
-          {/* 선택된 도구들 표시 */}
-          {currentTools.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {currentTools.map((toolId) => {
-                // Tools Group에서 찾기
-                const toolsGroup = toolsGroups.find(t => t.id === toolId);
-                if (toolsGroup) {
-                  return (
-                    <div key={toolId} className="p-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Tools Group</span>
-                        <span className="text-gray-800 dark:text-gray-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-gray-600 rounded-md">
-                          {toolsGroup.name}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                
-                // Code Node에서 찾기
-                const codeNode = agentCodeNodes.find((cn: any) => `code-${cn.id}` === toolId);
-                if (codeNode) {
-                  return (
-                    <div key={toolId} className="p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-600 rounded-md">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-purple-500 dark:text-purple-400 font-medium">Code Node</span>
-                        <span className="text-purple-800 dark:text-purple-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-purple-600 rounded-md">
-                          {codeNode.label || codeNode.title || 'Unnamed'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                
-                // User Node에서 찾기
-                const userNode = agentUserNodes.find((un: any) => `user-${un.id}` === toolId);
-                if (userNode) {
-                  return (
-                    <div key={toolId} className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-600 rounded-md">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-blue-500 dark:text-blue-400 font-medium">User Node</span>
-                        <span className="text-blue-800 dark:text-blue-200 font-mono bg-white dark:bg-gray-800 px-1.5 py-0.5 border dark:border-blue-600 rounded-md">
-                          {userNode.name || 'Unnamed'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                
-                return null;
-              })}
-            </div>
           )}
         </div>
 
