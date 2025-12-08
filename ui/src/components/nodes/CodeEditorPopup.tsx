@@ -13,10 +13,6 @@ interface CodeEditorPopupProps {
   availableVariables?: string[];
   hideInputVariables?: boolean; // Input Variables 영역을 숨길지 여부
   readOnly?: boolean; // 읽기 전용 모드
-  title?: string; // 코드 노드 제목
-  onTitleChange?: (title: string) => void; // 제목 변경 콜백
-  description?: string; // 코드 노드 설명
-  onDescriptionChange?: (description: string) => void; // 설명 변경 콜백
 }
 
 const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
@@ -28,15 +24,9 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
   sourceNode,
   availableVariables = [],
   hideInputVariables = false,
-  readOnly = false,
-  title = '',
-  onTitleChange,
-  description = '',
-  onDescriptionChange
+  readOnly = false
 }) => {
   const [tempValue, setTempValue] = useState(value);
-  const [tempTitle, setTempTitle] = useState(title);
-  const [tempDescription, setTempDescription] = useState(description);
   const [hasChanges, setHasChanges] = useState(false);
   const [_cursorPosition, _setCursorPosition] = useState(0);
   const [editorInstance, setEditorInstance] = useState<any>(null);
@@ -53,8 +43,6 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
   useEffect(() => {
     if (isOpen) {
       setTempValue(value);
-      setTempTitle(title);
-      setTempDescription(description);
       setHasChanges(false);
       
       // 트리를 기본으로 모두 펼치기
@@ -67,21 +55,19 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
         setAllExpanded(false);
       }
     }
-  }, [isOpen, value, title, description, edgeData]);
+  }, [isOpen, value, edgeData]);
 
   // value가 외부에서 변경될 때 tempValue 동기화
   useEffect(() => {
     if (isOpen && !hasChanges) {
       setTempValue(value);
-      setTempTitle(title);
-      setTempDescription(description);
     }
-  }, [value, title, description, isOpen, hasChanges]);
+  }, [value, isOpen, hasChanges]);
 
   // 임시 값이 변경될 때마다 변경사항 체크
   useEffect(() => {
-    setHasChanges(tempValue !== value || tempTitle !== title || tempDescription !== description);
-  }, [tempValue, tempTitle, tempDescription, value, title, description]);
+    setHasChanges(tempValue !== value);
+  }, [tempValue, value]);
 
   // expandedPaths가 변경될 때마다 allExpanded 상태 업데이트
   useEffect(() => {
@@ -93,22 +79,13 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
   }, [expandedPaths, edgeData]);
 
   const handleSave = () => {
-    console.log(`[CodeEditorPopup] Saving code, length: ${tempValue?.length}, title: ${tempTitle}, description: ${tempDescription}`);
-    
-    // title과 description을 먼저 업데이트하고, 그 다음 코드를 저장
-    if (onTitleChange) {
-      onTitleChange(tempTitle);
-    }
-    if (onDescriptionChange) {
-      onDescriptionChange(tempDescription);
-    }
-    
-    // 상태 업데이트가 완료된 후 코드 저장
+    console.log(`[CodeEditorPopup] Saving code, length: ${tempValue?.length}`);
+    onChange(tempValue);
+    setHasChanges(false);
+    // 저장 후 약간의 지연을 두어 상태 동기화 완료 대기
     setTimeout(() => {
-      onChange(tempValue);
-      setHasChanges(false);
       console.log(`[CodeEditorPopup] Save completed`);
-    }, 10);
+    }, 50);
   };
 
   const insertVariableAtCursor = (variableName: string) => {
@@ -383,41 +360,13 @@ const CodeEditorPopup: React.FC<CodeEditorPopupProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-7xl h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-3 flex-1">
+          <div className="flex items-center space-x-3">
             <Maximize2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  Python Code Editor
-                </h2>
-                {onTitleChange && (
-                  <input
-                    type="text"
-                    value={tempTitle}
-                    onChange={(e) => setTempTitle(e.target.value)}
-                    placeholder="노드 제목 입력..."
-                    className="flex-1 max-w-md px-3 py-1.5 text-base border border-gray-300 dark:border-gray-600 
-                               rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                               focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400
-                               placeholder-gray-400 dark:placeholder-gray-500"
-                    disabled={readOnly}
-                  />
-                )}
-              </div>
-              {onDescriptionChange && (
-                <input
-                  type="text"
-                  value={tempDescription}
-                  onChange={(e) => setTempDescription(e.target.value)}
-                  placeholder="설명 입력 (선택사항)..."
-                  className="w-full max-w-2xl px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 
-                             rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
-                             focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400
-                             placeholder-gray-400 dark:placeholder-gray-500 mb-1"
-                  disabled={readOnly}
-                />
-              )}
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Python Code Editor
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Use state['variable'] syntax to access input variables
               </p>
             </div>
