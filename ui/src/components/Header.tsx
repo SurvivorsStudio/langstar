@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Save, Play, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { useThemeStore } from '../store/themeStore';
+import { useTranslation } from '../hooks/useTranslation';
 import { Link, useNavigate } from 'react-router-dom';
 import homeLogo from '../assets/common/home_logo.png';
 import { apiService } from '../services/apiService';
@@ -14,6 +15,7 @@ import CodeEditor from './CodeEditor';
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const { isDarkMode } = useThemeStore();
+  const { t } = useTranslation();
   const { 
     projectName, 
     setProjectName, 
@@ -75,7 +77,7 @@ const Header: React.FC = () => {
     }
 
     if (!editingName.trim()) {
-      alert('워크플로우 이름은 비워둘 수 없습니다.');
+      alert(t('alert.workflowNameEmpty'));
       return;
     }
 
@@ -103,10 +105,10 @@ const Header: React.FC = () => {
       // URL 업데이트
       navigate(`/flow/${encodeURIComponent(newName)}`, { replace: true });
       
-      alert('워크플로우 이름이 변경되었습니다.');
+      alert(t('alert.workflowRenamed'));
     } catch (error) {
       console.error('Failed to rename workflow:', error);
-      alert(`워크플로우 이름 변경에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+      alert(t('alert.workflowRenameFailed', { error: error instanceof Error ? error.message : String(error) }));
       // 에러 시 편집 모드 유지
     } finally {
       setIsRenaming(false);
@@ -126,7 +128,7 @@ const Header: React.FC = () => {
     try {
       const jsonString = getWorkflowAsJSONString();
       if (!jsonString) {
-        throw new Error('워크플로우 데이터를 생성할 수 없습니다.');
+        throw new Error(t('alert.workflowDataError'));
       }
 
       const workflowData = JSON.parse(jsonString);
@@ -137,7 +139,7 @@ const Header: React.FC = () => {
       setIsDeploymentModalOpen(false);
     } catch (error) {
       console.error('Deployment creation failed:', error);
-      alert(`배포 생성에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+      alert(t('alert.deploymentFailed', { error: error instanceof Error ? error.message : String(error) }));
     } finally {
       setIsDeploying(false);
     }
@@ -174,7 +176,7 @@ const Header: React.FC = () => {
                     }
                   }}
                   className="font-medium text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-700 border border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded"
-                  placeholder="워크플로우 이름"
+                  placeholder={t('header.workflowNamePlaceholder')}
                   autoFocus
                 />
                 <button
@@ -184,7 +186,7 @@ const Header: React.FC = () => {
                   onClick={handleFinishEditName}
                   disabled={isRenaming}
                   className="text-green-600 hover:text-green-700 disabled:opacity-50"
-                  title="저장"
+                  title={t('common.save')}
                 >
                   {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓'}
                 </button>
@@ -195,7 +197,7 @@ const Header: React.FC = () => {
                   onClick={handleCancelEditName}
                   disabled={isRenaming}
                   className="text-red-600 hover:text-red-700 disabled:opacity-50"
-                  title="취소"
+                  title={t('common.cancel')}
                 >
                   ✕
                 </button>
@@ -205,7 +207,7 @@ const Header: React.FC = () => {
                 <span
                   onClick={handleStartEditName}
                   className="font-medium text-gray-800 dark:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                  title="클릭하여 이름 변경"
+                  title={t('header.clickToRename')}
                 >
                   {projectName}
                 </span>
@@ -229,27 +231,27 @@ const Header: React.FC = () => {
                 setEditableModalContent(langgraphCode);
               } catch (error) {
                 console.error('Header.tsx: Error exporting workflow JSON via API:', error);
-                alert(`Failed to export workflow JSON. An error occurred: ${error instanceof Error ? error.message : String(error)}`);
+                alert(t('alert.exportFailed', { error: error instanceof Error ? error.message : String(error) }));
               }
             } else {
-              alert('Failed to generate workflow JSON.');
+              alert(t('alert.exportJsonFailed'));
             }
           }}
           className="hidden sm:flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm"
-          title="Export Workflow as Python"
+          title={t('header.exportPython')}
         >
           <FileJson className="h-4 w-4 mr-1" />
-          Export Python
+          {t('header.exportPython')}
         </button>
         <button
           onClick={async () => {
             if (saveWorkflow) {
               try {
                 await saveWorkflow();
-                alert('Workflow saved successfully!');
+                alert(t('alert.workflowSaved'));
               } catch (error) {
                 console.error('Header.tsx: Error saving workflow:', error);
-                alert('Failed to save workflow. Please try again.');
+                alert(t('alert.workflowSaveFailed'));
               }
             } else {
               console.error('Header.tsx: saveWorkflow function is undefined!');
@@ -259,16 +261,16 @@ const Header: React.FC = () => {
           className="hidden sm:flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? t('header.saving') : t('header.save')}
         </button>
         <button
           onClick={() => setIsDeploymentModalOpen(true)}
           disabled={nodes.length === 0 || isDeploying}
           className="hidden sm:flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          title={nodes.length === 0 ? "워크플로우에 노드를 추가한 후 배포하세요" : "Deploy Workflow"}
+          title={nodes.length === 0 ? t('deployment.addNodeFirst') : t('header.deploy')}
         >
           <Rocket className="h-4 w-4 mr-1" />
-          Deploy
+          {t('header.deploy')}
         </button>
         <button
           onClick={() => {
@@ -284,11 +286,11 @@ const Header: React.FC = () => {
         >
           {isWorkflowRunning ? (
             <>
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Running...
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" /> {t('header.running')}
             </>
           ) : (
             <>
-              <Play className="h-4 w-4 mr-1" /> Run
+              <Play className="h-4 w-4 mr-1" /> {t('header.run')}
             </>
           )}
         </button>
@@ -297,24 +299,24 @@ const Header: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold ml-1 text-gray-900 dark:text-gray-100">API Response</h3>
+              <h3 className="text-lg font-semibold ml-1 text-gray-900 dark:text-gray-100">{t('header.apiResponse')}</h3>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={async () => {
                     if (editableModalContent) {
                       try {
                         await navigator.clipboard.writeText(editableModalContent);
-                        alert('Code copied to clipboard!');
+                        alert(t('alert.codeCopied'));
                       } catch (err) {
                         console.error('Failed to copy code: ', err);
-                        alert('Failed to copy code. See console for details.');
+                        alert(t('alert.codeCopyFailed'));
                       }
                     }
                   }}
                   className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-sm"
-                  title="Copy Code"
+                  title={t('header.copyCode')}
                 >
-                  <Copy size={16} className="mr-1" /> Copy
+                  <Copy size={16} className="mr-1" /> {t('common.copy')}
                 </button>
                 <button
                   onClick={() => {
