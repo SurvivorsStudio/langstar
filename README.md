@@ -73,6 +73,7 @@
 #### System Requirements
 - **Node.js** (v16 or higher)
 - **Python 3.11 or higher**
+- **MongoDB Community Edition** (required for data persistence)
 - **npm** or **yarn**
 
 #### Required Software Installation
@@ -138,6 +139,76 @@ sudo apt install python3.11 python3.11-venv python3.11-pip
 
 **Windows:**
 Download Python 3.11 or higher from [Python.org](https://www.python.org/downloads/)
+
+**3. MongoDB Community Edition 8 Installation**
+
+MongoDB **version 8** is **required** for LangStar to persist workflows, AI connections, deployments, and execution history.
+
+**macOS (using Homebrew):**
+```bash
+# Install MongoDB Community Edition 8
+brew tap mongodb/brew
+brew install mongodb-community
+
+# Start MongoDB service
+brew services start mongodb-community
+
+# Verify MongoDB is running and check version
+mongosh --eval "db.version()"
+```
+
+**Ubuntu/Debian:**
+```bash
+# Import MongoDB public GPG key
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+# Add MongoDB 8.0 repository
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | \
+   sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+# Update package list and install MongoDB 8.0
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+
+# Start MongoDB service
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+# Verify MongoDB is running and check version
+mongosh --eval "db.version()"
+```
+
+**Windows:**
+1. Download MongoDB Community Edition 8.2.2 from [MongoDB Download Center](https://www.mongodb.com/try/download/community)
+2. Select version **8.2.2** from the version dropdown
+3. Run the installer (choose "Complete" installation)
+4. During installation, select "Install MongoDB as a Service"
+5. MongoDB will start automatically as a Windows service
+6. Verify installation by opening Command Prompt:
+```cmd
+mongosh --eval "db.version()"
+```
+
+**MongoDB Role in LangStar:**
+
+MongoDB serves as the primary data store for:
+- **Workflows**: Visual workflow definitions, nodes, edges, and configurations
+- **AI Connections**: LLM provider credentials and settings (AWS Bedrock, OpenAI, etc.)
+- **User Nodes**: Custom node definitions and code
+- **Deployments**: Deployment configurations, versions, and snapshots
+- **Execution History**: Workflow execution logs and results
+- **Schedules**: Scheduled workflow configurations
+
+**Default Connection:**
+- LangStar connects to MongoDB at `mongodb://localhost:27017` by default
+- Database name: `langstar_db`
+- To use a different MongoDB instance, set the `MONGODB_URL` environment variable:
+  ```bash
+  export MONGODB_URL="mongodb://your-host:27017"
+  ```
+
+**Note:** While the server will start without MongoDB, storage features (save/load workflows, deployments, etc.) will not function until MongoDB is installed and running.
 
 #### Quick Start
 
@@ -274,6 +345,39 @@ sudo chown -R $USER:$GROUP ~/.config
 rm -rf server/venv
 npm run setup-python:darwin  # setup-python:win32 for Windows
 ```
+
+**6. MongoDB connection issues:**
+```bash
+# Check if MongoDB is running
+# macOS:
+brew services list | grep mongodb
+
+# Linux:
+sudo systemctl status mongod
+
+# Windows (in Command Prompt as Administrator):
+sc query MongoDB
+
+# If not running, start MongoDB:
+# macOS:
+brew services start mongodb-community
+
+# Linux:
+sudo systemctl start mongod
+
+# Windows:
+net start MongoDB
+
+# Test connection
+mongosh --eval "db.version()"
+```
+
+**7. Storage features not working:**
+If you see warnings like "MongoDB not connected" or storage features don't work:
+- Ensure MongoDB is installed and running (see above)
+- Check MongoDB connection URL in environment variables
+- Verify MongoDB is accessible at `localhost:27017`
+- Check server logs for MongoDB connection errors
 
 ---
 
@@ -436,6 +540,7 @@ For license information on open source libraries used in this project, see [NOTI
 ### 시스템 요구사항
 - **Node.js** (v16 이상)
 - **Python 3.11 이상**
+- **MongoDB Community Edition** (데이터 영속성을 위해 필수)
 - **npm** 또는 **yarn**
 
 ### 필수 프로그램 설치
@@ -501,6 +606,76 @@ sudo apt install python3.11 python3.11-venv python3.11-pip
 
 **Windows:**
 [Python.org](https://www.python.org/downloads/)에서 Python 3.11 이상 버전 다운로드
+
+#### 3. MongoDB Community Edition 8.2.2 설치
+
+MongoDB **버전 8.2.2**는 LangStar가 워크플로우, AI 연결, 배포, 실행 히스토리를 저장하기 위해 **필수적으로 필요**합니다.
+
+**macOS (Homebrew 사용):**
+```bash
+# MongoDB Community Edition 8.2.2 설치
+brew tap mongodb/brew
+brew install mongodb-community@8.0
+
+# MongoDB 서비스 시작
+brew services start mongodb-community@8.0
+
+# MongoDB 실행 확인 및 버전 체크
+mongosh --eval "db.version()"
+```
+
+**Ubuntu/Debian:**
+```bash
+# MongoDB public GPG 키 가져오기
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+# MongoDB 8.0 저장소 추가
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | \
+   sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+# 패키지 목록 업데이트 및 MongoDB 8.0 설치
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+
+# MongoDB 서비스 시작
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+# MongoDB 실행 확인 및 버전 체크
+mongosh --eval "db.version()"
+```
+
+**Windows:**
+1. [MongoDB 다운로드 센터](https://www.mongodb.com/try/download/community)에서 MongoDB Community Edition 8.2.2 다운로드
+2. 버전 드롭다운에서 **8.2.2** 선택
+3. 설치 프로그램 실행 ("Complete" 설치 선택)
+4. 설치 중 "Install MongoDB as a Service" 선택
+5. MongoDB가 Windows 서비스로 자동 시작됩니다
+6. 명령 프롬프트에서 설치 확인:
+```cmd
+mongosh --eval "db.version()"
+```
+
+**LangStar에서 MongoDB의 역할:**
+
+MongoDB는 다음 데이터를 저장하는 주요 데이터 저장소 역할을 합니다:
+- **워크플로우**: 시각적 워크플로우 정의, 노드, 엣지 및 설정
+- **AI 연결**: LLM 제공자 자격 증명 및 설정 (AWS Bedrock, OpenAI 등)
+- **사용자 노드**: 커스텀 노드 정의 및 코드
+- **배포**: 배포 구성, 버전 및 스냅샷
+- **실행 히스토리**: 워크플로우 실행 로그 및 결과
+- **스케줄**: 예약된 워크플로우 구성
+
+**기본 연결 설정:**
+- LangStar는 기본적으로 `mongodb://localhost:27017`에 연결합니다
+- 데이터베이스 이름: `langstar_db`
+- 다른 MongoDB 인스턴스를 사용하려면 `MONGODB_URL` 환경 변수를 설정하세요:
+  ```bash
+  export MONGODB_URL="mongodb://your-host:27017"
+  ```
+
+**참고:** MongoDB 없이도 서버는 시작되지만, MongoDB가 설치되고 실행되기 전까지는 저장 기능(워크플로우 저장/로드, 배포 등)이 작동하지 않습니다.
 
 ### 빠른 시작
 
@@ -639,6 +814,39 @@ sudo chown -R $USER:$GROUP ~/.config
 rm -rf server/venv
 npm run setup-python:darwin  # Windows의 경우 setup-python:win32
 ```
+
+**6. MongoDB 연결 문제:**
+```bash
+# MongoDB 실행 상태 확인
+# macOS:
+brew services list | grep mongodb
+
+# Linux:
+sudo systemctl status mongod
+
+# Windows (관리자 권한 명령 프롬프트):
+sc query MongoDB
+
+# 실행 중이 아니면 MongoDB 시작:
+# macOS:
+brew services start mongodb-community
+
+# Linux:
+sudo systemctl start mongod
+
+# Windows:
+net start MongoDB
+
+# 연결 테스트
+mongosh --eval "db.version()"
+```
+
+**7. 저장 기능이 작동하지 않음:**
+"MongoDB not connected" 경고가 표시되거나 저장 기능이 작동하지 않는 경우:
+- MongoDB가 설치되고 실행 중인지 확인 (위 참조)
+- 환경 변수에서 MongoDB 연결 URL 확인
+- `localhost:27017`에서 MongoDB에 접근 가능한지 확인
+- 서버 로그에서 MongoDB 연결 오류 확인
 
 ---
 
