@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, X, Search, Code } from 'lucide-react';
-import { nodeCategories } from '../data/nodeCategories';
+import { getNodeCategories } from '../data/nodeCategories';
 import { useFlowStore } from '../store/flowStore';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface NodeSidebarProps {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface NodeSidebarProps {
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
   const { userNodes, fetchUserNodes, nodes, isWorkflowRunning } = useFlowStore();
+  const { t, language } = useTranslation();
   
   // 다른 노드가 실행 중인지 확인
   const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
@@ -17,6 +19,9 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
     'Sequential Agents': true,
     'User Nodes': false
   });
+
+  // 언어가 변경될 때마다 노드 카테고리 재생성
+  const currentNodeCategories = React.useMemo(() => getNodeCategories(), [language]);
 
   // UserNode 목록 로드
   useEffect(() => {
@@ -34,7 +39,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
     // 실행 중일 때는 드래그 비활성화
     if (isWorkflowRunning || isAnyNodeExecuting) {
       event.preventDefault();
-      alert('워크플로우나 노드가 실행 중일 때는 노드를 추가할 수 없습니다.');
+      alert(t('alert.cannotAddNodeWhileRunning'));
       return;
     }
     
@@ -43,19 +48,19 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
   };
 
   const filteredCategories = searchTerm.trim() 
-    ? nodeCategories.map(category => ({
+    ? currentNodeCategories.map(category => ({
         ...category,
         nodes: category.nodes.filter(node => 
           node.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
           node.description.toLowerCase().includes(searchTerm.toLowerCase())
         )
       })).filter(category => category.nodes.length > 0)
-    : nodeCategories;
+    : currentNodeCategories;
 
   return (
     <div className="w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col shadow-md z-10">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">Add Nodes</h2>
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100">{t('sidebar.addNodes')}</h2>
         <button
           onClick={onClose}
           className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -68,7 +73,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
         <div className="relative">
           <input
             type="text"
-            placeholder="Search nodes"
+            placeholder={t('sidebar.searchNodes')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-3 py-2 pl-9 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
@@ -132,7 +137,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
             onClick={() => toggleCategory('User Nodes')}
             className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700"
           >
-            <span className="font-medium text-gray-700 dark:text-gray-300">User Nodes</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{t('sidebar.userNodes')}</span>
             {expandedCategories['User Nodes'] ? (
               <ChevronUp size={18} className="text-gray-500 dark:text-gray-400" />
             ) : (
@@ -143,7 +148,7 @@ const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
             <div className="px-4 pb-3">
               {userNodes.length === 0 ? (
                 <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
-                  사용자 정의 노드가 없습니다.
+                  {t('sidebar.noUserNodes')}
                 </div>
               ) : (
                 userNodes.map((userNode) => (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 import { DeploymentFormData, DeploymentEnvironment } from '../../types/deployment';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DeploymentModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
   onSubmit,
   isLoading = false
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<DeploymentFormData>({
     name: '',
     version: '1.0.0',
@@ -44,19 +46,19 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Deployment name is required.';
+      newErrors.name = t('deployment.deploymentNameRequired');
     } else if (formData.name.length > 100) {
-      newErrors.name = 'Deployment name must be 100 characters or less.';
+      newErrors.name = t('deployment.deploymentNameMaxLength');
     }
 
     if (!formData.version.trim()) {
-      newErrors.version = 'Version is required.';
+      newErrors.version = t('deployment.versionRequired');
     } else if (formData.version.length > 50) {
-      newErrors.version = 'Version must be 50 characters or less.';
+      newErrors.version = t('deployment.versionMaxLength');
     }
 
     if (formData.description && formData.description.length > 500) {
-      newErrors.description = 'Description must be 500 characters or less.';
+      newErrors.description = t('deployment.descriptionMaxLength');
     }
 
     setErrors(newErrors);
@@ -98,7 +100,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Create New Deployment
+            {t('deployment.createNew')}
           </h2>
           <button
             onClick={handleClose}
@@ -113,7 +115,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
           {/* Deployment Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Deployment Name *
+              {t('deployment.deploymentName')} *
             </label>
             <input
               type="text"
@@ -136,7 +138,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
           {/* Version */}
           <div>
             <label htmlFor="version" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Version *
+              {t('common.version')} *
             </label>
             <input
               type="text"
@@ -159,7 +161,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
           {/* 환경 */}
           <div>
             <label htmlFor="environment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Environment
+              {t('deployment.environment')}
             </label>
             <select
               id="environment"
@@ -168,15 +170,15 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               disabled={isLoading}
             >
-              <option value={DeploymentEnvironment.DEV}>Development (DEV)</option>
-              <option value={DeploymentEnvironment.PROD}>Production (PROD)</option>
+              <option value={DeploymentEnvironment.DEV}>{t('deployment.environmentDev')}</option>
+              <option value={DeploymentEnvironment.PROD}>{t('deployment.environmentProd')}</option>
             </select>
           </div>
 
           {/* 설명 */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Description
+              {t('common.description')}
             </label>
             <textarea
               id="description"
@@ -188,7 +190,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
                   ? 'border-red-500 focus:ring-red-500' 
                   : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white'
               }`}
-              placeholder="Enter description for the deployment..."
+              placeholder={t('deployment.descriptionPlaceholder')}
               disabled={isLoading}
             />
             {errors.description && (
@@ -204,7 +206,7 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
               disabled={isLoading}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -214,12 +216,12 @@ const DeploymentModal: React.FC<DeploymentModalProps> = ({
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deploying...
+                  {t('deployment.deploying')}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Create Deployment
+                  {t('deployment.createDeployment')}
                 </>
               )}
             </button>

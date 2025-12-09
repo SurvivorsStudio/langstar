@@ -40,7 +40,7 @@ const AIConnectionList: React.FC<AIConnectionListProps> = ({
   }
 
   return (
-    <div className="p-8 bg-white dark:bg-gray-900 min-h-screen">
+    <div className="p-8">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">

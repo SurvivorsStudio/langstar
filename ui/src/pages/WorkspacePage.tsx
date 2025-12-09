@@ -16,6 +16,7 @@ import ScheduleManagement from '../components/workspace/ScheduleManagement';
 import Footer from '../components/Footer';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
 import { Deployment } from '../types/deployment';
+import { useTranslation } from '../hooks/useTranslation';
 
 const mockRagConfigs = [
   {
@@ -45,6 +46,7 @@ const mockRagConfigs = [
 const WorkspacePage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
   const {
     availableWorkflows,
     fetchAvailableWorkflows,
@@ -141,19 +143,19 @@ const WorkspacePage: React.FC = () => {
 
   const handleDeleteRag = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this RAG configuration?')) {
+    if (window.confirm(t('aiConnection.deleteConfirm'))) {
       // Handle deletion
     }
   };
 
   const handleDeleteAIConnection = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this AI connection?')) {
+    if (window.confirm(t('aiConnection.deleteConfirm'))) {
       try {
         await deleteAIConnection(id);
         // Success notification (e.g., toast)
       } catch (error) {
-        alert(`Error deleting AI connection: ${(error as Error).message}`);
+        alert(`${t('common.error')}: ${(error as Error).message}`);
       }
     }
   };
@@ -227,7 +229,7 @@ const WorkspacePage: React.FC = () => {
       navigate(`/flow/${encodeURIComponent(workflowName)}`);
     } catch (error) {
       console.error(`WorkspacePage: Failed to load workflow ${workflowName}:`, error);
-      alert(`Error loading workflow: ${workflowName}. Check console for details.`);
+      alert(`${t('common.error')}: ${workflowName}`);
     }
   };
 
@@ -251,13 +253,13 @@ const WorkspacePage: React.FC = () => {
 
   const handleDeleteWorkflow = async (workflowName: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete the workflow "${workflowName}"? This action cannot be undone.`)) {
+    if (window.confirm(t('workflow.deleteConfirm', { name: workflowName }))) {
       try {
         await deleteWorkflow(workflowName);
         // Success notification (e.g., toast message)
       } catch (error) {
         console.error(`WorkspacePage: Failed to delete workflow ${workflowName}:`, error);
-        alert(`Error deleting workflow: ${workflowName}. Check console for details.`);
+        alert(`${t('common.error')}: ${workflowName}`);
       }
     }
   };
@@ -284,11 +286,11 @@ const WorkspacePage: React.FC = () => {
 
 
     const handleDeleteDeployment = async (deploymentId: string) => {
-      if (window.confirm('Are you sure you want to delete this deployment?')) {
+      if (window.confirm(t('deployment.deleteConfirm'))) {
         try {
           await deleteDeployment(deploymentId);
         } catch (error) {
-          alert(`Error deleting deployment: ${(error as Error).message}`);
+          alert(`${t('common.error')}: ${(error as Error).message}`);
         }
       }
     };
@@ -297,7 +299,7 @@ const WorkspacePage: React.FC = () => {
       try {
         await activateDeployment(deploymentId);
       } catch (error) {
-        alert(`Error activating deployment: ${(error as Error).message}`);
+        alert(`${t('common.error')}: ${(error as Error).message}`);
       }
     };
 
@@ -305,7 +307,7 @@ const WorkspacePage: React.FC = () => {
       try {
         await deactivateDeployment(deploymentId);
       } catch (error) {
-        alert(`Error deactivating deployment: ${(error as Error).message}`);
+        alert(`${t('common.error')}: ${(error as Error).message}`);
       }
     };
     

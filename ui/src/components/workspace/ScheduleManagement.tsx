@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useScheduleStore } from '../../store/scheduleStore';
 import { Schedule, ScheduleStatus, ScheduleType } from '../../types/schedule';
 import ScheduleModal from './ScheduleModal';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const ScheduleManagement: React.FC = () => {
+  const { t } = useTranslation();
   const {
     schedules,
     isLoading,
@@ -33,7 +35,7 @@ const ScheduleManagement: React.FC = () => {
   };
 
   const handleDelete = async (scheduleId: string) => {
-    if (window.confirm('이 스케줄을 삭제하시겠습니까?')) {
+    if (window.confirm(t('schedule.deleteConfirm'))) {
       try {
         await deleteSchedule(scheduleId);
       } catch (error) {
@@ -72,13 +74,28 @@ const ScheduleManagement: React.FC = () => {
   const getScheduleTypeLabel = (type: ScheduleType) => {
     switch (type) {
       case ScheduleType.CRON:
-        return 'Cron';
+        return t('schedule.typeCron');
       case ScheduleType.INTERVAL:
-        return '반복';
+        return t('schedule.typeInterval');
       case ScheduleType.DATE:
-        return '일회성';
+        return t('schedule.typeDate');
       default:
         return type;
+    }
+  };
+
+  const getStatusLabel = (status: ScheduleStatus) => {
+    switch (status) {
+      case ScheduleStatus.ACTIVE:
+        return t('schedule.statusActive');
+      case ScheduleStatus.PAUSED:
+        return t('schedule.statusPaused');
+      case ScheduleStatus.COMPLETED:
+        return t('schedule.statusCompleted');
+      case ScheduleStatus.FAILED:
+        return t('schedule.statusFailed');
+      default:
+        return status;
     }
   };
 
@@ -92,13 +109,13 @@ const ScheduleManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          스케줄 관리
+          {t('schedule.title')}
         </h2>
         <button
           onClick={handleCreateNew}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          + 새 스케줄
+          + {t('schedule.newSchedule')}
         </button>
       </div>
 
@@ -118,7 +135,7 @@ const ScheduleManagement: React.FC = () => {
       {/* Loading State */}
       {isLoading && (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-gray-500 dark:text-gray-400">로딩 중...</div>
+          <div className="text-gray-500 dark:text-gray-400">{t('common.loading')}</div>
         </div>
       )}
 
@@ -127,8 +144,8 @@ const ScheduleManagement: React.FC = () => {
         <div className="flex-1 overflow-auto p-4">
           {schedules.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
-              <p className="text-lg mb-2">등록된 스케줄이 없습니다</p>
-              <p className="text-sm">새 스케줄 버튼을 클릭하여 시작하세요</p>
+              <p className="text-lg mb-2">{t('schedule.noSchedules')}</p>
+              <p className="text-sm">{t('schedule.createFirst')}</p>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -149,7 +166,7 @@ const ScheduleManagement: React.FC = () => {
                             schedule.status
                           )}`}
                         >
-                          {schedule.status}
+                          {getStatusLabel(schedule.status)}
                         </span>
                         <span className="px-2 py-1 text-xs rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                           {getScheduleTypeLabel(schedule.scheduleType)}
@@ -168,20 +185,20 @@ const ScheduleManagement: React.FC = () => {
                           onClick={() => handlePauseResume(schedule)}
                           className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
                         >
-                          {schedule.status === ScheduleStatus.ACTIVE ? '일시중지' : '재개'}
+                          {schedule.status === ScheduleStatus.ACTIVE ? t('schedule.pause') : t('schedule.resume')}
                         </button>
                       )}
                       <button
                         onClick={() => handleEdit(schedule)}
                         className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                       >
-                        수정
+                        {t('schedule.edit')}
                       </button>
                       <button
                         onClick={() => handleDelete(schedule.id)}
                         className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                       >
-                        삭제
+                        {t('common.delete')}
                       </button>
                     </div>
                   </div>
@@ -189,25 +206,25 @@ const ScheduleManagement: React.FC = () => {
                   {/* Schedule Info */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">배포:</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t('schedule.deployment')}:</span>
                       <span className="ml-2 text-gray-900 dark:text-white">
                         {schedule.deploymentName}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">실행 횟수:</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t('schedule.executionCount')}:</span>
                       <span className="ml-2 text-gray-900 dark:text-white">
-                        {schedule.executionCount}회
+                        {t('schedule.executionCountValue', { count: schedule.executionCount })}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">다음 실행:</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t('schedule.nextRun')}:</span>
                       <span className="ml-2 text-gray-900 dark:text-white">
                         {formatDateTime(schedule.nextRunTime)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">마지막 실행:</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t('schedule.lastRun')}:</span>
                       <span className="ml-2 text-gray-900 dark:text-white">
                         {formatDateTime(schedule.lastRunTime)}
                       </span>
@@ -218,7 +235,7 @@ const ScheduleManagement: React.FC = () => {
                   {schedule.lastRunStatus && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                       <span className="text-sm text-gray-500 dark:text-gray-400">
-                        마지막 실행 결과:
+                        {t('schedule.lastRunResult')}:
                       </span>
                       <span
                         className={`ml-2 text-sm font-medium ${
@@ -227,7 +244,7 @@ const ScheduleManagement: React.FC = () => {
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {schedule.lastRunStatus === 'success' ? '성공' : '실패'}
+                        {schedule.lastRunStatus === 'success' ? t('schedule.success') : t('schedule.failed')}
                       </span>
                     </div>
                   )}
