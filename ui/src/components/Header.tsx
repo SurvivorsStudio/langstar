@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, Play, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
+import { useWorkflowStorageStore } from '../store/workflowStorageStore';
 import { useThemeStore } from '../store/themeStore';
 import { useTranslation } from '../hooks/useTranslation';
 import { Link, useNavigate } from 'react-router-dom';
@@ -25,10 +26,11 @@ const Header: React.FC = () => {
     isSaving,
     getWorkflowAsJSONString,
     nodes,
-    renameWorkflow
   } = useFlowStore(state => ({ 
-    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes, renameWorkflow: state.renameWorkflow
+    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes
   }));
+
+  const { renameWorkflow } = useWorkflowStorageStore();
 
   const [apiResponseModalContent, setApiResponseModalContent] = useState<string | null>(null);
   const [editableModalContent, setEditableModalContent] = useState<string>('');
