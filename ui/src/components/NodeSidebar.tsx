@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, X, Search, Code } from 'lucide-react';
 import { getNodeCategories } from '../data/nodeCategories';
 import { useFlowStore } from '../store/flowStore';
+
 import { useUserNodeStore } from '../store/userNodeStore';
+
+
 import { useTranslation } from '../hooks/useTranslation';
 
 interface NodeSidebarProps {
@@ -10,8 +13,10 @@ interface NodeSidebarProps {
 }
 
 const NodeSidebar: React.FC<NodeSidebarProps> = ({ onClose }) => {
+
   const { nodes, isWorkflowRunning } = useFlowStore();
   const { userNodes, fetchUserNodes } = useUserNodeStore();
+
   const { t, language } = useTranslation();
   
   // 다른 노드가 실행 중인지 확인
