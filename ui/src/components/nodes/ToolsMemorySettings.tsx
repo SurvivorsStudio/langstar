@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { AlertCircle, Code, Maximize2 } from 'lucide-react';
+import { useUserNodeStore } from '../../store/userNodeStore';
+import { AlertCircle, Code, Maximize2, X } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
 import CodeEditorPopup from './CodeEditorPopup';
+import UserNodeCodeViewerModal from './UserNodeCodeViewerModal';
 import { Group, NodeData } from '../../types/node';
 import CustomSelect from '../Common/CustomSelect';
 
@@ -12,10 +14,16 @@ interface ToolsMemorySettingsProps {
 
 const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => {
   const { nodes, updateNodeData } = useFlowStore();
+  const { userNodes, fetchUserNodes } = useUserNodeStore();
   const node = nodes.find(n => n.id === nodeId);
   const groups = (node?.data.config?.groups as Group[]) || [];
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameValidationError, setNameValidationError] = useState<string | null>(null);
+  
+  // 컴포넌트 마운트 시 사용자 노드 목록 가져오기
+  useEffect(() => {
+    fetchUserNodes();
+  }, [fetchUserNodes]);
   
   useEffect(() => {
     const selectedGroupId = (node?.data as NodeData)?.selectedGroupId;
@@ -29,6 +37,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>((node?.data as NodeData)?.selectedGroupId || null);
   const [isCodePopupOpen, setIsCodePopupOpen] = useState<boolean>(false);
+  const [isUserNodeCodeViewerOpen, setIsUserNodeCodeViewerOpen] = useState<boolean>(false);
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
 
   const checkNameExists = (name: string, currentGroupId: string): boolean => {
@@ -89,6 +98,12 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
         }
       } as NodeData);
       setSelectedGroupId(null);
+    }
+  };
+
+  const handleUserNodeCodeChange = (code: string) => {
+    if (selectedGroup) {
+      handleUpdateGroup(selectedGroup.id, { code });
     }
   };
 
@@ -177,13 +192,13 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
 
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-              Tools Description
+              {selectedGroup.type === 'tools' ? 'Tools Description' : 'Description'}
             </label>
             <textarea
               value={selectedGroup.description}
               onChange={(e) => handleUpdateGroup(selectedGroup.id, { description: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              placeholder="Enter tools description"
+              placeholder={selectedGroup.type === 'tools' ? 'Enter tools description' : 'Enter description'}
               rows={2}
             />
           </div>
@@ -191,6 +206,109 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
       </div>
 
       {selectedGroup.type === 'tools' && (
+        <>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
+              Source Type
+            </label>
+            <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">
+              {selectedGroup.sourceType === 'userNode' ? 'User Node (사용자 노드 선택)' : 'Custom Code (직접 작성)'}
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Source type cannot be modified after creation
+            </p>
+          </div>
+
+          {selectedGroup.sourceType === 'userNode' && (
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Select User Node(s)
+                </label>
+                {(selectedGroup.selectedUserNodeIds?.length > 0 || selectedGroup.selectedUserNodeId) && (
+                  <button
+                    onClick={() => setIsUserNodeCodeViewerOpen(true)}
+                    className="px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center"
+                    title="View and edit code"
+                  >
+                    <Maximize2 size={14} className="mr-1" />
+                    View Code
+                  </button>
+                )}
+              </div>
+              
+              {/* 멀티 선택이 있는 경우 멀티 선택 UI 표시 */}
+              {selectedGroup.selectedUserNodeIds && selectedGroup.selectedUserNodeIds.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Selected {selectedGroup.selectedUserNodeIds.length} user node(s):
+                  </div>
+                  <div className="space-y-2">
+                    {selectedGroup.selectedUserNodeIds.map(nodeId => {
+                      const userNode = userNodes.find(un => un.id === nodeId);
+                      return userNode ? (
+                        <div key={nodeId} className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            {userNode.name}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updatedIds = selectedGroup.selectedUserNodeIds!.filter(id => id !== nodeId);
+                              handleUpdateGroup(selectedGroup.id, { 
+                                selectedUserNodeIds: updatedIds.length > 0 ? updatedIds : undefined 
+                              });
+                            }}
+                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                  <button
+                    onClick={() => handleUpdateGroup(selectedGroup.id, { selectedUserNodeIds: undefined })}
+                    className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                  >
+                    Clear all selections
+                  </button>
+                </div>
+              ) : (
+                /* 단일 선택 UI (기존 방식) */
+                <>
+                  <CustomSelect
+                    value={selectedGroup.selectedUserNodeId || ''}
+                    onChange={value => handleUpdateGroup(selectedGroup.id, { selectedUserNodeId: value })}
+                    options={userNodes.map(userNode => ({
+                      value: userNode.id,
+                      label: userNode.name
+                    }))}
+                    placeholder={userNodes.length === 0 ? 'No user nodes available' : 'Select a user node'}
+                  />
+                  {userNodes.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-500 flex items-center">
+                      <AlertCircle size={12} className="mr-1" />
+                      No user nodes found. Please create a user node first.
+                    </p>
+                  )}
+                  {selectedGroup.selectedUserNodeId && (
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                      <div className="text-xs text-gray-600 dark:text-gray-300">
+                        <div className="font-medium mb-1">Selected User Node:</div>
+                        <div className="text-gray-800 dark:text-gray-100 font-mono">
+                          {userNodes.find(un => un.id === selectedGroup.selectedUserNodeId)?.name || 'Unknown'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {selectedGroup.type === 'tools' && (!selectedGroup.sourceType || selectedGroup.sourceType === 'customCode') && (
         <div className="flex-1 overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div className="flex items-center space-x-2">
@@ -208,7 +326,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
               Full Screen
             </button>
           </div>
-          <div className="h-[calc(100vh-380px)]">
+          <div className="h-[calc(100vh-480px)]">
             <CodeEditor
               value={selectedGroup.code || '# Write your Python code here\n'}
               onChange={(value) => handleUpdateGroup(selectedGroup.id, { code: value })}
@@ -232,6 +350,16 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
         sourceNode={null}
         availableVariables={[]}
         hideInputVariables={true}
+      />
+      
+      {/* User Node Code Viewer Modal */}
+      <UserNodeCodeViewerModal
+        isOpen={isUserNodeCodeViewerOpen}
+        onClose={() => setIsUserNodeCodeViewerOpen(false)}
+        selectedUserNodeIds={selectedGroup?.selectedUserNodeIds || []}
+        selectedUserNodeId={selectedGroup?.selectedUserNodeId}
+        groupCode={selectedGroup?.code}
+        onCodeChange={handleUserNodeCodeChange}
       />
     </div>
   );
