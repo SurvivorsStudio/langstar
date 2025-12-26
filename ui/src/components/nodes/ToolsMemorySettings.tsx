@@ -237,7 +237,7 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
                 )}
               </div>
               
-              {/* 멀티 선택이 있는 경우 멀티 선택 UI 표시 */}
+              {/* 멀티 선택이 있는 경우 멀티 선택 UI 표시 (읽기 전용) */}
               {selectedGroup.selectedUserNodeIds && selectedGroup.selectedUserNodeIds.length > 0 ? (
                 <div className="space-y-3">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -247,61 +247,53 @@ const ToolsMemorySettings: React.FC<ToolsMemorySettingsProps> = ({ nodeId }) => 
                     {selectedGroup.selectedUserNodeIds.map(nodeId => {
                       const userNode = userNodes.find(un => un.id === nodeId);
                       return userNode ? (
-                        <div key={nodeId} className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
-                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        <div key={nodeId} className="flex items-center p-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                             {userNode.name}
                           </span>
-                          <button
-                            onClick={() => {
-                              const updatedIds = selectedGroup.selectedUserNodeIds!.filter(id => id !== nodeId);
-                              handleUpdateGroup(selectedGroup.id, { 
-                                selectedUserNodeIds: updatedIds.length > 0 ? updatedIds : undefined 
-                              });
-                            }}
-                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <X size={16} />
-                          </button>
+                          {userNode.functionDescription && (
+                            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                              - {userNode.functionDescription}
+                            </span>
+                          )}
                         </div>
                       ) : null;
                     })}
                   </div>
-                  <button
-                    onClick={() => handleUpdateGroup(selectedGroup.id, { selectedUserNodeIds: undefined })}
-                    className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                  >
-                    Clear all selections
-                  </button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    User node selection cannot be modified after creation
+                  </p>
+                </div>
+              ) : selectedGroup.selectedUserNodeId ? (
+                /* 단일 선택 UI (읽기 전용) */
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                    <div className="text-sm text-gray-800 dark:text-gray-200 font-medium">
+                      {userNodes.find(un => un.id === selectedGroup.selectedUserNodeId)?.name || 'Unknown Node'}
+                    </div>
+                    {(() => {
+                      const userNode = userNodes.find(un => un.id === selectedGroup.selectedUserNodeId);
+                      return userNode?.functionDescription ? (
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {userNode.functionDescription}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    User node selection cannot be modified after creation
+                  </p>
                 </div>
               ) : (
-                /* 단일 선택 UI (기존 방식) */
-                <>
-                  <CustomSelect
-                    value={selectedGroup.selectedUserNodeId || ''}
-                    onChange={value => handleUpdateGroup(selectedGroup.id, { selectedUserNodeId: value })}
-                    options={userNodes.map(userNode => ({
-                      value: userNode.id,
-                      label: userNode.name
-                    }))}
-                    placeholder={userNodes.length === 0 ? 'No user nodes available' : 'Select a user node'}
-                  />
-                  {userNodes.length === 0 && (
-                    <p className="mt-2 text-xs text-amber-500 flex items-center">
-                      <AlertCircle size={12} className="mr-1" />
-                      No user nodes found. Please create a user node first.
-                    </p>
-                  )}
-                  {selectedGroup.selectedUserNodeId && (
-                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                      <div className="text-xs text-gray-600 dark:text-gray-300">
-                        <div className="font-medium mb-1">Selected User Node:</div>
-                        <div className="text-gray-800 dark:text-gray-100 font-mono">
-                          {userNodes.find(un => un.id === selectedGroup.selectedUserNodeId)?.name || 'Unknown'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
+                /* 선택된 노드가 없는 경우 */
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    No user node selected
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    User node selection cannot be modified after creation
+                  </p>
+                </div>
               )}
             </div>
           )}

@@ -523,7 +523,7 @@ const FlowBuilder: React.FC = () => {
     // UserNode인 경우 특별한 처리
     if (type === 'userNode') {
       // UserNode 정보를 가져와서 노드 생성
-      const userNodes = useFlowStore.getState().userNodes;
+      const { userNodes } = useUserNodeStore.getState();
       const userNode = userNodes.find(node => node.name === label);
       
       console.log('FlowBuilder - UserNode drag:', { type, label });
