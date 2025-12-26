@@ -265,6 +265,38 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
+  const handleDeleteDeployment = async (deploymentId: string) => {
+    console.log('[WorkspacePage] handleDeleteDeployment called with ID:', deploymentId);
+    if (window.confirm(t('deployment.deleteConfirm'))) {
+      console.log('[WorkspacePage] User confirmed deletion, calling deleteDeployment...');
+      try {
+        await deleteDeployment(deploymentId);
+        console.log('[WorkspacePage] Deployment deleted successfully');
+      } catch (error) {
+        console.error('[WorkspacePage] Error deleting deployment:', error);
+        alert(`${t('common.error')}: ${(error as Error).message}`);
+      }
+    } else {
+      console.log('[WorkspacePage] User cancelled deletion');
+    }
+  };
+
+  const handleActivateDeployment = async (deploymentId: string) => {
+    try {
+      await activateDeployment(deploymentId);
+    } catch (error) {
+      alert(`${t('common.error')}: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeactivateDeployment = async (deploymentId: string) => {
+    try {
+      await deactivateDeployment(deploymentId);
+    } catch (error) {
+      alert(`${t('common.error')}: ${(error as Error).message}`);
+    }
+  };
+
   const renderMainContent = () => {
     if (showWizard) {
       return (
@@ -276,34 +308,6 @@ const WorkspacePage: React.FC = () => {
         />
       );
     }
-
-
-
-    const handleDeleteDeployment = async (deploymentId: string) => {
-      if (window.confirm(t('deployment.deleteConfirm'))) {
-        try {
-          await deleteDeployment(deploymentId);
-        } catch (error) {
-          alert(`${t('common.error')}: ${(error as Error).message}`);
-        }
-      }
-    };
-
-    const handleActivateDeployment = async (deploymentId: string) => {
-      try {
-        await activateDeployment(deploymentId);
-      } catch (error) {
-        alert(`${t('common.error')}: ${(error as Error).message}`);
-      }
-    };
-
-    const handleDeactivateDeployment = async (deploymentId: string) => {
-      try {
-        await deactivateDeployment(deploymentId);
-      } catch (error) {
-        alert(`${t('common.error')}: ${(error as Error).message}`);
-      }
-    };
     
     switch (activeMenu) {
       case 'chatflows':

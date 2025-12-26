@@ -118,15 +118,20 @@ export const useDeploymentStore = create<DeploymentState>((set, get) => ({
    * @param id - Deployment ID
    */
   deleteDeployment: async (id: string) => {
+    console.log('[DeploymentStore] deleteDeployment called with ID:', id);
     try {
       set({ isLoadingDeployments: true, loadErrorDeployments: null });
 
+      console.log('[DeploymentStore] Calling apiService.deleteDeployment...');
       await apiService.deleteDeployment(id);
+      console.log('[DeploymentStore] API call successful, refreshing deployment list...');
 
       // Refresh deployment list
       await get().fetchDeployments();
+      console.log('[DeploymentStore] Deployment list refreshed');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[DeploymentStore] Error deleting deployment:', errorMessage);
       set({ loadErrorDeployments: errorMessage, isLoadingDeployments: false });
       throw error;
     } finally {
