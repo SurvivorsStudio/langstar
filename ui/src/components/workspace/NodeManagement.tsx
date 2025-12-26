@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Code, Edit, Trash2, FileDown, X, Upload } from 'lucide-react';
-import { useFlowStore } from '../../store/flowStore';
+import { useUserNodeStore } from '../../store/userNodeStore';
 import NodeCreation from './NodeCreation';
 import NodeDetail from './NodeDetail';
 
@@ -9,7 +9,7 @@ interface NodeManagementProps {
 }
 
 const NodeManagement: React.FC<NodeManagementProps> = ({ onBack }) => {
-  const { userNodes, fetchUserNodes, deleteUserNode, importUserNodes, exportUserNodes } = useFlowStore();
+  const { userNodes, fetchUserNodes, deleteUserNode, importUserNodes, exportUserNodes } = useUserNodeStore();
   const [showNodeCreation, setShowNodeCreation] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   

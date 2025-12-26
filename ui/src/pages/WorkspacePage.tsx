@@ -2,6 +2,9 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // import logoImage from '../assets/common/langstar_logo.png';
 import { useFlowStore, DEFAULT_PROJECT_NAME, emptyInitialNodes, emptyInitialEdges } from '../store/flowStore';
+import { useAIConnectionStore } from '../store/aiConnectionStore';
+import { useWorkflowStorageStore } from '../store/workflowStorageStore';
+import { useDeploymentStore } from '../store/deploymentZustandStore';
 import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar';
 import WorkflowList from '../components/workspace/WorkflowList';
 import RagConfigList from '../components/workspace/RagConfigList';
@@ -48,22 +51,17 @@ const WorkspacePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   const {
-    availableWorkflows,
-    fetchAvailableWorkflows,
     loadWorkflow,
-    isLoading: isStoreLoading,
-    loadError,
     setProjectName,
-    deleteWorkflow,
-    aiConnections,
-    fetchAIConnections,
-    addAIConnection,
-    updateAIConnection,
-    deleteAIConnection,
-    isLoadingAIConnections,
-    loadErrorAIConnections,
     getWorkflowAsJSONString,
-    // 배포 관련 상태와 함수들
+  } = useFlowStore(state => ({
+    loadWorkflow: state.loadWorkflow,
+    setProjectName: state.setProjectName,
+    getWorkflowAsJSONString: state.getWorkflowAsJSONString,
+  }));
+
+  // 배포 관련 상태와 함수들 (별도 스토어에서 가져오기)
+  const {
     deployments,
     fetchDeployments,
     isLoadingDeployments,
@@ -71,31 +69,27 @@ const WorkspacePage: React.FC = () => {
     deleteDeployment,
     activateDeployment,
     deactivateDeployment,
-  } = useFlowStore(state => ({
-    availableWorkflows: state.availableWorkflows,
-    fetchAvailableWorkflows: state.fetchAvailableWorkflows,
-    loadWorkflow: state.loadWorkflow,
-    isLoading: state.isLoading,
-    loadError: state.loadError,
-    setProjectName: state.setProjectName,
-    deleteWorkflow: state.deleteWorkflow,
-    aiConnections: state.aiConnections,
-    fetchAIConnections: state.fetchAIConnections,
-    addAIConnection: state.addAIConnection,
-    updateAIConnection: state.updateAIConnection,
-    deleteAIConnection: state.deleteAIConnection,
-    isLoadingAIConnections: state.isLoadingAIConnections,
-    loadErrorAIConnections: state.loadErrorAIConnections,
-    getWorkflowAsJSONString: state.getWorkflowAsJSONString,
-    // 배포 관련 상태와 함수들
-    deployments: state.deployments,
-    fetchDeployments: state.fetchDeployments,
-    isLoadingDeployments: state.isLoadingDeployments,
-    loadErrorDeployments: state.loadErrorDeployments,
-    deleteDeployment: state.deleteDeployment,
-    activateDeployment: state.activateDeployment,
-    deactivateDeployment: state.deactivateDeployment,
-  }));
+  } = useDeploymentStore();
+
+  // Workflow Storage 관련 상태와 함수들 (별도 스토어에서 가져오기)
+  const {
+    availableWorkflows,
+    fetchAvailableWorkflows,
+    deleteWorkflow,
+    isLoading: isStoreLoading,
+    loadError,
+  } = useWorkflowStorageStore();
+
+  // AI Connection 관련 상태와 함수들 (별도 스토어에서 가져오기)
+  const {
+    aiConnections,
+    fetchAIConnections,
+    addAIConnection,
+    updateAIConnection,
+    deleteAIConnection,
+    isLoadingAIConnections,
+    loadErrorAIConnections,
+  } = useAIConnectionStore();
 
   const [activeMenu, setActiveMenu] = React.useState(() => {
     const tab = searchParams.get('tab');
@@ -271,6 +265,38 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
+  const handleDeleteDeployment = async (deploymentId: string) => {
+    console.log('[WorkspacePage] handleDeleteDeployment called with ID:', deploymentId);
+    if (window.confirm(t('deployment.deleteConfirm'))) {
+      console.log('[WorkspacePage] User confirmed deletion, calling deleteDeployment...');
+      try {
+        await deleteDeployment(deploymentId);
+        console.log('[WorkspacePage] Deployment deleted successfully');
+      } catch (error) {
+        console.error('[WorkspacePage] Error deleting deployment:', error);
+        alert(`${t('common.error')}: ${(error as Error).message}`);
+      }
+    } else {
+      console.log('[WorkspacePage] User cancelled deletion');
+    }
+  };
+
+  const handleActivateDeployment = async (deploymentId: string) => {
+    try {
+      await activateDeployment(deploymentId);
+    } catch (error) {
+      alert(`${t('common.error')}: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeactivateDeployment = async (deploymentId: string) => {
+    try {
+      await deactivateDeployment(deploymentId);
+    } catch (error) {
+      alert(`${t('common.error')}: ${(error as Error).message}`);
+    }
+  };
+
   const renderMainContent = () => {
     if (showWizard) {
       return (
@@ -282,34 +308,6 @@ const WorkspacePage: React.FC = () => {
         />
       );
     }
-
-
-
-    const handleDeleteDeployment = async (deploymentId: string) => {
-      if (window.confirm(t('deployment.deleteConfirm'))) {
-        try {
-          await deleteDeployment(deploymentId);
-        } catch (error) {
-          alert(`${t('common.error')}: ${(error as Error).message}`);
-        }
-      }
-    };
-
-    const handleActivateDeployment = async (deploymentId: string) => {
-      try {
-        await activateDeployment(deploymentId);
-      } catch (error) {
-        alert(`${t('common.error')}: ${(error as Error).message}`);
-      }
-    };
-
-    const handleDeactivateDeployment = async (deploymentId: string) => {
-      try {
-        await deactivateDeployment(deploymentId);
-      } catch (error) {
-        alert(`${t('common.error')}: ${(error as Error).message}`);
-      }
-    };
     
     switch (activeMenu) {
       case 'chatflows':

@@ -440,6 +440,18 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             self._update_workflow_snap_metadata(deployment_id, execution_id, execution_record)
             
             # 7. 응답 반환 (노드 실행 결과 전체 포함)
+            # output 추출 - result가 dict이고 result 키가 있으면 그것을 사용, 아니면 result 자체를 사용
+            output_data = None
+            if isinstance(output_result.get("result"), dict):
+                if "result" in output_result.get("result", {}):
+                    output_data = output_result["result"]["result"]
+                elif "response" in output_result.get("result", {}):
+                    output_data = output_result["result"]["response"]
+                else:
+                    output_data = output_result.get("result")
+            else:
+                output_data = output_result.get("result")
+            
             return {
                 "success": True,
                 "deployment_id": deployment_id,
@@ -448,7 +460,7 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
                     "message": f"Deployment {deployment.name} executed successfully",
                     "input_received": input_data,
                     "status": "executed",
-                    "output": output_result.get("result").get("response"),
+                    "output": output_data,
                     "error": output_result.get("error"),
                     "execution_summary": {
                         "start_time": start_time,
@@ -767,13 +779,13 @@ def run_deployment_{deployment_id.replace('-', '_')}(input_data):
             
             # 1. MongoDB에서 배포 버전 삭제
             versions_collection = get_deployment_versions_collection()
-            if versions_collection:
+            if versions_collection is not None:
                 result = versions_collection.delete_many({"deploymentId": deployment_id})
                 logger.info(f"Deleted {result.deleted_count} deployment versions from MongoDB")
             
             # 2. MongoDB에서 배포 삭제
             deployments_collection = get_deployments_collection()
-            if deployments_collection:
+            if deployments_collection is not None:
                 deployments_collection.delete_one({"id": deployment_id})
                 logger.info(f"Deleted deployment {deployment_id} from MongoDB")
             

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, Pencil, Check, Search } from 'lucide-react';
 import { useFlowStore } from '../../store/flowStore';
-import type { AIConnection } from '../../store/flowStore';
+import { useAIConnectionStore } from '../../store/aiConnectionStore';
+import type { AIConnection } from '../../types/aiConnection';
 import CustomSelect from '../Common/CustomSelect';
 import MultiSelect from '../Common/MultiSelect';
 import HierarchicalKeySelector from '../Common/HierarchicalKeySelector';
@@ -26,16 +27,18 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ nodeId }) => {
     edges,
     updateNodeData,
     getNodeById,
-    aiConnections,
-    fetchAIConnections,
   } = useFlowStore(state => ({
     nodes: state.nodes,
     edges: state.edges,
     updateNodeData: state.updateNodeData,
     getNodeById: state.getNodeById,
-    aiConnections: state.aiConnections,
-    fetchAIConnections: state.fetchAIConnections,
   }));
+
+  // AI Connection 관련 상태와 함수들 (별도 스토어에서 가져오기)
+  const {
+    aiConnections,
+    fetchAIConnections,
+  } = useAIConnectionStore();
 
   const node = nodes.find(n => n.id === nodeId);
   const [isEditingOutputVariable, setIsEditingOutputVariable] = useState(false);
