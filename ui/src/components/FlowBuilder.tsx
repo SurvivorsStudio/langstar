@@ -15,12 +15,16 @@ import 'reactflow/dist/style.css';
 
 import { useFlowStore } from '../store/flowStore';
 import { useThemeStore } from '../store/themeStore';
+import { useUserNodeStore } from '../store/userNodeStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import ExecutionToast from './ExecutionToast';
 import ConnectionToast from './ConnectionToast';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
+import AddToolsGroupModal from './nodes/AddToolsGroupModal';
+import CreateCodeToolsModal from './nodes/CreateCodeToolsModal';
+import CustomNodeSelectionModal from './nodes/CustomNodeSelectionModal';
 import { PlusCircle, Trash2 } from 'lucide-react';
 
 const edgeTypes = {
@@ -47,6 +51,14 @@ const FlowBuilder: React.FC = () => {
   const [isOverTrashZone, setIsOverTrashZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<{x:number;y:number}|null>(null);
+
+  // 모달 상태들
+  const [toolsGroupModalState, setToolsGroupModalState] = useState({
+    isAddToolsGroupModalOpen: false,
+    isCreateCodeModalOpen: false,
+    isCustomNodeSelectionModalOpen: false,
+    targetNodeId: null as string | null
+  });
 
   // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
   useEffect(() => {
@@ -184,6 +196,163 @@ const FlowBuilder: React.FC = () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, showTrashZone]);
+
+  // 모달 핸들러 함수들
+  const handleOpenAddToolsGroupModal = useCallback((nodeId: string) => {
+    setToolsGroupModalState(prev => ({
+      ...prev,
+      isAddToolsGroupModalOpen: true,
+      targetNodeId: nodeId
+    }));
+  }, []);
+
+  const handleCreateCodeClick = useCallback(() => {
+    setToolsGroupModalState(prev => ({
+      ...prev,
+      isAddToolsGroupModalOpen: false,
+      isCreateCodeModalOpen: true
+    }));
+  }, []);
+
+  const handleCustomNodeClick = useCallback(() => {
+    setToolsGroupModalState(prev => ({
+      ...prev,
+      isAddToolsGroupModalOpen: false,
+      isCustomNodeSelectionModalOpen: true
+    }));
+  }, []);
+
+  const handleCreateCodeSave = useCallback((groupData: { name: string; description: string; code: string }) => {
+    if (!toolsGroupModalState.targetNodeId) return;
+
+    const targetNode = nodes.find(n => n.id === toolsGroupModalState.targetNodeId);
+    if (!targetNode) return;
+
+    const groups = (targetNode.data.config?.groups as any[]) || [];
+    const newGroup = {
+      id: `group-${Date.now()}`,
+      name: groupData.name,
+      description: groupData.description,
+      type: 'tools' as const,
+      sourceType: 'customCode' as const,
+      code: groupData.code,
+      nodes: []
+    };
+
+    const { updateNodeData } = useFlowStore.getState();
+    updateNodeData(toolsGroupModalState.targetNodeId, {
+      ...targetNode.data,
+      config: {
+        ...targetNode.data.config,
+        groups: [...groups, newGroup]
+      }
+    });
+
+    setToolsGroupModalState(prev => ({
+      ...prev,
+      isCreateCodeModalOpen: false,
+      targetNodeId: null
+    }));
+  }, [toolsGroupModalState.targetNodeId, nodes]);
+
+  const handleCustomNodeSave = useCallback((selectedUserNodeIds: string[]) => {
+    if (!toolsGroupModalState.targetNodeId) return;
+
+    const targetNode = nodes.find(n => n.id === toolsGroupModalState.targetNodeId);
+    if (!targetNode) return;
+
+    const { userNodes } = useUserNodeStore.getState();
+    const groups = (targetNode.data.config?.groups as any[]) || [];
+    const newGroups = [...groups];
+
+    // 선택된 각 커스텀 노드에 대해 별도의 tool group 생성
+    selectedUserNodeIds.forEach(userNodeId => {
+      const userNode = userNodes.find(un => un.id === userNodeId);
+      if (userNode) {
+        const newGroup = {
+          id: `group-${Date.now()}-${userNodeId}`,
+          name: userNode.name, // 커스텀 노드의 이름 사용
+          description: userNode.functionDescription || '', // 커스텀 노드의 설명 사용
+          type: 'tools' as const,
+          sourceType: 'userNode' as const,
+          selectedUserNodeId: userNodeId, // 단일 노드 ID 사용
+          code: userNode.code, // 커스텀 노드의 코드 사용
+          nodes: []
+        };
+        newGroups.push(newGroup);
+      }
+    });
+
+    const { updateNodeData } = useFlowStore.getState();
+    updateNodeData(toolsGroupModalState.targetNodeId, {
+      ...targetNode.data,
+      config: {
+        ...targetNode.data.config,
+        groups: newGroups
+      }
+    });
+
+    setToolsGroupModalState(prev => ({
+      ...prev,
+      isCustomNodeSelectionModalOpen: false,
+      targetNodeId: null
+    }));
+  }, [toolsGroupModalState.targetNodeId, nodes]);
+
+  const getExistingGroupNames = useCallback(() => {
+    if (!toolsGroupModalState.targetNodeId) return [];
+    
+    const targetNode = nodes.find(n => n.id === toolsGroupModalState.targetNodeId);
+    if (!targetNode) return [];
+
+    const groups = (targetNode.data.config?.groups as any[]) || [];
+    return groups.map((g: any) => g.name);
+  }, [toolsGroupModalState.targetNodeId, nodes]);
+
+  const getUsedUserNodeIds = useCallback(() => {
+    if (!toolsGroupModalState.targetNodeId) return [];
+    
+    const targetNode = nodes.find(n => n.id === toolsGroupModalState.targetNodeId);
+    if (!targetNode) return [];
+
+    const groups = (targetNode.data.config?.groups as any[]) || [];
+    const usedIds: string[] = [];
+    
+    groups.forEach((group: any) => {
+      if (group.type === 'tools' && group.sourceType === 'userNode') {
+        if (group.selectedUserNodeId) {
+          usedIds.push(group.selectedUserNodeId);
+        }
+        if (group.selectedUserNodeIds && Array.isArray(group.selectedUserNodeIds)) {
+          usedIds.push(...group.selectedUserNodeIds);
+        }
+      }
+    });
+    
+    return [...new Set(usedIds)]; // 중복 제거
+  }, [toolsGroupModalState.targetNodeId, nodes]);
+
+  const closeAllModals = useCallback(() => {
+    setToolsGroupModalState({
+      isAddToolsGroupModalOpen: false,
+      isCreateCodeModalOpen: false,
+      isCustomNodeSelectionModalOpen: false,
+      targetNodeId: null
+    });
+  }, []);
+
+  // 전역 이벤트 리스너 추가 (CustomNode에서 모달 열기 요청)
+  useEffect(() => {
+    const handleOpenToolsGroupModal = (event: CustomEvent) => {
+      handleOpenAddToolsGroupModal(event.detail.nodeId);
+    };
+
+    window.addEventListener('open-tools-group-modal', handleOpenToolsGroupModal as EventListener);
+
+    return () => {
+      window.removeEventListener('open-tools-group-modal', handleOpenToolsGroupModal as EventListener);
+    };
+  }, [handleOpenAddToolsGroupModal]);
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
@@ -513,6 +682,28 @@ const FlowBuilder: React.FC = () => {
       {/* 실행 상태 표시 컴포넌트들 */}
       <ExecutionToast />
       <ConnectionToast />
+
+      {/* Tools Group 모달들 */}
+      <AddToolsGroupModal
+        isOpen={toolsGroupModalState.isAddToolsGroupModalOpen}
+        onClose={closeAllModals}
+        onCreateCode={handleCreateCodeClick}
+        onSelectCustomNode={handleCustomNodeClick}
+      />
+
+      <CreateCodeToolsModal
+        isOpen={toolsGroupModalState.isCreateCodeModalOpen}
+        onClose={closeAllModals}
+        onSave={handleCreateCodeSave}
+        existingNames={getExistingGroupNames()}
+      />
+
+      <CustomNodeSelectionModal
+        isOpen={toolsGroupModalState.isCustomNodeSelectionModalOpen}
+        onClose={closeAllModals}
+        onSave={handleCustomNodeSave}
+        usedUserNodeIds={getUsedUserNodeIds()}
+      />
     </div>
   );
 };
