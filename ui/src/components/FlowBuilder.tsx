@@ -19,6 +19,7 @@ import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import ExecutionToast from './ExecutionToast';
 import ConnectionToast from './ConnectionToast';
+import AiChat from './AiChat';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -42,11 +43,27 @@ const FlowBuilder: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [synced, setSynced] = useState(false);
   
+  // AI Chat 상태
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  
   // 드래그 앤 드롭 삭제 관련 상태
   const [showTrashZone, setShowTrashZone] = useState(false);
   const [isOverTrashZone, setIsOverTrashZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<{x:number;y:number}|null>(null);
+
+  // Header에서 AI 버튼 상태 감지
+  useEffect(() => {
+    const handleAiChatToggle = (event: CustomEvent) => {
+      setIsAiChatOpen(event.detail.isOpen);
+    };
+
+    window.addEventListener('ai-chat-toggle', handleAiChatToggle as EventListener);
+    
+    return () => {
+      window.removeEventListener('ai-chat-toggle', handleAiChatToggle as EventListener);
+    };
+  }, []);
 
   // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
   useEffect(() => {
@@ -507,6 +524,18 @@ const FlowBuilder: React.FC = () => {
             setSelectedNode(null);
             setSelectedEdge(null);
           }}
+        />
+      )}
+      
+      {/* AI Chat Component - 오른쪽 사이드바 형태 */}
+      {isAiChatOpen && (
+        <AiChat 
+          isOpen={isAiChatOpen} 
+          onClose={() => {
+            setIsAiChatOpen(false);
+            // Also dispatch event to keep Header in sync
+            window.dispatchEvent(new CustomEvent('ai-chat-toggle', { detail: { isOpen: false } }));
+          }} 
         />
       )}
       

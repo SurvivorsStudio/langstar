@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Save, Play, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Play, Loader2, FileJson, Copy, X, Rocket, Bot } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { useWorkflowStorageStore } from '../store/workflowStorageStore';
 import { useThemeStore } from '../store/themeStore';
@@ -63,6 +63,22 @@ const Header: React.FC = () => {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentSuccessModalOpen, setDeploymentSuccessModalOpen] = useState(false);
   const [createdDeployment, setCreatedDeployment] = useState<Deployment | null>(null);
+
+  // AI 채팅 관련 상태
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+
+  // AI 채팅 상태 동기화
+  useEffect(() => {
+    const handleAiChatToggle = (event: CustomEvent) => {
+      setIsAiChatOpen(event.detail.isOpen);
+    };
+
+    window.addEventListener('ai-chat-toggle', handleAiChatToggle as EventListener);
+    
+    return () => {
+      window.removeEventListener('ai-chat-toggle', handleAiChatToggle as EventListener);
+    };
+  }, []);
 
   // 워크플로우 이름 편집 시작
   const handleStartEditName = () => {
@@ -273,6 +289,19 @@ const Header: React.FC = () => {
         >
           <Rocket className="h-4 w-4 mr-1" />
           {t('header.deploy')}
+        </button>
+        <button
+          onClick={() => {
+            const newState = !isAiChatOpen;
+            setIsAiChatOpen(newState);
+            // Dispatch custom event to notify FlowBuilder
+            window.dispatchEvent(new CustomEvent('ai-chat-toggle', { detail: { isOpen: newState } }));
+          }}
+          className="flex items-center px-3 py-1.5 bg-gradient-to-r from-purple-500 via-pink-500 via-red-500 via-orange-500 via-yellow-500 via-green-500 via-blue-500 to-indigo-500 hover:from-purple-600 hover:via-pink-600 hover:via-red-600 hover:via-orange-600 hover:via-yellow-600 hover:via-green-600 hover:via-blue-600 hover:to-indigo-600 text-white rounded-md text-sm font-medium shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl"
+          title="AI Assistant"
+        >
+          <Bot className="h-4 w-4 mr-1 animate-pulse" />
+          AI
         </button>
         <button
           onClick={() => {
