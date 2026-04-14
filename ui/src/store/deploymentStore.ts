@@ -210,7 +210,6 @@ export class DeploymentStore {
       nodes: workflow.nodes,
       edges: workflow.edges,
       viewport: workflow.viewport,
-      manuallySelectedEdges: workflow.manuallySelectedEdges,
       lastModified: workflow.lastModified
     };
 

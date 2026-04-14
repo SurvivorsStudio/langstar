@@ -495,8 +495,6 @@ class WorkflowService:
 
             insert_pram = {} 
             for row in param : 
-                # tmp_data = real_data[ row['matchData'] ] 
-                print(row['matchData'] )
                 if row['inputType'] == 'select box':
                     tmp_data = eval(row['matchData'], {}, real_data)
                 elif row['inputType'] == 'text box':

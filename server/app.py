@@ -6,6 +6,14 @@ import os
 from contextlib import asynccontextmanager
 import atexit
 
+# Windows에서 print/로그 시 cp949 인코딩 오류 방지 (이모지 등 유니코드)
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Import structured modules
 from server.utils.logger import setup_logger
 from server.routes import health, workflow, deployment, execution, schedule, storage

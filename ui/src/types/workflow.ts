@@ -28,9 +28,6 @@ export interface Workflow {
   /** 캔버스 뷰포트 (위치 및 줌 레벨) */
   viewport: Viewport;
   
-  /** 노드별 수동 선택된 엣지 정보 (nodeId -> edgeId) */
-  manuallySelectedEdges?: Record<string, string | null>;
-  
   /** 마지막 수정 시간 (ISO 문자열) */
   lastModified: string;
 }

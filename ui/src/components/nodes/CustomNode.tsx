@@ -13,7 +13,7 @@ import { getNodeDescription } from '../../utils/nodeDescriptions';
  */
 export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) => {
   // Zustand 스토어에서 상태 및 액션 가져오기
-  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, manuallySelectedEdges, isWorkflowRunning } = useFlowStore();
+  const { removeNode, executeNode, updateNodeData, nodes, edges, focusedElement, isWorkflowRunning } = useFlowStore();
   // 현재 노드가 실행 중인지 여부 (data.isExecuting이 없으면 false)
   const isExecuting = data.isExecuting || false;
   
@@ -79,25 +79,17 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
     const incomingEdges = edges.filter(edge => edge.target === id);
     if (incomingEdges.length <= 1) return null; // 입력이 1개 이하면 표시하지 않음
     
-    // 수동 선택된 엣지가 있는지 확인
-    const manuallySelectedEdgeId = manuallySelectedEdges[id];
-    let currentEdge;
-    
-    if (manuallySelectedEdgeId) {
-      currentEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
-    }
-    
-    // 수동 선택된 엣지가 없거나 찾을 수 없으면 첫 번째 엣지 사용
-    if (!currentEdge && incomingEdges.length > 0) {
-      currentEdge = incomingEdges[0];
-    }
-    
+    // 가장 최근 timestamp 엣지 사용, 없으면 첫 번째 엣지
+    const withTimestamp = incomingEdges
+      .map(edge => ({ edge, ts: edge.data?.timestamp ?? 0 }))
+      .sort((a, b) => b.ts - a.ts);
+    const currentEdge = withTimestamp.length > 0 ? withTimestamp[0].edge : null;
     if (!currentEdge) return null;
     
     // 소스 노드 찾기
     const sourceNode = nodes.find(node => node.id === currentEdge.source);
     return sourceNode ? sourceNode.data.label : null;
-  }, [id, edges, nodes, manuallySelectedEdges, isStartNode]);
+  }, [id, edges, nodes, isStartNode]);
 
   // ToolsMemoryNode일 경우, 설정에서 그룹 목록 가져오기
   const groups: any[] = data.config?.groups || [];
