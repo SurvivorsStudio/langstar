@@ -34,6 +34,35 @@ export interface MergeMapping {
 }
 
 /**
+ * Tools & Memory 그룹 인터페이스
+ * Tools & Memory 노드에서 사용되는 그룹 정의
+ */
+export interface Group {
+  /** 그룹 고유 ID */
+  id: string;
+  /** 그룹 이름 */
+  name: string;
+  /** 그룹 타입 (memory 또는 tools) */
+  type: 'memory' | 'tools';
+  /** 그룹 설명 */
+  description?: string;
+  /** Tools 그룹의 코드 (customCode일 때) */
+  code?: string;
+  /** Memory 타입 */
+  memoryType?: 'ConversationBufferMemory' | 'ConversationBufferWindowMemory';
+  /** Window Size (ConversationBufferWindowMemory일 때) */
+  windowSize?: number;
+  /** Tools 그룹의 소스 타입 (userNode: 사용자 노드 선택, customCode: 직접 코드 작성) */
+  sourceType?: 'userNode' | 'customCode';
+  /** 선택된 사용자 노드 ID (sourceType이 userNode일 때) - 단일 선택용 */
+  selectedUserNodeId?: string;
+  /** 선택된 사용자 노드 ID들 (sourceType이 userNode일 때) - 멀티 선택용 */
+  selectedUserNodeIds?: string[];
+  /** 노드 목록 (deprecated) */
+  nodes?: any[];
+}
+
+/**
  * 모델 설정 인터페이스
  * Agent 노드에서 사용되는 모델 정보
  */

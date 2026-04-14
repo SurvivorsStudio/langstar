@@ -474,6 +474,16 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
    * @param {'memory' | 'tools'} type - 생성할 그룹의 타입.
    */
   const handleAddGroup = (type: 'memory' | 'tools') => {
+    if (type === 'tools') {
+      // tools 그룹일 때는 전역 이벤트를 발생시켜 FlowBuilder의 모달을 열도록 함
+      const event = new CustomEvent('open-tools-group-modal', {
+        detail: { nodeId: id }
+      });
+      window.dispatchEvent(event);
+      return;
+    }
+
+    // memory 그룹일 때는 기존 로직 유지
     const defaultName = `New ${type === 'memory' ? 'Memory' : 'Tools'} Group`;
     let newName = defaultName;
     let counter = 1;
@@ -489,7 +499,8 @@ export const CustomNode = memo(({ data, isConnectable, id, type }: NodeProps) =>
       description: '',
       nodes: [],
       type,
-      ...(type === 'memory' && { memoryType: 'ConversationBufferMemory' }) // memory 그룹일 때만 기본값 추가
+      ...(type === 'memory' && { memoryType: 'ConversationBufferMemory' }), // memory 그룹일 때만 기본값 추가
+      ...(type === 'tools' && { sourceType: 'customCode' }) // tools 그룹일 때 sourceType 기본값 추가
     };
     // 노드 데이터 업데이트 (새 그룹 추가)
     updateNodeData(id, {
