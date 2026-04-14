@@ -257,6 +257,7 @@ class ApiService {
    * 배포 삭제
    */
   async deleteDeployment(deploymentId: string): Promise<void> {
+    console.log('[ApiService] deleteDeployment called with ID:', deploymentId);
     const response = await this.request<{ success: boolean; message: string }>(
       `/api/deployment/${deploymentId}`,
       {
@@ -264,6 +265,7 @@ class ApiService {
       }
     );
 
+    console.log('[ApiService] deleteDeployment response:', response);
     if (!response.success) {
       throw new Error(response.message);
     }

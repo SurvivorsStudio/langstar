@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight, Database, Key, Plus, Workflow, Rocket, CircleDot, Square, Settings, Hammer, PenTool, Clock } from 'lucide-react';
 import langstarLogo from '../../assets/common/langstar_logo.png';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface AdminSidebarProps {
   activeMenu: string;
@@ -17,6 +18,8 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
   toggleMenu,
   setSelectedAIType,
 }) => {
+  const { t } = useTranslation();
+  
   return(
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col justify-between">
       <div>
@@ -33,7 +36,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           }`}
         >
           <Workflow className="w-4 h-4 mr-2" />
-          <span className="flex-1 text-left">Chatflows</span>
+          <span className="flex-1 text-left">{t('workspace.chatflows')}</span>
         </button>
         <button
           onClick={() => setActiveMenu('deployment')}
@@ -43,7 +46,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           }`}
         >
           <Rocket className="w-4 h-4 mr-2" />
-          <span className="flex-1 text-left">Deployment</span>
+          <span className="flex-1 text-left">{t('workspace.deployment')}</span>
         </button>
 
         <button
@@ -54,7 +57,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           }`}
         >
           <Clock className="w-4 h-4 mr-2" />
-          <span className="flex-1 text-left">Schedule</span>
+          <span className="flex-1 text-left">{t('workspace.schedule')}</span>
         </button>
 
         <button
@@ -65,7 +68,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
           }`}
         >
           <PenTool className="w-4 h-4 mr-2" />
-          <span className="flex-1 text-left">Create Node</span>
+          <span className="flex-1 text-left">{t('workspace.nodeCreation')}</span>
         </button>
 
         <div>
@@ -77,7 +80,7 @@ const WorkspaceSidebar: React.FC<AdminSidebarProps> = ({
             }`}
           >
             <Key className="w-4 h-4 mr-2" />
-            <span className="flex-1 text-left">AI Model Configuration</span>
+            <span className="flex-1 text-left">{t('workspace.aiModelConfig')}</span>
           </button>
         </div>
       </div>

@@ -4,6 +4,8 @@ import {
   Database, Cpu
 } from 'lucide-react';
 import { getNodeCategoryDescription } from '../utils/nodeDescriptions';
+import { useLanguageStore } from '../store/languageStore';
+import { translations } from '../locales';
 
 export interface NodeItem {
   type: string;
@@ -33,83 +35,68 @@ const getIconColor = (nodeType: string, isDarkMode: boolean = false) => {
   return color ? (isDarkMode ? color.dark : color.light) : '#6b7280';
 };
 
-export const nodeCategories: NodeCategory[] = [
-  {
-    id: 'workflow',
-    title: 'Workflow Nodes',
-    nodes: [
-      {
-        type: 'promptNode',
-        label: 'Prompt',
-        description: getNodeCategoryDescription('promptNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <MessageSquare size={20} className={className} style={{ color: getIconColor('promptNode', isDarkMode) }} />
-        )
-      },
-      // {
-      //   type: 'systemPromptNode',
-      //   label: 'System Prompt',
-      //   description: 'Define system and user prompts for LLM interaction',
-      //   icon: (className = '') => <Settings size={20} className={className} />
-      // },
-      {
-        type: 'agentNode',
-        label: 'Agent',
-        description: getNodeCategoryDescription('agentNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <Bot size={20} className={className} style={{ color: getIconColor('agentNode', isDarkMode) }} />
-        )
-      },
-      {
-        type: 'conditionNode',
-        label: 'Condition',
-        description: getNodeCategoryDescription('conditionNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <Split size={20} className={className} style={{ color: getIconColor('conditionNode', isDarkMode) }} />
-        )
-      },
-      {
-        type: 'functionNode',
-        label: 'Custom Python Function',
-        description: getNodeCategoryDescription('functionNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <Database size={20} className={className} style={{ color: getIconColor('functionNode', isDarkMode) }} />
-        )
-      },
-      {
-        type: 'toolsMemoryNode',
-        label: 'Tools and Memory',
-        description: getNodeCategoryDescription('toolsMemoryNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />
-        )
-      },
-      {
-        type: 'mergeNode',
-        label: 'Merge',
-        description: getNodeCategoryDescription('mergeNode'),
-        icon: (className = '', isDarkMode = false) => (
-          <GitMerge size={20} className={className} style={{ color: getIconColor('mergeNode', isDarkMode) }} />
-        )
-      }
-    ]
-  }
-  // {
-  //   id: 'rag',
-  //   title: 'RAG Nodes',
-  //   nodes: [
-  //     {
-  //       type: 'embeddingNode',
-  //       label: 'Embedding',
-  //       description: 'Generate embeddings from text using configured models',
-  //       icon: (className = '') => <Cpu size={20} className={className} />
-  //     },
-  //     {
-  //       type: 'ragNode',
-  //       label: 'RAG',
-  //       description: 'Retrieval-Augmented Generation using vector store',
-  //       icon: (className = 'className' />
-  //     }
-  //   ]
-  // }
-];
+// 노드 카테고리를 동적으로 생성하는 함수
+export const getNodeCategories = (): NodeCategory[] => {
+  const language = useLanguageStore.getState().language;
+  const t = translations[language];
+  
+  return [
+    {
+      id: 'workflow',
+      title: t.node.workflowNode,
+      nodes: [
+        {
+          type: 'promptNode',
+          label: t.node.prompt,
+          description: getNodeCategoryDescription('promptNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <MessageSquare size={20} className={className} style={{ color: getIconColor('promptNode', isDarkMode) }} />
+          )
+        },
+        {
+          type: 'agentNode',
+          label: t.node.agent,
+          description: getNodeCategoryDescription('agentNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <Bot size={20} className={className} style={{ color: getIconColor('agentNode', isDarkMode) }} />
+          )
+        },
+        {
+          type: 'conditionNode',
+          label: t.node.condition,
+          description: getNodeCategoryDescription('conditionNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <Split size={20} className={className} style={{ color: getIconColor('conditionNode', isDarkMode) }} />
+          )
+        },
+        {
+          type: 'functionNode',
+          label: t.node.customPythonFunction,
+          description: getNodeCategoryDescription('functionNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <Database size={20} className={className} style={{ color: getIconColor('functionNode', isDarkMode) }} />
+          )
+        },
+        {
+          type: 'toolsMemoryNode',
+          label: t.node.toolsAndMemory,
+          description: getNodeCategoryDescription('toolsMemoryNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <Group size={20} className={className} style={{ color: getIconColor('toolsMemoryNode', isDarkMode) }} />
+          )
+        },
+        {
+          type: 'mergeNode',
+          label: t.node.merge,
+          description: getNodeCategoryDescription('mergeNode'),
+          icon: (className = '', isDarkMode = false) => (
+            <GitMerge size={20} className={className} style={{ color: getIconColor('mergeNode', isDarkMode) }} />
+          )
+        }
+      ]
+    }
+  ];
+};
+
+// 하위 호환성을 위해 기본 export 유지
+export const nodeCategories = getNodeCategories();

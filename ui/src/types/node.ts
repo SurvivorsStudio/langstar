@@ -1,48 +1,141 @@
-import { ReactNode } from 'react';
+/**
+ * @module types/node
+ * @description 노드 관련 타입 정의
+ * 
+ * 이 파일은 워크플로우의 노드와 관련된 모든 타입 정의를 포함합니다.
+ * - NodeData: 노드의 데이터 구조
+ * - NodeConfig: 노드 설정 구조
+ * - Variable: 노드 변수 구조
+ * - MergeMapping: Merge 노드 매핑 구조
+ */
 
-export type VariableValue = string | number | boolean | null | undefined | VariableValue[] | { [key: string]: VariableValue } | Group[];
+import { AIConnection } from './aiConnection';
 
-export interface Group {
-  id: string;
+/**
+ * 노드 변수 인터페이스
+ * Start 노드에서 사용되는 변수 정의
+ */
+export interface Variable {
   name: string;
-  description: string;
-  type: 'memory' | 'tools';
-  memoryType?: 'ConversationBufferMemory' | 'ConversationBufferWindowMemory';
-  windowSize?: number;
-  code?: string;
+  type: string;
+  defaultValue: any;
+  selectVariable: string;
 }
 
+/**
+ * Merge 노드 매핑 인터페이스
+ * 여러 입력을 하나의 출력으로 병합하는 설정
+ */
+export interface MergeMapping {
+  id: string;
+  outputKey: string;
+  sourceNodeId: string;
+  sourceNodeKey: string;
+}
+
+/**
+ * 모델 설정 인터페이스
+ * Agent 노드에서 사용되는 모델 정보
+ */
+export interface ModelConfig {
+  connName: string;
+  providerName: string;
+  modelName: string;
+  apiKey: string | undefined;
+}
+
+/**
+ * 노드 설정 인터페이스
+ * 각 노드 타입별로 다른 설정을 가질 수 있음
+ */
+export interface NodeConfig {
+  // Start 노드 설정
+  className?: string;
+  classType?: 'TypedDict' | 'BaseModel';
+  variables?: Variable[];
+  
+  // Loop 노드 설정
+  repetitions?: number;
+  
+  // Prompt 노드 설정
+  template?: string;
+  outputVariable?: string;
+  inputVariable?: string;
+  selectedKeyName?: string;
+  
+  // Agent 노드 설정
+  model?: string | AIConnection | ModelConfig;
+  userPromptInputKey?: string;
+  systemPromptInputKey?: string;
+  memoryGroup?: string;
+  tools?: string[];
+  agentOutputVariable?: string;
+  topK?: number;
+  topP?: number;
+  temperature?: number;
+  maxTokens?: number;
+  
+  // Embedding 노드 설정
+  inputColumn?: string;
+  outputColumn?: string;
+  
+  // End 노드 설정
+  receiveKey?: string;
+  
+  // Merge 노드 설정
+  mergeMappings?: MergeMapping[];
+  
+  // User 노드 설정
+  functionName?: string;
+  parameters?: Array<{
+    name: string;
+    inputType: string;
+    required: boolean;
+    funcArgs?: string;
+    matchData?: string;
+  }>;
+  returnType?: string;
+  functionDescription?: string;
+  inputData?: any;
+  settings?: Record<string, any>;
+  
+  // 공통 설정
+  inputKey?: string;
+  selectedInput?: any;
+  
+  // 확장 가능한 설정
+  [key: string]: any;
+}
+
+/**
+ * 노드 데이터 인터페이스
+ * ReactFlow Node의 data 속성 타입
+ */
 export interface NodeData {
+  /** 노드 레이블 (화면에 표시되는 이름) */
   label: string;
+  
+  /** Python 코드 (Function 노드, User 노드에서 사용) */
   code?: string;
+  
+  /** 노드 설명 */
   description?: string;
-  icon?: ReactNode;
-  selectedGroupId?: string | null;
-  config?: {
-    className?: string;
-    classType?: 'TypedDict' | 'BaseModel';
-    variables?: Array<{
-      name: string;
-      type: string;
-      defaultValue: VariableValue;
-      selectVariable: string;
-    }>;
-    repetitions?: number;
-    template?: string;
-    model?: string;
-    inputColumn?: string;
-    outputColumn?: string;
-    groups?: Group[];
-    mergeMappings?: Array<{
-      id: string;
-      outputKey: string;
-      sourceNodeId: string;
-      sourceNodeKey: string;
-    }>;
-    receiveKey?: string;
-    [key: string]: VariableValue;
-  };
-  inputData?: VariableValue;
-  output?: VariableValue;
+  
+  /** 노드 아이콘 (React 컴포넌트) */
+  icon?: React.ReactNode;
+  
+  /** 노드 타입별 설정 */
+  config?: NodeConfig;
+  
+  /** Merge 노드 전용 매핑 설정 (deprecated: config.mergeMappings 사용 권장) */
+  mergeMappings?: MergeMapping[];
+  
+  /** 노드로 들어온 입력 데이터 */
+  inputData?: any;
+  
+  /** 노드 실행 결과 출력 데이터 */
+  output?: any;
+  
+  /** 노드 실행 중 여부 */
   isExecuting?: boolean;
-} 
+}

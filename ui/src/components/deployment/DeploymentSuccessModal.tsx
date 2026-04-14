@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, ExternalLink, Copy, X } from 'lucide-react';
 import { Deployment } from '../../types/deployment';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DeploymentSuccessModalProps {
   isOpen: boolean;
@@ -13,12 +14,14 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
   onClose,
   deployment
 }) => {
+  const { t } = useTranslation();
+  
   if (!isOpen || !deployment) return null;
 
   const handleCopyDeploymentId = async () => {
     try {
       await navigator.clipboard.writeText(deployment.id);
-      alert('Deployment ID copied to clipboard.');
+      alert(t('alert.deploymentIdCopied'));
     } catch (err) {
       console.error('Failed to copy deployment ID:', err);
     }
@@ -36,7 +39,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
           <div className="flex items-center">
             <CheckCircle className="h-6 w-6 text-green-500 mr-3" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Deployment Successful!
+              {t('deployment.deploymentSuccessful')}
             </h2>
           </div>
           <button
@@ -50,14 +53,14 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
         <div className="p-6 space-y-4">
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <p className="text-green-800 dark:text-green-200 text-sm">
-              Workflow deployed successfully.
+              {t('deployment.workflowDeployedSuccessfully')}
             </p>
           </div>
 
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Deployment Name
+                {t('deployment.deploymentName')}
               </label>
               <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">
                 {deployment.name}
@@ -66,7 +69,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Version
+                {t('common.version')}
               </label>
               <p className="text-sm text-gray-900 dark:text-gray-100">
                 {deployment.version}
@@ -75,7 +78,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Environment
+                {t('deployment.environment')}
               </label>
               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                 deployment.environment === 'prod' 
@@ -90,7 +93,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Deployment ID
+                {t('deployment.deploymentId')}
               </label>
               <div className="flex items-center space-x-2">
                 <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded font-mono text-gray-800 dark:text-gray-200">
@@ -99,7 +102,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
                 <button
                   onClick={handleCopyDeploymentId}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  title="Copy Deployment ID"
+                  title={t('deployment.copyDeploymentId')}
                 >
                   <Copy className="h-4 w-4" />
                 </button>
@@ -109,7 +112,7 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
             {deployment.description && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description
+                  {t('common.description')}
                 </label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {deployment.description}
@@ -120,12 +123,12 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
 
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-              Next Steps
+              {t('deployment.nextSteps')}
             </h3>
             <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-              <li>• Check deployment status in the deployment list</li>
-              <li>• Activate or deactivate the deployment as needed</li>
-              <li>• Generate code and deploy to the actual service</li>
+              <li>• {t('deployment.nextStepsDesc1')}</li>
+              <li>• {t('deployment.nextStepsDesc2')}</li>
+              <li>• {t('deployment.nextStepsDesc3')}</li>
             </ul>
           </div>
         </div>
@@ -135,14 +138,14 @@ const DeploymentSuccessModal: React.FC<DeploymentSuccessModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
-            Close
+            {t('common.close')}
           </button>
           <button
             onClick={handleViewDeployments}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
           >
             <ExternalLink className="h-4 w-4 mr-2" />
-            View Deployment List
+            {t('deployment.viewDeploymentList')}
           </button>
         </div>
       </div>

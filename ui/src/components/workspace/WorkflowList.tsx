@@ -3,6 +3,7 @@ import { PlusCircle, Trash2, Loader2, Download, Upload } from 'lucide-react';
 import { Workflow } from '../../store/flowStore';
 import { exportWorkflowOnly } from '../../utils/exportImport';
 import { Deployment, DeploymentEnvironment, DeploymentStatus } from '../../types/deployment';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface WorkflowListProps {
   availableWorkflows: Workflow[];
@@ -27,11 +28,12 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
   deployments = [],
   isLoadingDeployments = false,
 }) => {
+  const { t } = useTranslation();
   // 워크플로우의 배포 상태 확인
   const getWorkflowDeploymentStatuses = (workflowName: string) => {
     // 배포 데이터가 로딩 중인 경우
     if (isLoadingDeployments) {
-      return [{ status: 'loading', text: 'Loading...', color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
+      return [{ status: 'loading', text: t('common.loading'), color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
     }
 
     const workflowDeployments = deployments.filter(
@@ -39,7 +41,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
     );
 
     if (workflowDeployments.length === 0) {
-      return [{ status: 'saved', text: 'Saved', color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
+      return [{ status: 'saved', text: t('workflow.notDeployed'), color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
     }
 
     const statuses: Array<{
@@ -73,7 +75,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
         if (inactiveDevDeployment) {
           statuses.push({
             status: 'deployed_dev_inactive',
-            text: `DEV v${inactiveDevDeployment.version} - Inactive`,
+            text: `DEV v${inactiveDevDeployment.version} - ${t('deployment.inactive')}`,
             color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
             environment: DeploymentEnvironment.DEV
           });
@@ -84,7 +86,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
           if (draftDevDeployment) {
             statuses.push({
               status: 'deployed_dev_draft',
-              text: `DEV v${draftDevDeployment.version} - Draft`,
+              text: `DEV v${draftDevDeployment.version} - ${t('deploymentList.draft')}`,
               color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
               environment: DeploymentEnvironment.DEV
             });
@@ -117,7 +119,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
         if (inactiveProdDeployment) {
           statuses.push({
             status: 'deployed_prod_inactive',
-            text: `PROD v${inactiveProdDeployment.version} - Inactive`,
+            text: `PROD v${inactiveProdDeployment.version} - ${t('deployment.inactive')}`,
             color: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
             environment: DeploymentEnvironment.PROD
           });
@@ -128,7 +130,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
           if (draftProdDeployment) {
             statuses.push({
               status: 'deployed_prod_draft',
-              text: `PROD v${draftProdDeployment.version} - Draft`,
+              text: `PROD v${draftProdDeployment.version} - ${t('deploymentList.draft')}`,
               color: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
               environment: DeploymentEnvironment.PROD
             });
@@ -158,7 +160,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
       }
     }
 
-    return statuses.length > 0 ? statuses : [{ status: 'saved', text: 'Saved', color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
+    return statuses.length > 0 ? statuses : [{ status: 'saved', text: t('workflow.notDeployed'), color: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }];
   };
 
   const handleExportWorkflow = async (workflowName: string, event: React.MouseEvent) => {
@@ -167,14 +169,14 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
       await exportWorkflowOnly(workflowName);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('워크플로우 내보내기에 실패했습니다.');
+      alert(t('importExport.exportWorkflowFailed'));
     }
   };
 
   return (
   <div className="p-8">
     <div className="flex justify-between items-center mb-6">
-      <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Workflows</h1>
+      <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">{t('workspace.chatflows')}</h1>
       <div className="flex gap-2">
                  {onImportExport && (
            <button
@@ -182,7 +184,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
              className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
            >
              <Upload className="w-5 h-5 mr-2" />
-             Import
+             {t('common.import')}
            </button>
          )}
         <button
@@ -190,25 +192,25 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
           className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
           <PlusCircle className="w-5 h-5 mr-2" />
-          New Workflow
+          {t('workflow.newWorkflow')}
         </button>
       </div>
     </div>
     {isLoading && (
       <div className="flex justify-center items-center h-32">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <p className="ml-2 text-gray-600 dark:text-gray-300">Loading workflows...</p>
+        <p className="ml-2 text-gray-600 dark:text-gray-300">{t('common.loading')}</p>
       </div>
     )}
     {!isLoading && loadError && (
       <div className="text-red-500 bg-red-100 dark:bg-red-900/20 dark:text-red-400 p-4 rounded-md">
-        Error loading workflows: {loadError}
+        {t('common.error')}: {loadError}
       </div>
     )}
     {!isLoading && !loadError && availableWorkflows.length === 0 && (
       <div className="text-center text-gray-500 dark:text-gray-400 py-10">
-        <p>No workflows found.</p>
-        <p>Click "New Workflow" to get started.</p>
+        <p>{t('workflow.noWorkflows')}</p>
+        <p>{t('workflow.createFirst')}</p>
       </div>
     )}
     {!isLoading && !loadError && availableWorkflows.length > 0 && (

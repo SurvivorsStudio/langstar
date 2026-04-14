@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Edit, Save, X, Trash2 } from 'lucide-react';
-import { useFlowStore } from '../../store/flowStore';
+import { useUserNodeStore } from '../../store/userNodeStore';
 import CodeEditor from '../CodeEditor';
 
 interface Parameter {
@@ -20,7 +20,7 @@ interface NodeDetailProps {
 }
 
 const NodeDetail: React.FC<NodeDetailProps> = ({ nodeId, onBack }) => {
-  const { userNodes, updateUserNode, deleteUserNode } = useFlowStore();
+  const { userNodes, updateUserNode, deleteUserNode } = useUserNodeStore();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('code');
   

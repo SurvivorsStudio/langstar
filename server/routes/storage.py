@@ -143,19 +143,6 @@ async def get_all_user_nodes():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/user-nodes/by-name/{node_name}", response_model=Dict[str, Any])
-async def get_user_node_by_name(node_name: str):
-    """Get user node by name"""
-    try:
-        node = storage_service.get_user_node_by_name(node_name)
-        if not node:
-            raise HTTPException(status_code=404, detail=f"User Node with name '{node_name}' not found")
-        return node
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/user-nodes/{node_id}", response_model=Dict[str, Any])
 async def get_user_node(node_id: str):
     """Get user node by ID"""

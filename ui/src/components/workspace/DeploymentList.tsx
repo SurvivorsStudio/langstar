@@ -5,6 +5,7 @@ import { Code, X, Play, Pause, Trash2, Rocket, AlertCircle, ChevronRight, Chevro
 import DeploymentPlayground from '../deployment/DeploymentPlayground';
 import Editor from '@monaco-editor/react';
 import { apiService } from '../../services/apiService';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DeploymentListProps {
   deployments: Deployment[];
@@ -48,6 +49,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
   const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({});
   const expandedStatesRef = useRef<Map<string, boolean>>(new Map());
   const navigate = useNavigate();
+  const { t } = useTranslation();
   
   // 현재 테마 감지
   const isDarkMode = () => {
@@ -450,7 +452,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading deployments...</p>
+            <p className="text-gray-600 dark:text-gray-400">{t('deploymentList.loadingDeployments')}</p>
           </div>
         </div>
       </div>
@@ -465,7 +467,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
             <div className="text-red-500 mb-4">
               <AlertCircle className="h-12 w-12 mx-auto" />
             </div>
-            <p className="text-red-600 dark:text-red-400 mb-2">Failed to load deployments</p>
+            <p className="text-red-600 dark:text-red-400 mb-2">{t('deploymentList.failedToLoad')}</p>
             <p className="text-gray-600 dark:text-gray-400 text-sm">{loadError}</p>
           </div>
         </div>
@@ -476,45 +478,45 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">ChatFlow Deployments</h2>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t('deploymentList.title')}</h2>
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setIsPlaygroundOpen(true)}
             className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
           >
             <Rocket className="h-4 w-4 mr-2" />
-            Playground
+            {t('deploymentList.playground')}
           </button>
         </div>
       </div>
 
       {workflowGroups.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400">No ChatFlow deployments available. Create a new one to get started.</p>
+        <p className="text-gray-500 dark:text-gray-400">{t('deploymentList.noDeployments')}</p>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
           <table className="min-w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  ChatFlow & Environments
+                  {t('deploymentList.chatflowAndEnvironments')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Version
+                  {t('common.version')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Environment
+                  {t('deployment.environment')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Status
+                  {t('common.status')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Description
+                  {t('common.description')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Last Updated
+                  {t('deploymentList.lastUpdated')}
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
@@ -541,7 +543,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                             {group.workflowName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {group.deployments.length} deployment{group.deployments.length !== 1 ? 's' : ''}
+                            {t('deploymentList.deploymentCount', { count: group.deployments.length })}
                           </div>
                         </div>
                       </div>
@@ -594,7 +596,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                              </button>
                              <div className="w-4 h-4 bg-blue-500 rounded mr-3"></div>
                              <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                               Development
+                               {t('deploymentList.development')}
                              </div>
                              <div className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                                ({group.environments.dev.deployments.length})
@@ -752,7 +754,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                   </button>
                              <div className="w-4 h-4 bg-green-500 rounded mr-3"></div>
                              <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                               Production
+                               {t('deploymentList.production')}
                 </div>
                              <div className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                                ({group.environments.prod.deployments.length})
@@ -906,7 +908,7 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-4">
-                                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">API Call Example</h3>
+                                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('deploymentList.apiExamples')}</h3>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {selectedDeployment.name} (v{selectedDeployment.version})
                 </div>
@@ -916,16 +918,16 @@ curl -X POST "${baseUrl}/api/deployment/${deploymentId}/run" \\
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(apiResponseModalContent || '');
-                      alert('Code copied to clipboard!');
+                      alert(t('alert.codeCopied'));
                     } catch (err) {
                       console.error('Failed to copy code: ', err);
-                      alert('Failed to copy code. See console for details.');
+                      alert(t('alert.codeCopyFailed'));
                     }
                   }}
                   className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-sm"
-                  title="Copy Code"
+                  title={t('common.copy')}
                 >
-                  <Code size={16} className="mr-1" /> Copy
+                  <Code size={16} className="mr-1" /> {t('common.copy')}
                 </button>
                 <button
                   onClick={() => {

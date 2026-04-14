@@ -1,24 +1,28 @@
+import { useLanguageStore } from '../store/languageStore';
+import { translations } from '../locales';
+
 /**
  * 노드 타입별 기본 description을 관리하는 유틸리티
  * CustomNode 툴팁과 NodeInspector에서 공통으로 사용
  */
 
 export const getNodeDescription = (nodeType: string): string => {
-  const descriptions: Record<string, string> = {
-    'startNode': 'A start node in the workflow',
-    'promptNode': 'A prompt node for user input and AI responses',
-    'functionNode': 'A function node for executing custom logic',
-    'endNode': 'An end node that terminates the workflow',
-    'agentNode': 'An agent node for AI agent interactions',
-    'conditionNode': 'A condition node for workflow branching',
-    'toolNode': 'A tool node for external tool integration',
-    'toolsMemoryNode': 'A tools and memory management node',
-    'mergeNode': 'A merge node for combining multiple inputs',
-    'userNode': 'A user interaction node',
-    'groupsNode': 'A groups node for managing collections'
+  const language = useLanguageStore.getState().language;
+  const t = translations[language];
+  
+  const descriptionMap: Record<string, string> = {
+    'startNode': t.node.startNodeDesc,
+    'promptNode': t.node.promptNodeDesc,
+    'functionNode': t.node.functionNodeDesc,
+    'endNode': t.node.endNodeDesc,
+    'agentNode': t.node.agentNodeDesc,
+    'conditionNode': t.node.conditionNodeDesc,
+    'toolsMemoryNode': t.node.toolsMemoryNodeDesc,
+    'mergeNode': t.node.mergeNodeDesc,
+    'userNode': t.node.userNodeDesc,
   };
   
-  return descriptions[nodeType] || 'A workflow node';
+  return descriptionMap[nodeType] || t.node.startNodeDesc;
 };
 
 /**
@@ -26,17 +30,5 @@ export const getNodeDescription = (nodeType: string): string => {
  * CustomNode의 description과 동일하게 유지
  */
 export const getNodeCategoryDescription = (nodeType: string): string => {
-  const categoryDescriptions: Record<string, string> = {
-    'promptNode': 'A prompt node for user input and AI responses',
-    'agentNode': 'An agent node for AI agent interactions',
-    'conditionNode': 'A condition node for workflow branching',
-    'functionNode': 'A function node for executing custom logic',
-    'toolsMemoryNode': 'A tools and memory management node',
-    'mergeNode': 'A merge node for combining multiple inputs',
-    'userNode': 'A user interaction node',
-    'startNode': 'A start node in the workflow',
-    'endNode': 'An end node that terminates the workflow'
-  };
-  
-  return categoryDescriptions[nodeType] || 'A workflow node';
+  return getNodeDescription(nodeType);
 };

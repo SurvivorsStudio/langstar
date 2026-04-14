@@ -1,3 +1,28 @@
+/**
+ * Flow Store
+ * 
+ * Main Zustand store for managing workflow canvas state.
+ * 
+ * Responsibilities:
+ * - Node and edge management (add, update, delete)
+ * - Workflow execution (individual nodes and full workflow)
+ * - Canvas state (viewport, selection, focus)
+ * - Workflow save/load operations
+ * - Edge validation and connection rules
+ * 
+ * This store has been refactored from 2,744 lines to 1,183 lines (-57%)
+ * by extracting specialized stores, services, and utilities.
+ * 
+ * Related stores:
+ * - aiConnectionStore: AI model connections
+ * - userNodeStore: User-defined nodes
+ * - workflowStorageStore: Workflow list management
+ * - deploymentZustandStore: Deployment management
+ * 
+ * @see store/README.md for architecture overview
+ * @see EXTENSION_GUIDE.md for extension instructions
+ */
+
 import { create } from 'zustand';
 import {
   Connection,
@@ -10,7 +35,7 @@ import {
   OnConnect,
   applyNodeChanges,
   applyEdgeChanges,
-  Viewport, // Viewport 타입을 가져옵니다.
+  Viewport,
 } from 'reactflow';
 import { nanoid } from 'nanoid';
 import { Deployment, DeploymentVersion, DeploymentFormData } from '../types/deployment';
@@ -71,54 +96,35 @@ export interface NodeData {
   isExecuting?: boolean;
 }
 
-export interface AIConnection {
-  id: string; // nanoid로 생성
-  name: string;
-  type: 'language' | 'embedding';
-  provider: string;
-  model: string;
-  apiKey?: string; // API 키는 선택적으로 저장 (보안 고려)
-  accessKeyId?: string; // AWS Access Key ID
-  secretAccessKey?: string; // AWS Secret Access Key
-  region?: string; // AWS Region
-  temperature?: number; // Language model 전용
-  maxTokens?: number;   // Language model 전용
-  status: 'active' | 'draft' | 'archived';
-  lastModified: string; // ISO string
-}
+// Type imports
+import { NodeData } from '../types/node';
+import { EDGE_STATES } from '../types/edge';
+import { Workflow } from '../types/workflow';
 
-export interface UserNode {
-  id: string; // nanoid로 생성
-  name: string; // Node Name
-  type: 'UserNode';
-  code: string; // 파이썬 코드
-  parameters: Array<{
-    name: string;
-    inputType: string; // 'select box', 'text box', 'checkbox', 'radio button'
-    required: boolean;
-    funcArgs?: string; // 매개변수별 funcArgs 추가
-    matchData?: string; // 매개변수별 matchData 추가
-    type?: string; // 파라미터 타입 (str, any 등)
-    description?: string; // 파라미터 설명
-    options?: string[]; // checkbox, radio button 옵션
-  }>;
-  functionName: string;
-  returnType: string;
-  functionDescription: string;
-  outputVariable?: string; // 출력 변수명 추가
-  lastModified: string; // ISO string
-}
+// Utility imports
+import { hasValidEdgeData, getCircularReplacer, safeCompare } from '../utils/edgeUtils';
+import { getUniqueNodeName, generateStartNodeOutput } from '../utils/nodeUtils';
+import {
+  calculateInDegree,
+  isMergeNode,
+  isConditionConvergenceNode,
+  hasPathFromTargetToSource,
+  canConnect,
+  findViolatingEdges
+} from '../utils/edgeValidation';
+import {
+  convertToPythonNotation,
+  prepareConditionForEvaluation,
+  evaluateCondition
+} from '../utils/dataTransform';
 
-export interface Workflow {
-  projectId: string;
-  projectName: string;
-  nodes: Node<NodeData>[];
-  edges: Edge[];
-  viewport: Viewport;
-  manuallySelectedEdges?: Record<string, string | null>; // 노드별 수동 선택된 엣지 정보
-  lastModified: string;
-  version?: number; // 낙관적 잠금을 위한 버전 번호
-}
+// Execution engine imports
+import * as executionEngine from '../services/execution/executionEngine';
+import type { ExecutionCallbacks } from '../services/execution/executionEngine';
+
+// Re-exports for backward compatibility
+export { EDGE_STATES };
+export type { NodeData, Workflow };
 
 
 export interface FlowState {
@@ -137,23 +143,23 @@ export interface FlowState {
   setNodeOutput: (nodeId: string, output: any) => void;
   setEdgeOutput: (edgeId: string, output: any) => void;
   executeNode: (nodeId: string, chatId?: string) => Promise<void>;
-  updateEdgeLabel: (edgeId: string, label: string) => void; // 추가
-  updateEdgeDescription: (edgeId: string, description: string) => void; // 추가
-  updateEdgeData: (edgeId: string, data: Partial<Edge['data']>) => void; // 엣지 데이터 업데이트 통합
+  updateEdgeLabel: (edgeId: string, label: string) => void; // ��??
+  updateEdgeDescription: (edgeId: string, description: string) => void; // ��??
+  updateEdgeData: (edgeId: string, data: Partial<Edge['data']>) => void; // ???? ??��????��??Ʈ ??��
 
-  setEdgeSuccess: (edgeId: string, isSuccess: boolean) => void; // 엣지 성공 상태 설정
-  setEdgeFailure: (edgeId: string, isFailure: boolean) => void; // 엣지 실패 상태 설정
-  setEdgeExecuting: (edgeId: string, isExecuting: boolean) => void; // 엣지 실행 중 상태 설정
-  resetAllEdgeStatuses: (excludeEdgeIds?: string[]) => void; // 모든 엣지 상태 초기화 (예외 목록 제외)
+  setEdgeSuccess: (edgeId: string, isSuccess: boolean) => void; // ???? ??�� ??�� ??��
+  setEdgeFailure: (edgeId: string, isFailure: boolean) => void; // ???? ??�� ??�� ??��
+  setEdgeExecuting: (edgeId: string, isExecuting: boolean) => void; // ???? ??�� ????�� ??��
+  resetAllEdgeStatuses: (excludeEdgeIds?: string[]) => void; // ��� ???? ??�� �ʱ�??(??�� ��� ??��)
 
   setNodeExecuting: (nodeId: string, isExecuting: boolean, success?: boolean, nodeName?: string, isWorkflowExecution?: boolean) => void;
-  runWorkflow: (chatId?: string) => Promise<void>; // chatId 파라미터 추가
+  runWorkflow: (chatId?: string) => Promise<void>; // chatId ??����� ��??
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
-  viewport: Viewport; // viewport 상태 추가
-  setViewport: (viewport: Viewport) => void; // viewport 업데이트 함수 추가
+  viewport: Viewport; // viewport ??�� ��??
+  setViewport: (viewport: Viewport) => void; // viewport ??��??Ʈ ??�� ��??
   
-  // 노드 연결 제약 조건 검사 함수들
+  // ??�� ??�� ??�� ���� ��????��??
   calculateInDegree: (nodeId: string, edges: Edge[]) => number;
   isMergeNode: (nodeId: string, nodes: Node<NodeData>[]) => boolean;
   isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => boolean;
@@ -162,98 +168,28 @@ export interface FlowState {
   findViolatingEdges: () => string[];
   updateEdgeWarnings: () => void;
 
-  // 노드 선택 상태
+  // ??�� ??�� ??��
   selectedNode: string | null;
   setSelectedNode: (id: string | null) => void;
-  
-  // Agent 노드 확대 상태 (드래그 오버)
-  overlappingAgentNodes: Set<string>;
-  setOverlappingAgentNodes: (nodes: Set<string>) => void;
-  
-  // Agent 팝업에서 선택된 User Node
-  selectedUserNodeInAgentPopup: any | null;
-  setSelectedUserNodeInAgentPopup: (userNode: any | null) => void;
 
-  // IndexedDB 저장 및 불러오기 관련 상태 및 함수
+  // IndexedDB ??????�ҷ�??�� ��????�� ????��
   isSaving: boolean;
   saveError: string | null;
   lastSaved: Date | null;
   isLoading: boolean;
   loadError: string | null;
-  availableWorkflows: Workflow[];
   saveWorkflow: () => Promise<void>;
   loadWorkflow: (projectName: string) => Promise<void>;
-  fetchAvailableWorkflows: () => Promise<void>;
-  deleteWorkflow: (projectName: string) => Promise<void>; // 워크플로 삭제 함수 추가
-  renameWorkflow: (oldName: string, newName: string) => Promise<void>; // 워크플로 이름 변경 함수 추가
-
-  getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null; // 워크플로우를 JSON 문자열로 가져오는 함수
+  getWorkflowAsJSONString: (deploymentData?: Workflow) => string | null;
   
-  // AI Connections 관련 상태 및 함수
-  aiConnections: AIConnection[];
-  isLoadingAIConnections: boolean;
-  loadErrorAIConnections: string | null;
-  fetchAIConnections: () => Promise<void>;
-  addAIConnection: (connection: Omit<AIConnection, 'id' | 'lastModified'>) => Promise<AIConnection>;
-  updateAIConnection: (connectionId: string, updates: Partial<Omit<AIConnection, 'id' | 'lastModified'>>) => Promise<AIConnection>;
-  deleteAIConnection: (connectionId: string) => Promise<void>;
-  
-  // UserNode 관련 상태 및 함수
-  userNodes: UserNode[];
-  isLoadingUserNodes: boolean;
-  loadErrorUserNodes: string | null;
-  fetchUserNodes: () => Promise<void>;
-  addUserNode: (userNode: Omit<UserNode, 'id' | 'lastModified'>) => Promise<UserNode>;
-  updateUserNode: (userNodeId: string, updates: Partial<Omit<UserNode, 'id' | 'lastModified'>>) => Promise<UserNode>;
-  deleteUserNode: (userNodeId: string) => Promise<void>;
-  exportUserNodes: (nodeIds?: string[], customFileName?: string) => Promise<any>;
-  importUserNodes: (file: File) => Promise<any>;
-  
-  // 포커스 관리
+  // ��Ŀ�� ����
   focusedElement: { type: 'node' | 'edge' | null; id: string | null };
   setFocusedElement: (type: 'node' | 'edge' | null, id: string | null) => void;
 
 
-  // 수동 선택된 edge 정보
+  // ??�� ??��??edge ??��
   manuallySelectedEdges: Record<string, string | null>; // nodeId -> edgeId
   setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => void;
-
-
-
-  // 배포 관련 상태 및 함수
-  deployments: Deployment[];
-  activeDeployment: Deployment | null;
-  deploymentVersions: DeploymentVersion[];
-  isLoadingDeployments: boolean;
-  loadErrorDeployments: string | null;
-  
-  // 배포 관련 함수들
-  createDeployment: (deploymentData: DeploymentFormData) => Promise<Deployment>;
-  updateDeployment: (id: string, updates: Partial<Omit<Deployment, 'id' | 'createdAt'>>) => Promise<Deployment>;
-  deleteDeployment: (id: string) => Promise<void>;
-  activateDeployment: (id: string) => Promise<void>;
-  deactivateDeployment: (id: string) => Promise<void>;
-  fetchDeployments: () => Promise<void>;
-  getDeploymentVersions: (deploymentId: string) => Promise<DeploymentVersion[]>;
-  createDeploymentVersion: (deploymentId: string, workflowSnapshot: Workflow, version: string, changelog?: string) => Promise<DeploymentVersion>;
-  activateDeploymentVersion: (deploymentId: string, versionId: string) => Promise<void>;
-  
-  // 협업 관련 상태 및 함수
-  workflowVersion: number; // 현재 워크플로우 버전
-  collaborationService: CollaborationService | null; // 협업 서비스 인스턴스
-  activeUsers: CollabUserInfo[]; // 현재 활성 사용자 목록
-  lockedNodes: Record<string, string>; // nodeId -> userId 매핑
-  currentUserId: string; // 현재 사용자 ID
-  currentUsername: string; // 현재 사용자 이름
-  isReceivingRemoteChange: boolean; // 원격 변경 수신 중 플래그 (무한 루프 방지)
-  lastNodePositions: Map<string, { x: number; y: number }>; // 마지막 노드 위치 캐시
-  
-  // 협업 관련 함수
-  initializeCollaboration: (userId: string, username: string) => void;
-  connectCollaboration: () => Promise<void>;
-  disconnectCollaboration: () => void;
-  lockNodeForEdit: (nodeId: string) => Promise<boolean>;
-  unlockNodeAfterEdit: (nodeId: string) => Promise<void>;
 }
 
 // 초기 상태는 initialState.ts에서 관리
@@ -444,44 +380,13 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
   nodes: initialNodes,
   edges: initialEdges,
   projectName: DEFAULT_PROJECT_NAME,
-  viewport: { x: 0, y: 0, zoom: 1 }, // viewport 초기값
+  viewport: { x: 0, y: 0, zoom: 1 }, // viewport �ʱ�??
   isWorkflowRunning: false,
   setWorkflowRunning: (isRunning: boolean) => set({ isWorkflowRunning: isRunning }),
   
   onNodesChange: (changes: NodeChange[]) => {
-    // 먼저 로컬 상태 업데이트
     set({
       nodes: applyNodeChanges(changes, get().nodes),
-    });
-    
-    // 🆕 협업: 노드 위치 변경 브로드캐스트 (로컬 업데이트 후)
-    const { collaborationService, isReceivingRemoteChange, lastNodePositions } = get();
-    
-    changes.forEach(change => {
-      if (change.type === 'position') {
-        const dragging = (change as any).dragging;
-        
-        // 드래그 중일 때 position 저장
-        if (dragging && change.position) {
-          lastNodePositions.set(change.id, change.position);
-          console.log(`💾 [Collaboration] Cached position for ${change.id}:`, change.position);
-        }
-        
-        // 드래그 완료 시 (dragging: false)
-        if (!dragging && collaborationService?.isConnected() && !isReceivingRemoteChange) {
-          // position이 있으면 사용, 없으면 캐시된 position 사용
-          const positionToSend = change.position || lastNodePositions.get(change.id);
-          
-          if (positionToSend) {
-            console.log(`✅ [Collaboration] Broadcasting node position: ${change.id}`, positionToSend);
-            collaborationService.broadcastNodeChange(change.id, { position: positionToSend });
-            // 전송 후 캐시 삭제
-            lastNodePositions.delete(change.id);
-          } else {
-            console.log(`⚠️ [Collaboration] No position to broadcast for ${change.id}`);
-          }
-        }
-      }
     });
   },
   
@@ -491,17 +396,9 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
     });
   },
 
-  // 노드 선택 상태
+  // ??�� ??�� ??��
   selectedNode: null,
   setSelectedNode: (id: string | null) => set({ selectedNode: id }),
-  
-  // Agent 노드 확대 상태 (드래그 오버)
-  overlappingAgentNodes: new Set<string>(),
-  setOverlappingAgentNodes: (nodes: Set<string>) => set({ overlappingAgentNodes: nodes }),
-  
-  // Agent 팝업에서 선택된 User Node
-  selectedUserNodeInAgentPopup: null,
-  setSelectedUserNodeInAgentPopup: (userNode: any | null) => set({ selectedUserNodeInAgentPopup: userNode }),
 
   // 퍼시스턴스 슬라이스 주입
   ...(createPersistenceSlice(set, get, api) as any),
@@ -514,28 +411,13 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
   isLoadingAIConnections: false,
   loadErrorAIConnections: null,
   
-  // UserNode 관련 초기 상태
-  userNodes: [],
-  isLoadingUserNodes: false,
-  loadErrorUserNodes: null,
-  
-  // 포커스 관리 초기 상태
+  // ��Ŀ�� ���� �ʱ� ����
   focusedElement: { type: null, id: null },
 
 
-  // 수동 선택된 edge 정보
+  // ??�� ??��??edge ??��
   manuallySelectedEdges: {},
   setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => set({ manuallySelectedEdges: { ...get().manuallySelectedEdges, [nodeId]: edgeId } }),
-
-  // 협업 관련 초기 상태
-  workflowVersion: 0,
-  collaborationService: null,
-  activeUsers: [],
-  lockedNodes: {},
-  currentUserId: '',
-  currentUsername: '',
-  isReceivingRemoteChange: false, // 🆕 원격 변경 수신 중 플래그 (무한 루프 방지)
-  lastNodePositions: new Map<string, { x: number; y: number }>(), // 🆕 마지막 노드 위치 캐시
 
   setViewport: (viewport: Viewport) => {
     set({ viewport });
@@ -563,7 +445,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
   
   // onConnect moved to edgesSlice
 
-  // 모든 엣지 상태 초기화 (예외 edgeId는 유지)
+  // ��� ???? ??�� �ʱ�??(??�� edgeId??????)
   resetAllEdgeStatuses: (excludeEdgeIds: string[] = []) => {
     set({
       edges: get().edges.map(edge => (
@@ -591,12 +473,12 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       className: '',
       classType: 'TypedDict' as const,
       variables: []
-    } : type === 'functionNode' ? { // functionNode (Custom Python Function) 기본 설정
+    } : type === 'functionNode' ? { // functionNode (Custom Python Function) �⺻ ??��
       outputVariable: uniqueLabel,
-      // code는 newNode 생성 시 data에 직접 설정합니다.
+      // code??newNode ??�� ??data??���� ??��??��??
     } : type === 'loopNode' ? {
       repetitions: 1
-    } : type === 'promptNode' ? { // promptNode에 outputVariable 기본값 추가
+    } : type === 'promptNode' ? { // promptNode??outputVariable �⺻??��??
       template: 'User: {{user_input}}\n\nAssistant:',
       outputVariable: uniqueLabel
     } : type === 'agentNode' ? {
@@ -611,18 +493,12 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
     } : type === 'endNode' ? {
       receiveKey: ''
     } : type === 'userNode' ? {
-      // UserNode의 경우 data.config에서 가져온 설정을 사용하되, 기본값도 제공
+      // UserNode??��� data.config??�� ��??�� ??��????��??��, �⺻���� ??��
       outputVariable: uniqueLabel,
       ...data.config
     } : {};
-    
-    // 🆕 협업: 노드 추가 브로드캐스트 (나중에 추가)
-    // const { collaborationService } = get();
-    // if (collaborationService?.isConnected()) {
-    //   console.log(`[Collaboration] Broadcasting node add: ${id}`);
-    // }
 
-    // functionNode의 경우 data.code에 기본 스켈레톤 코드를 제공합니다.
+    // functionNode??��� data.code??�⺻ ??��??�� �ڵ�????��??��??
     const initialNodeData = { ...data };
     if (type === 'functionNode' && !initialNodeData.code) {
       initialNodeData.code =
@@ -640,10 +516,10 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       type,
       position,
       data: {
-        ...initialNodeData, // 기본 코드가 포함될 수 있는 initialNodeData 사용
+        ...initialNodeData, // �⺻ �ڵ尡 ??��??????�� initialNodeData ??��
         label: uniqueLabel,
         output: null,
-        inputData: null, // inputData 초기화
+        inputData: null, // inputData �ʱ�??
         isExecuting: false,
         config: type === 'userNode' ? data.config : defaultConfig
       },
@@ -652,27 +528,12 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
     set({
       nodes: [...get().nodes, newNode],
     });
-
-    // 🆕 협업: 노드 추가 브로드캐스트
-    const { collaborationService, isReceivingRemoteChange } = get();
-    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
-      console.log(`✅ [Collaboration] Broadcasting node add: ${id}`);
-      collaborationService.broadcastNodeAdd(newNode);
-    }
     
     return id;
   },
   
   updateNodeData: (nodeId: string, dataUpdate: Partial<NodeData>) => {
     console.log(`[FlowStore] updateNodeData called - nodeId: ${nodeId}, dataUpdate:`, dataUpdate);
-    
-    // 🆕 협업: 노드 데이터 변경 브로드캐스트 (원격 변경 수신 중이 아닐 때만)
-    const { collaborationService, isReceivingRemoteChange } = get();
-    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
-      console.log(`[Collaboration] Broadcasting node data update: ${nodeId}`);
-      collaborationService.broadcastNodeChange(nodeId, dataUpdate);
-    }
-    
     set(state => {
       const nodeToUpdate = state.nodes.find(node => node.id === nodeId);
       if (!nodeToUpdate) {
@@ -683,7 +544,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       console.log(`[FlowStore] Current node data:`, nodeToUpdate.data);
       const newData = { ...nodeToUpdate.data, ...dataUpdate };
 
-      // config 객체는 얕은 복사되므로, 내부 속성도 병합해줘야 합니다.
+      // config ��ü?????? ����?????? ???? ??��??����??��????��??
       if (dataUpdate.config) {
         newData.config = { ...nodeToUpdate.data.config, ...dataUpdate.config };
       }
@@ -703,7 +564,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
         return node;
       });
 
-      // output이 변경되었는지 확인하고, 변경되었다면 연결된 엣지도 업데이트
+      // output??�����??���� ??��??��, �����??��????��??????????��??Ʈ
       if (!safeCompare(nodeToUpdate.data.output, newData.output)) {
         const updatedEdges = state.edges.map(edge => {
           if (edge.source === nodeId) {
@@ -759,13 +620,6 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
         edges: updatedEdges
       };
     });
-
-    // 🆕 협업: 노드 삭제 브로드캐스트
-    const { collaborationService, isReceivingRemoteChange } = get();
-    if (collaborationService?.isConnected() && !isReceivingRemoteChange) {
-      console.log(`✅ [Collaboration] Broadcasting node remove: ${nodeId}`);
-      collaborationService.broadcastNodeRemove(nodeId);
-    }
   },
 
   removeEdge: (edgeId: string) => {
@@ -774,7 +628,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
 
     set(state => {
       const updatedNodes = state.nodes.map(node => {
-        // Source 노드의 output 초기화
+        // Source ??��??output �ʱ�??
         if (node.id === edge.source) {
           return {
             ...node,
@@ -782,17 +636,17 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
           };
         }
         
-        // Target 노드의 설정값 초기화
+        // Target ??��????��??�ʱ�??
         if (node.id === edge.target) {
           const resetConfig = { ...node.data.config };
           
-          // 노드 타입별 설정값 초기화
+          // ??�� ????�� ??��??�ʱ�??
           switch (node.type) {
             case 'endNode':
               resetConfig.receiveKey = '';
               break;
             case 'promptNode':
-              // 프롬프트 노드의 입력 관련 설정 초기화
+              // ??��??Ʈ ??��????�� ��????�� �ʱ�??
               if (resetConfig.inputVariable) {
                 resetConfig.inputVariable = '';
               }
@@ -801,7 +655,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
               }
               break;
             case 'agentNode':
-              // 에이전트 노드의 입력 관련 설정 초기화
+              // ??��??Ʈ ??��????�� ��????�� �ʱ�??
               if (resetConfig.userPromptInputKey) {
                 resetConfig.userPromptInputKey = '';
               }
@@ -810,13 +664,13 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
               }
               break;
             case 'userNode':
-              // 사용자 노드의 입력 데이터 초기화
+              // ??��????��????�� ??��??�ʱ�??
               if (resetConfig.inputData) {
                 resetConfig.inputData = {};
               }
               break;
             case 'mergeNode':
-              // 머지 노드의 매핑 설정에서 해당 엣지 관련 매핑 제거
+              // ��?? ??��??���� ??��??�� ??�� ???? ��??���� ??��
               if (resetConfig.mergeMappings) {
                 resetConfig.mergeMappings = resetConfig.mergeMappings.filter(
                   (mapping: any) => mapping.sourceNodeId !== edge.source
@@ -824,7 +678,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
               }
               break;
             default:
-              // 다른 노드 타입들의 공통 설정 초기화
+              // ??�� ??�� ????��??���� ??�� �ʱ�??
               if (resetConfig.inputKey) {
                 resetConfig.inputKey = '';
               }
@@ -839,8 +693,8 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...node.data, 
               config: resetConfig,
-              inputData: null, // 입력 데이터 초기화
-              output: null     // 출력 데이터도 초기화
+              inputData: null, // ??�� ??��??�ʱ�??
+              output: null     // ��� ??��??�� �ʱ�??
             }
           };
         }
@@ -854,7 +708,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       };
     });
 
-    // 수동 선택된 엣지 정보도 초기화
+    // ??�� ??��?????? ??��??�ʱ�??
     const { manuallySelectedEdges } = get();
     if (manuallySelectedEdges[edge.target] === edgeId) {
       set(state => ({
@@ -865,7 +719,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       }));
     }
 
-    // edge 삭제 후 제약 조건 재검사 및 경고 상태 업데이트
+    // edge ???? ????�� ���� ????????��� ??�� ??��??Ʈ
     setTimeout(() => {
       get().updateEdgeWarnings();
     }, 0);
@@ -903,7 +757,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...edge.data, 
               output,
-              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+              timestamp: output ? Date.now() : 0 // output????�� ??�� timestamp ????
             }
           };
         }
@@ -923,7 +777,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...edge.data, 
               output,
-              timestamp: output ? Date.now() : 0 // output이 있을 때만 timestamp 저장
+              timestamp: output ? Date.now() : 0 // output????�� ??�� timestamp ????
             }
           };
         }
@@ -935,7 +789,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
   },
 
   setNodeExecuting: (nodeId: string, isExecuting: boolean, success: boolean = true, nodeName?: string, isWorkflowExecution?: boolean) => {
-    console.log(`🔄 [setNodeExecuting] Node ${nodeId} (${nodeName}) -> isExecuting: ${isExecuting}, success: ${success}, isWorkflowExecution: ${isWorkflowExecution}`);
+    console.log(`??? [setNodeExecuting] Node ${nodeId} (${nodeName}) -> isExecuting: ${isExecuting}, success: ${success}, isWorkflowExecution: ${isWorkflowExecution}`);
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === nodeId) {
@@ -948,17 +802,17 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       })
     });
     
-    // 실행 시작 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
+    // ??�� ??�� ????��????��??�߻� (??ũ??��????�� ���� ??�� ??��)
     if (isExecuting && !isWorkflowExecution) {
-      console.log(`📢 [setNodeExecuting] Dispatching nodeExecutionStarted event for node ${nodeId}`);
+      console.log(`??? [setNodeExecuting] Dispatching nodeExecutionStarted event for node ${nodeId}`);
       window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
         detail: { nodeId, nodeName }
       }));
     }
 
-    // 실행 완료 시 토스트 이벤트 발생 (워크플로우 실행 중이 아닐 때만)
+    // ??�� ??�� ????��????��??�߻� (??ũ??��????�� ���� ??�� ??��)
     if (!isExecuting && !isWorkflowExecution) {
-      console.log(`📢 [setNodeExecuting] Dispatching nodeExecutionCompleted event for node ${nodeId}`);
+      console.log(`??? [setNodeExecuting] Dispatching nodeExecutionCompleted event for node ${nodeId}`);
       window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', { 
         detail: { nodeId, success, nodeName } 
       }));
@@ -976,8 +830,8 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...edge.data, 
               isSuccess,
-              isFailure: false, // 성공 시 실패 상태 해제
-              isExecuting: false, // 성공 시 실행 중 상태 해제
+              isFailure: false, // ??�� ????�� ??�� ??��
+              isExecuting: false, // ??�� ????�� ????�� ??��
               successTimestamp: isSuccess ? Date.now() : undefined
             }
           };
@@ -985,7 +839,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
         return edge;
       })
     });
-    // 색상은 다음 실행까지 유지 (자동 해제 제거)
+    // ??��?? ??�� ??���?? ???? (??�� ??�� ??��)
   },
 
   setEdgeFailure: (edgeId: string, isFailure: boolean) => {
@@ -997,8 +851,8 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...edge.data, 
               isFailure,
-              isSuccess: false, // 실패 시 성공 상태 해제
-              isExecuting: false, // 실패 시 실행 중 상태 해제
+              isSuccess: false, // ??�� ????�� ??�� ??��
+              isExecuting: false, // ??�� ????�� ????�� ??��
               failureTimestamp: isFailure ? Date.now() : undefined
             }
           };
@@ -1006,7 +860,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
         return edge;
       })
     });
-    // 색상은 다음 실행까지 유지 (자동 해제 제거)
+    // ??��?? ??�� ??���?? ???? (??�� ??�� ??��)
   },
 
   setEdgeExecuting: (edgeId: string, isExecuting: boolean) => {
@@ -1018,7 +872,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             data: { 
               ...edge.data, 
               isExecuting,
-              isSuccess: false, // 실행 시작 시 다른 상태 해제
+              isSuccess: false, // ??�� ??�� ????�� ??�� ??��
               isFailure: false,
               executingTimestamp: isExecuting ? Date.now() : undefined
             }
@@ -1029,104 +883,143 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
     });
   },
 
-  executeNode: async (nodeId: string, chatId?: string) => { // chatId 파라미터 추가
-    console.log(`🔍 [executeNode] Starting execution for node ${nodeId}`);
-    const node = get().nodes.find(n => n.id === nodeId);
-    if (!node) {
-      console.log(`❌ [executeNode] Node ${nodeId} not found`);
-      return;
-    }
+  executeNode: async (nodeId: string, chatId?: string) => {
+    // ??�� ??�� ??��????�� �ݹ� ??��
+    const callbacks: ExecutionCallbacks = {
+      onNodeStart: (nodeId: string, nodeName: string) => {
+        get().setNodeExecuting(nodeId, true, true, nodeName, get().isWorkflowRunning);
+      },
+      onNodeComplete: (nodeId: string, output: any, success: boolean, nodeName: string) => {
+        get().setNodeExecuting(nodeId, false, success, nodeName, get().isWorkflowRunning);
+      },
+      onEdgeUpdate: (edgeId: string, output: any) => {
+        get().setEdgeOutput(edgeId, output);
+      },
+      onEdgeStatusUpdate: (edgeId: string, status: 'executing' | 'success' | 'failure') => {
+        if (status === 'executing') {
+          get().setEdgeExecuting(edgeId, true);
+        } else if (status === 'success') {
+          get().setEdgeSuccess(edgeId, true);
+        } else if (status === 'failure') {
+          get().setEdgeFailure(edgeId, true);
+        }
+      },
+      onWorkflowComplete: (success: boolean, errorNodes?: string[]) => {
+        // ??ũ??��????�� ó��??runWorkflow??�� ó��
+      },
+      onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => {
+        get().updateNodeData(nodeId, dataUpdate);
+      },
+      onManualEdgeSelect: (nodeId: string, edgeId: string | null) => {
+        get().setManuallySelectedEdge(nodeId, edgeId);
+      },
+      onNodeOutputSet: (nodeId: string, output: any) => {
+        get().setNodeOutput(nodeId, output);
+      },
+      getNodeById: (nodeId: string) => {
+        return get().getNodeById(nodeId);
+      },
+      getEdges: () => {
+        return get().edges;
+      },
+      getNodes: () => {
+        return get().nodes;
+      },
+      isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
+        return get().isConditionConvergenceNode(nodeId, nodes, edges);
+      },
+      getManuallySelectedEdge: (nodeId: string) => {
+        return get().manuallySelectedEdges[nodeId] || null;
+      }
+    };
 
-    // 노드 이름 가져오기
-    const nodeName = node.data?.label || node.type || 'Node';
-    console.log(`📝 [executeNode] Node name: ${nodeName}, type: ${node.type}`);
-
-    get().updateNodeData(nodeId, { ...node.data, inputData: null }); // 실행 전 inputData 초기화 (선택적)
-    // Check if workflow is running
+    // ���� ??��????�� ??�� ????????��??�ʱ�??
     const isWorkflowRunning = get().isWorkflowRunning;
-    // CustomNode에서 이미 상태를 설정했으므로 여기서는 제거
-    // get().setNodeExecuting(nodeId, true, true, nodeName, isWorkflowRunning);
-    
-    // 실행 시작 시: 나가는 엣지들을 실행 중으로 설정
-    // 개별 실행일 때만 다른 엣지들 상태를 초기화하고, 전체 실행 중에는 이전 성공 상태를 유지
-    const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
-    const outgoingIds = outgoingEdges.map(e => e.id);
     if (!isWorkflowRunning) {
+      const outgoingEdges = get().edges.filter(edge => edge.source === nodeId);
+      const outgoingIds = outgoingEdges.map(e => e.id);
       get().resetAllEdgeStatuses(outgoingIds);
     }
-    // 조건 노드는 분기 결정 전까지 어떤 엣지도 실행 표시하지 않는다
-    if (node.type !== 'conditionNode') {
-      outgoingEdges.forEach(edge => {
-        get().setEdgeExecuting(edge.id, true);
-      });
+
+    // ??�� ??�� ??��
+    await executionEngine.executeNode(nodeId, callbacks, chatId);
+  },
+
+  runWorkflow: async (chatId?: string) => {
+    // �ߺ� ���� ����
+    if (get().isWorkflowRunning) {
+      console.log('?? [RunWorkflow] Workflow is already running, skipping...');
+      return;
     }
     
-    // Node Inspector와 동일한 방식으로 input data 선택
-    const incomingEdges = get().edges.filter(edge => edge.target === nodeId);
-    let input: Record<string, any> = {};
+    get().setWorkflowRunning(true);
     
-    // condition convergence 노드인지 확인
-    const isConditionConvergence = get().isConditionConvergenceNode(nodeId, get().nodes, get().edges);
-    
-    if (incomingEdges.length > 0) {
-      // condition convergence 노드의 경우 특별 처리
-      if (isConditionConvergence) {
-        console.log(`🔀 [executeNode] ${nodeName} is a condition convergence node`);
-        
-        // null/undefined가 아닌 실제 데이터를 가진 edge만 필터링
-        const edgesWithValidData = incomingEdges.filter(edge => {
-          const hasOutput = edge.data?.output !== null && 
-                           edge.data?.output !== undefined && 
-                           typeof edge.data.output === 'object';
-          if (hasOutput) {
-            console.log(`🔀 [executeNode] Valid data from edge ${edge.id}:`, edge.data.output);
-          }
-          return hasOutput;
-        });
-        
-        console.log(`🔀 [executeNode] ${edgesWithValidData.length}/${incomingEdges.length} edges have valid data`);
-        
-        // 실제 데이터가 있는 edge 중 가장 최근 것 사용
-        if (edgesWithValidData.length > 0) {
-          const sortedEdges = edgesWithValidData
-            .map(edge => ({
-              edge,
-              timestamp: edge.data?.timestamp || 0,
-              output: edge.data.output
-            }))
-            .sort((a, b) => b.timestamp - a.timestamp);
-          
-          input = sortedEdges[0].output;
-          console.log(`🔀 [executeNode] Using data from most recent edge:`, input);
+    // ���� ���� ����� ���� �ݹ� ����
+    const callbacks: ExecutionCallbacks = {
+      onNodeStart: (nodeId: string, nodeName: string) => {
+        // ��ũ�÷ο� ���� �˸��� Ư�� ó��
+        if (nodeId === 'workflow') {
+          window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
+            detail: { nodeId: 'workflow', nodeName: 'Workflow' }
+          }));
         } else {
-          console.warn(`🔀 [executeNode] No valid data found in any incoming edges`);
+          get().setNodeExecuting(nodeId, true, true, nodeName, true); // isWorkflowExecution = true
         }
-      } else {
-        // 일반 노드의 기존 로직
-        // 수동으로 선택된 edge가 있는지 확인
-        const manuallySelectedEdgeId = get().manuallySelectedEdges[nodeId];
+      },
+      onNodeComplete: (nodeId: string, output: any, success: boolean, nodeName: string) => {
+        if (nodeId !== 'workflow') {
+          get().setNodeExecuting(nodeId, false, success, nodeName, true); // isWorkflowExecution = true
+        }
+      },
+      onEdgeUpdate: (edgeId: string, output: any) => {
+        get().setEdgeOutput(edgeId, output);
+      },
+      onEdgeStatusUpdate: (edgeId: string, status: 'executing' | 'success' | 'failure') => {
+        if (status === 'executing') {
+          get().setEdgeExecuting(edgeId, true);
+        } else if (status === 'success') {
+          get().setEdgeSuccess(edgeId, true);
+        } else if (status === 'failure') {
+          get().setEdgeFailure(edgeId, true);
+        }
+      },
+      onWorkflowComplete: (success: boolean, errorNodes?: string[]) => {
+        get().setWorkflowRunning(false);
         
-        if (manuallySelectedEdgeId) {
-          // 수동으로 선택된 edge의 데이터 사용
-          const selectedEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
-          if (selectedEdge && selectedEdge.data?.output && typeof selectedEdge.data.output === 'object') {
-            input = selectedEdge.data.output;
-          }
+        // �Ϸ� �佺Ʈ
+        if (errorNodes && errorNodes.length > 0) {
+          window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
+            detail: { nodeId: 'workflow', success: false, nodeName: 'Workflow', failedNodeName: errorNodes[0] }
+          }));
         } else {
-          // 수동 선택이 없으면 가장 최근에 실행된 노드의 데이터 사용
-          const edgesWithTimestamps = incomingEdges
-            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-            .map(edge => ({
-              edge,
-              timestamp: edge.data?.timestamp || 0,
-              output: edge.data.output
-            }))
-            .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
-
-          if (edgesWithTimestamps.length > 0) {
-            input = edgesWithTimestamps[0].output;
-          }
+          window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
+            detail: { nodeId: 'workflow', success: true, nodeName: 'Workflow' }
+          }));
         }
+      },
+      onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => {
+        get().updateNodeData(nodeId, dataUpdate);
+      },
+      onManualEdgeSelect: (nodeId: string, edgeId: string | null) => {
+        get().setManuallySelectedEdge(nodeId, edgeId);
+      },
+      onNodeOutputSet: (nodeId: string, output: any) => {
+        get().setNodeOutput(nodeId, output);
+      },
+      getNodeById: (nodeId: string) => {
+        return get().getNodeById(nodeId);
+      },
+      getEdges: () => {
+        return get().edges;
+      },
+      getNodes: () => {
+        return get().nodes;
+      },
+      isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
+        return get().isConditionConvergenceNode(nodeId, nodes, edges);
+      },
+      getManuallySelectedEdge: (nodeId: string) => {
+        return get().manuallySelectedEdges[nodeId] || null;
       }
     }
 
@@ -2135,13 +2028,13 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
       viewport: deploymentData.viewport
     } : get();
 
-    // saveWorkflow와 유사하게 직렬화할 노드 데이터를 준비합니다.
-    // 'icon' 필드는 React 컴포넌트일 수 있어 JSON 직렬화 시 제외합니다.
+    // saveWorkflow?? ??��??�� ����??�� ??�� ??��???? �غ���??��.
+    // 'icon' ??��??React ����??Ʈ??????�� JSON ����??????��??��??
     const nodesToSave = nodes.map((currentNode: Node<NodeData>) => {
-      const { icon, ...restOfNodeData } = currentNode.data; // 노드의 data 필드 (icon 제외)
-      const finalNodeData = { ...restOfNodeData }; // 최종적으로 노드에 저장될 data 객체
+      const { icon, ...restOfNodeData } = currentNode.data; // ??��??data ??�� (icon ??��)
+      const finalNodeData = { ...restOfNodeData }; // ����??��????��??????�� data ��ü
 
-      // 만약 현재 노드가 conditionNode 타입이라면, config에 조건 정보를 추가합니다.
+      // ���� ??�� ??�尡 conditionNode ????��??��, config??���� ??��??��????��??
       if (currentNode.type === 'conditionNode') {
         const outgoingEdges = edges
           .filter((edge: Edge) => edge.source === currentNode.id)
@@ -2153,26 +2046,26 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             edgeId: edge.id,
             targetNodeId: edge.target,
             targetNodeLabel: targetNode?.data.label || edge.target,
-            condition: edge.data?.label, // 예: "if data['value'] > 0", "else"
-            description: edge.data?.conditionDescription, // 예: "Rule #1"
+            condition: edge.data?.label, // ?? "if data['value'] > 0", "else"
+            description: edge.data?.conditionDescription, // ?? "Rule #1"
             orderIndex: edge.data?.conditionOrderIndex,
           };
         });
 
-        // 기존 config를 유지하면서 conditions 배열을 추가합니다.
+        // ���� config????????��??conditions �迭??��????��??
         finalNodeData.config = {
-          ...(finalNodeData.config || {}), // 기존 config 내용 보존
-          conditions: conditionsSummary,   // 조건 요약 정보 추가
+          ...(finalNodeData.config || {}), // ���� config ??�� ����
+          conditions: conditionsSummary,   // ���� ??�� ??�� ��??
         };
       }
 
-      // Agent 노드일 경우, 연결된 모델의 상세 정보를 찾아 `config.model`에 채워 넣습니다.
+      // Agent ??��??���, ??��??��????�� ??��??ã�� `config.model`??ä�� ??��??��.
       if (currentNode.type === 'agentNode' && finalNodeData.config?.model && typeof finalNodeData.config.model === 'object') {
-        // AgentSettings에서 이미 AIConnection 객체 전체를 저장했다고 가정합니다.
-        const modelDetails = finalNodeData.config.model as AIConnection;
+        // AgentSettings??�� ???? AIConnection ��ü ??ü??????��??�� ��??��??��.
+        const modelDetails = finalNodeData.config.model as any;
 
         if (modelDetails) {
-          // 저장된 객체를 서버가 요구하는 최종 포맷으로 변환합니다.
+          // ????�� ��ü????���� ??��??�� ���� ??��??�� ��??��??��.
           const modelConfigForExport: any = {
             connName: modelDetails.name,
             providerName: modelDetails.provider,
@@ -2186,7 +2079,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             modelConfigForExport.apiKey = modelDetails.apiKey;
           }
           
-          // Memory Group 정보를 실제 구성 정보로 변환
+          // Memory Group ??��????�� ���� ??��??��??
           let memoryConfigForExport: any = undefined;
           if (finalNodeData.config?.memoryGroup) {
             const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
@@ -2205,7 +2098,7 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             }
           }
 
-          // Tools 정보를 실제 구성 정보로 변환
+          // Tools ??��????�� ���� ??��??��??
           const toolsConfigForExport: Array<{ id: string; name: string; description: string; code: string }> = [];
           if (finalNodeData.config?.tools && Array.isArray(finalNodeData.config.tools)) {
             const toolsMemoryNode = nodes.find(n => n.type === 'toolsMemoryNode');
@@ -2225,29 +2118,29 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
             }
           }
 
-          // OpenAI mini 모델 체크 (provider가 openai이고 model name에 mini가 포함된 경우)
+          // OpenAI mini �� üũ (provider�� openai??�� model name??mini�� ??��??���)
           const isOpenAiMiniModel = modelConfigForExport.providerName === 'openai' && 
                                     modelConfigForExport.modelName?.toLowerCase().includes('mini');
 
-          // 모델 설정값들을 포함하여 변환된 객체로 기존 config를 대체합니다.
-          // 중복되거나 불필요한 필드들을 제거하고 깔끔한 구조로 만듭니다.
+          // �� ??������????��??�� ��??�� ��ü??���� config????ü��??��.
+          // �ߺ�??��??����??�� ??��??�� ??��??�� ���??����??����??��.
           finalNodeData.config = {
             model: modelConfigForExport,
-            memoryGroup: memoryConfigForExport, // ID 대신 실제 구성 정보
-            tools: toolsConfigForExport, // ID 배열 대신 실제 구성 정보 배열
-            // 프롬프트 관련 설정
+            memoryGroup: memoryConfigForExport, // ID ??????�� ���� ??��
+            tools: toolsConfigForExport as any, // ID �迭 ??????�� ���� ??�� �迭
+            // ??��??Ʈ ��????��
             userPromptInputKey: finalNodeData.config.userPromptInputKey || 'user_input',
             systemPromptInputKey: finalNodeData.config.systemPromptInputKey || 'system_message',
             agentOutputVariable: finalNodeData.config.agentOutputVariable || 'agent_response',
-            // 모델 설정값들 (OpenAI mini 모델 예외 처리)
+            // �� ??������ (OpenAI mini �� ??�� ó��)
             topK: finalNodeData.config.topK ?? 40,
             topP: finalNodeData.config.topP ?? 1,
             temperature: isOpenAiMiniModel ? 1 : (finalNodeData.config.temperature ?? 0.7),
-            maxTokens: isOpenAiMiniModel ? null : (finalNodeData.config.maxTokens ?? 1000),
+            maxTokens: isOpenAiMiniModel ? null : (finalNodeData.config.maxTokens ?? 1000) as any,
           };
 
-          // Agent 노드의 최종 JSON 데이터를 콘솔에 출력
-          console.log(`[Export] Agent Node "${currentNode.data.label}" (ID: ${currentNode.id}) JSON 데이터:`, JSON.stringify({
+          // Agent ??��??���� JSON ??��???? �ܼ�??���
+          console.log(`[Export] Agent Node "${currentNode.data.label}" (ID: ${currentNode.id}) JSON ??��??`, JSON.stringify({
             id: currentNode.id,
             type: currentNode.type,
             label: currentNode.data.label,
@@ -2256,30 +2149,30 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
         }
       }
 
-      // UserNode의 경우 parameters에 matchData 추가 및 inputData 변환
+      // UserNode??��� parameters??matchData ��?? ??inputData ��??
       if (currentNode.type === 'userNode' && finalNodeData.config?.parameters) {
-        // config 객체를 deep copy하여 원본 변경 방지
+        // config ��ü??deep copy??�� ??�� ��??��??
         finalNodeData.config = { ...finalNodeData.config };
         
-        // parameters에 matchData 추가 (실시간 API 호출과 동일한 방식)
-        // 원본 배열을 변경하지 않고 새로운 배열을 생성
-        const parametersWithMatchData = finalNodeData.config.parameters.map((param: any) => {
+        // parameters??matchData ��?? (??��??API ??��????��??���)
+        // ??�� �迭??�������� ??�� ??��??�迭????��
+        const parametersWithMatchData = (finalNodeData.config.parameters || []).map((param: any) => {
           let matchData;
           if (param.inputType === 'select box') {
-            // select box의 경우 기존 방식 유지 (inputData에서 키 값 가져오기)
+            // select box??��� ���� ��� ???? (inputData??�� ????��??��??
             matchData = finalNodeData.config?.inputData?.[param.name] || '';
           } else if (param.inputType === 'text box') {
-            // text box의 경우 settings에서 값을 가져와서 그대로 전달
+            // text box??��� settings??�� ���� ��??????��??????��
             const textValue = finalNodeData.config?.settings?.[param.name] || '';
-            matchData = textValue; // 작은따옴표 제거
+            matchData = textValue; // ??????��????��
           } else if (param.inputType === 'radio button') {
-            // radio button의 경우 settings에서 선택된 값을 가져와서 그대로 전달
+            // radio button??��� settings??�� ??��??���� ��??????��??????��
             const radioValue = finalNodeData.config?.settings?.[param.name] || '';
-            matchData = radioValue; // 작은따옴표 제거
+            matchData = radioValue; // ??????��????��
           } else if (param.inputType === 'checkbox') {
-            // checkbox의 경우 settings에서 선택된 값들을 배열로 전달
+            // checkbox??��� settings??�� ??��??����??�迭????��
             const checkboxValues = finalNodeData.config?.settings?.[param.name] || [];
-            matchData = checkboxValues; // 배열 자체로 전송
+            matchData = checkboxValues; // �迭 ??ü????��
           } else {
             matchData = '';
           }
@@ -2289,10 +2182,10 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
           };
         });
         
-        // 새로운 parameters 배열을 할당 (원본 변경 없음)
+        // ??��??parameters �迭????�� (??�� ��????��)
         finalNodeData.config.parameters = parametersWithMatchData;
 
-        // inputData를 funcArgs 기반으로 변환
+        // inputData??funcArgs ���??�� ��??
         if (finalNodeData.config?.inputData && Object.keys(finalNodeData.config.inputData).length > 0) {
           const newInputData: any = {};
           finalNodeData.config.parameters.forEach((param: any) => {
@@ -2305,15 +2198,15 @@ export const useFlowStore = create<FlowState>((set, get, api) => ({
           }
         }
 
-        // outputVariable이 설정되지 않은 경우 기본값 설정
+        // outputVariable????��???? ???? ��� �⺻????��
         if (!finalNodeData.config.outputVariable) {
           finalNodeData.config.outputVariable = 'result';
         }
       }
 
       return {
-        ...currentNode, // 노드의 나머지 속성들 (id, type, position 등)
-        data: finalNodeData, // 처리된 data 객체 할당
+        ...currentNode, // ??��????���� ??��??(id, type, position ??
+        data: finalNodeData, // ó��??data ��ü ??��
       };
     });
 

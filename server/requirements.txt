@@ -13,4 +13,4 @@ boto3>=1.37.0
 youtube-search-python==1.6.6
 youtube-transcript-api==1.2.3
 pymongo>=4.6.0
-websockets>=12.0
+apscheduler>=3.10.4

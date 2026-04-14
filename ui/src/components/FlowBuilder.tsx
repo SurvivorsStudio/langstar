@@ -22,7 +22,6 @@ import ConnectionToast from './ConnectionToast';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle, Trash2 } from 'lucide-react';
-import AgentNodePopup from './nodes/AgentNodePopup';
 
 const edgeTypes = {
   default: CustomEdge,
@@ -30,7 +29,7 @@ const edgeTypes = {
 
 const FlowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning, setOverlappingAgentNodes, overlappingAgentNodes, updateNodeData, selectedUserNodeInAgentPopup, setSelectedUserNodeInAgentPopup } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning } = useFlowStore();
   
   // 다른 노드가 실행 중인지 확인
   const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
@@ -48,21 +47,6 @@ const FlowBuilder: React.FC = () => {
   const [isOverTrashZone, setIsOverTrashZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<{x:number;y:number}|null>(null);
-  
-  // Agent 노드 팝업 상태
-  const [isAgentPopupOpen, setIsAgentPopupOpen] = useState(false);
-  const [selectedAgentNodeData, setSelectedAgentNodeData] = useState<any>(null);
-  const [selectedAgentNodeId, setSelectedAgentNodeId] = useState<string>('');
-  
-  // 드래그 중인 노드 추적
-  const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  
-  // selectedUserNodeInAgentPopup이 설정되면 Inspector 열기
-  useEffect(() => {
-    if (selectedUserNodeInAgentPopup) {
-      setShowInspector(true);
-    }
-  }, [selectedUserNodeInAgentPopup]);
 
   // 전역 마우스 이벤트 처리 (휴지통 영역 감지)
   useEffect(() => {
@@ -213,17 +197,6 @@ const FlowBuilder: React.FC = () => {
     setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)
   }, [setFocusedElement, setSelectedNode]);
 
-  const onNodeDoubleClick = useCallback((_: unknown, node: Node) => {
-    console.log(`[FlowBuilder] Node double-clicked: ${node.id}, type: ${node.type}`);
-    
-    // Agent 노드인 경우 팝업 열기
-    if (node.type === 'agentNode') {
-      setSelectedAgentNodeData(node.data);
-      setSelectedAgentNodeId(node.id);
-      setIsAgentPopupOpen(true);
-    }
-  }, []);
-
   const onEdgeClick = useCallback((_: unknown, edge: any) => {
     console.log(`[FlowBuilder] Edge clicked: ${edge.id}, source: ${edge.source}, target: ${edge.target}`);
     console.log(`[FlowBuilder] Edge data:`, edge.data);
@@ -279,30 +252,6 @@ const FlowBuilder: React.FC = () => {
     setFocusedElement(null, null); // 패널 클릭 시 모든 포커스 해제
   }, [setFocusedElement, setSelectedNode]);
 
-  // 두 노드가 겹치는지 확인하는 함수
-  const checkOverlap = useCallback((draggedNodePos: any, targetNode: any) => {
-    const draggedRect = {
-      left: draggedNodePos.x,
-      right: draggedNodePos.x + 200, // 노드 너비 대략 200px
-      top: draggedNodePos.y,
-      bottom: draggedNodePos.y + 100 // 노드 높이 대략 100px
-    };
-    
-    const targetPos = (targetNode as any).positionAbsolute || targetNode.position;
-    const targetRect = {
-      left: targetPos.x,
-      right: targetPos.x + 200,
-      top: targetPos.y,
-      bottom: targetPos.y + 100
-    };
-    
-    // 겹침 확인
-    return !(draggedRect.right < targetRect.left || 
-             draggedRect.left > targetRect.right || 
-             draggedRect.bottom < targetRect.top || 
-             draggedRect.top > targetRect.bottom);
-  }, []);
-
   // 노드 드래그 이벤트 핸들러
   const onNodeDragStart: NodeDragHandler = useCallback((_, node) => {
     setIsDragging(true);
@@ -310,11 +259,6 @@ const FlowBuilder: React.FC = () => {
     setIsOverTrashZone(false);
     const pos = (node as any).positionAbsolute || node.position;
     setDragStartPos({ x: pos?.x ?? 0, y: pos?.y ?? 0 });
-    
-    // userNode가 드래그되기 시작하면 추적
-    if (node.type === 'userNode') {
-      setDraggedNode(node.id);
-    }
   }, []);
 
   const onNodeDrag: NodeDragHandler = useCallback((_, node) => {
@@ -328,59 +272,11 @@ const FlowBuilder: React.FC = () => {
         setShowTrashZone(true);
       }
     }
-    
-    // userNode가 드래그 중이면 agent 노드와의 겹침 확인
-    if (node.type === 'userNode') {
-      const agentNodes = nodes.filter(n => n.type === 'agentNode');
-      const overlapping = new Set<string>();
-      
-      agentNodes.forEach(agentNode => {
-        if (checkOverlap(pos, agentNode)) {
-          overlapping.add(agentNode.id);
-        }
-      });
-      
-      setOverlappingAgentNodes(overlapping);
-    }
-  }, [dragStartPos, nodes, checkOverlap]);
+  }, [dragStartPos]);
 
   const onNodeDragStop: NodeDragHandler = useCallback((_, node) => {
-    // userNode가 agentNode에 드롭되었는지 확인
-    if (node.type === 'userNode' && overlappingAgentNodes.size > 0) {
-      // 드래그된 userNode 정보를 가져오기
-      const userNodeInfo = {
-        id: node.id,
-        name: node.data.label,
-        code: node.data.code || '',
-        functionName: node.data.functionName || '',
-        functionDescription: node.data.functionDescription || '',
-        parameters: node.data.parameters || []
-      };
-      
-      // 각 겹친 agentNode에 userNode 정보 추가
-      overlappingAgentNodes.forEach(agentNodeId => {
-        const agentNode = nodes.find(n => n.id === agentNodeId);
-        if (agentNode) {
-          const currentUserNodes = agentNode.data.userNodes || [];
-          
-          // 중복 체크 (같은 userNode가 이미 추가되어 있는지)
-          const alreadyExists = currentUserNodes.some((un: any) => un.id === userNodeInfo.id);
-          
-          if (!alreadyExists) {
-            // agentNode의 data에 userNode 정보 추가
-            updateNodeData(agentNodeId, {
-              ...agentNode.data,
-              userNodes: [...currentUserNodes, userNodeInfo]
-            });
-          }
-        }
-      });
-      
-      // userNode 삭제
-      removeNode(node.id);
-    }
     // 휴지통 영역에 드롭되었는지 확인
-    else if (isOverTrashZone) {
+    if (isOverTrashZone) {
       // Start와 End 노드는 삭제 불가
       if (node.type !== 'startNode' && node.type !== 'endNode') {
         if (window.confirm(`Are you sure you want to delete this node?`)) {
@@ -395,11 +291,7 @@ const FlowBuilder: React.FC = () => {
     setShowTrashZone(false);
     setIsOverTrashZone(false);
     setDragStartPos(null);
-    
-    // 드래그 종료 시 상태 초기화
-    setDraggedNode(null);
-    setOverlappingAgentNodes(new Set());
-  }, [isOverTrashZone, removeNode, setOverlappingAgentNodes, overlappingAgentNodes, nodes, updateNodeData]);
+  }, [isOverTrashZone, removeNode]);
 
   // backspace 키로 노드 삭제 방지, delete 키로 선택된 노드 삭제
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -526,7 +418,6 @@ const FlowBuilder: React.FC = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
-            onNodeDoubleClick={onNodeDoubleClick}
             onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
@@ -606,17 +497,15 @@ const FlowBuilder: React.FC = () => {
 
         </ReactFlow>
       </div>
-      {showInspector && (selectedNode || selectedEdge || selectedUserNodeInAgentPopup) && (
+      {showInspector && (selectedNode || selectedEdge) && (
         <NodeInspector
           nodeId={selectedNode || ''}
           selectedEdge={selectedEdge}
-          selectedUserNode={selectedUserNodeInAgentPopup}
           onClose={() => {
             setShowInspector(false);
             setFocusedElement(null, null); // NodeInspector 닫힐 때 포커스 해제
             setSelectedNode(null);
             setSelectedEdge(null);
-            setSelectedUserNodeInAgentPopup(null);
           }}
         />
       )}
@@ -624,14 +513,6 @@ const FlowBuilder: React.FC = () => {
       {/* 실행 상태 표시 컴포넌트들 */}
       <ExecutionToast />
       <ConnectionToast />
-      
-      {/* Agent 노드 팝업 */}
-      <AgentNodePopup
-        isOpen={isAgentPopupOpen}
-        onClose={() => setIsAgentPopupOpen(false)}
-        nodeData={selectedAgentNodeData}
-        nodeId={selectedAgentNodeId}
-      />
     </div>
   );
 };

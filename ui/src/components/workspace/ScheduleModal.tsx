@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useScheduleStore } from '../../store/scheduleStore';
-import { useFlowStore } from '../../store/flowStore';
+import { useDeploymentStore } from '../../store/deploymentZustandStore';
 import {
   Schedule,
   ScheduleType,
@@ -16,7 +16,7 @@ interface ScheduleModalProps {
 
 const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSuccess }) => {
   const { createSchedule, updateSchedule } = useScheduleStore();
-  const { deployments, fetchDeployments } = useFlowStore();
+  const { deployments, fetchDeployments } = useDeploymentStore();
 
   const [formData, setFormData] = useState({
     name: schedule?.name || '',

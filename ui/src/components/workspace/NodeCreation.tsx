@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { X, Save } from 'lucide-react';
 import CodeEditor from '../CodeEditor';
-import { useFlowStore } from '../../store/flowStore';
+import { useUserNodeStore } from '../../store/userNodeStore';
 
 interface NodeCreationProps {
   onSave?: () => void;
 }
 
 const NodeCreation: React.FC<NodeCreationProps> = ({ onSave }) => {
-  const { addUserNode, userNodes, fetchUserNodes } = useFlowStore();
+  const { addUserNode, userNodes, fetchUserNodes } = useUserNodeStore();
   const [nodeName, setNodeName] = useState('my_function');
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('code');
   
