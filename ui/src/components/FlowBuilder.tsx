@@ -20,6 +20,7 @@ import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import ExecutionToast from './ExecutionToast';
 import ConnectionToast from './ConnectionToast';
+import FlowAssistantChatPanel from './FlowAssistantChatPanel';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -28,7 +29,11 @@ const edgeTypes = {
   default: CustomEdge,
 };
 
-const FlowBuilder: React.FC = () => {
+export interface FlowBuilderComponentProps {
+  aiPanelOpen: boolean;
+}
+
+const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
   const { id } = useParams<{ id: string }>();
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, isWorkflowRunning } = useFlowStore();
   
@@ -397,12 +402,13 @@ const FlowBuilder: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full min-h-0">
       {showNodeSidebar && (
         <NodeSidebar onClose={() => setShowNodeSidebar(false)} />
       )}
-      <div className="flex-grow h-full" ref={reactFlowWrapper}>
-        <ReactFlow
+      <div className="flex min-h-0 min-w-0 flex-1 flex-row">
+        <div className="relative min-h-0 min-w-0 flex-1" ref={reactFlowWrapper}>
+          <ReactFlow
             onInit={inst => setRfInstance(inst)}
             nodes={nodes}
             edges={edges}
@@ -501,6 +507,17 @@ const FlowBuilder: React.FC = () => {
           }}
         />
       )}
+
+      <div
+        className={`shrink-0 overflow-hidden border-l border-transparent transition-[width] duration-300 ease-out dark:border-transparent ${
+          aiPanelOpen ? 'w-[min(100vw,420px)] border-slate-200 dark:border-slate-700' : 'w-0 border-l-0'
+        }`}
+      >
+        <div className="flex h-full w-[min(100vw,420px)] shrink-0 flex-col bg-white shadow-lg dark:bg-slate-950">
+          <FlowAssistantChatPanel panelOpen={aiPanelOpen} />
+        </div>
+      </div>
+      </div>
       
       {/* 실행 상태 표시 컴포넌트들 */}
       <ExecutionToast />

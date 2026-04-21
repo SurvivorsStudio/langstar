@@ -1,21 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import FlowBuilderComponent from '../components/FlowBuilder';
 import Header from '../components/Header';
-import ChatBot from '../components/ChatBot';
 import Footer from '../components/Footer';
 import 'reactflow/dist/style.css';
 
 function FlowBuilder() {
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
   return (
     <div className="flex flex-col h-screen w-full bg-gray-50 dark:bg-gray-900">
-      <Header />
+      <Header
+        aiPanelOpen={aiPanelOpen}
+        onToggleAiPanel={() => setAiPanelOpen((v) => !v)}
+      />
       <div className="flex-1 overflow-hidden">
         <ReactFlowProvider>
-          <FlowBuilderComponent />
+          <FlowBuilderComponent aiPanelOpen={aiPanelOpen} />
         </ReactFlowProvider>
       </div>
-      <ChatBot />
       <Footer />
     </div>
   );
