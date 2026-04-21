@@ -35,7 +35,6 @@ LangStar는 Zustand를 사용하여 상태를 관리합니다. 원래 모든 상
   isWorkflowRunning: boolean
   selectedNode: string | null
   focusedElement: { type, id }
-  manuallySelectedEdges: Record<string, string | null>
   // ... 저장/로드 관련 상태
 }
 ```

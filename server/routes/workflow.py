@@ -28,7 +28,6 @@ def prompt_node(data: PromptNodeInput):
 @router.post('/workflow/node/pythonnode')
 def python_node(msg: dict = Body(...)):
     try:
-        print( msg )
         logger.info("Received python node request")
         result = WorkflowService.process_python_node(msg)
         logger.info("Python node request processed successfully")
@@ -40,7 +39,6 @@ def python_node(msg: dict = Body(...)):
 @router.post('/workflow/node/usernode')
 def user_node(msg: dict = Body(...)):
     try:
-        print( msg )
         logger.info("Received user node request")
         result = WorkflowService.process_user_node(msg)
         logger.info("user node request processed successfully")
@@ -80,7 +78,6 @@ def agent_node(msg: dict = Body(...)):
 def merge_node(msg: dict = Body(...)):
     try:
         logger.info("Received merge node request")
-        print( msg )
         result = WorkflowService.process_merge_node(msg)
         logger.info("merge node request processed successfully")
         return result
@@ -92,7 +89,6 @@ def merge_node(msg: dict = Body(...)):
 def condition_node(msg: dict = Body(...)):
     try:
         logger.info("Received condition node request")
-        print( msg )
         result = WorkflowService.process_condition_node(msg)
         logger.info("condition node request processed successfully")
         return result

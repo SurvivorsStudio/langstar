@@ -133,8 +133,6 @@ export interface FlowState {
 
 
   // ??�� ??��??edge ??��
-  manuallySelectedEdges: Record<string, string | null>; // nodeId -> edgeId
-  setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => void;
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -246,9 +244,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
 
   // ??�� ??��??edge ??��
-  manuallySelectedEdges: {},
-  setManuallySelectedEdge: (nodeId: string, edgeId: string | null) => set({ manuallySelectedEdges: { ...get().manuallySelectedEdges, [nodeId]: edgeId } }),
-
   setViewport: (viewport: Viewport) => {
     set({ viewport });
   },
@@ -391,13 +386,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     // ??�� ??��?????? ??��??�ʱ�??(??����� ����??���� ��??)
-    set(state => ({
-      manuallySelectedEdges: {
-        ...state.manuallySelectedEdges,
-        [connection.target!]: null
-      }
-    }));
-
     // ??�� ????�� ���� ????????��� ??�� ??��??Ʈ
     setTimeout(() => {
       get().updateEdgeWarnings();
@@ -668,16 +656,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     // ??�� ??��?????? ??��??�ʱ�??
-    const { manuallySelectedEdges } = get();
-    if (manuallySelectedEdges[edge.target] === edgeId) {
-      set(state => ({
-        manuallySelectedEdges: {
-          ...state.manuallySelectedEdges,
-          [edge.target]: null
-        }
-      }));
-    }
-
     // edge ???? ????�� ���� ????????��� ??�� ??��??Ʈ
     setTimeout(() => {
       get().updateEdgeWarnings();
@@ -889,9 +867,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => {
         get().updateNodeData(nodeId, dataUpdate);
       },
-      onManualEdgeSelect: (nodeId: string, edgeId: string | null) => {
-        get().setManuallySelectedEdge(nodeId, edgeId);
-      },
       onNodeOutputSet: (nodeId: string, output: any) => {
         get().setNodeOutput(nodeId, output);
       },
@@ -906,9 +881,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       },
       isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
         return get().isConditionConvergenceNode(nodeId, nodes, edges);
-      },
-      getManuallySelectedEdge: (nodeId: string) => {
-        return get().manuallySelectedEdges[nodeId] || null;
       }
     };
 
@@ -979,9 +951,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => {
         get().updateNodeData(nodeId, dataUpdate);
       },
-      onManualEdgeSelect: (nodeId: string, edgeId: string | null) => {
-        get().setManuallySelectedEdge(nodeId, edgeId);
-      },
       onNodeOutputSet: (nodeId: string, output: any) => {
         get().setNodeOutput(nodeId, output);
       },
@@ -996,9 +965,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       },
       isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
         return get().isConditionConvergenceNode(nodeId, nodes, edges);
-      },
-      getManuallySelectedEdge: (nodeId: string) => {
-        return get().manuallySelectedEdges[nodeId] || null;
       }
     };
     
@@ -1011,7 +977,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   saveWorkflow: async () => {
     set({ isSaving: true, saveError: null });
-    const { projectName, nodes, edges, viewport, manuallySelectedEdges } = get();
+    const { projectName, nodes, edges, viewport } = get();
 
     if (!projectName || projectName.trim() === "") {
       const errorMsg = "Project name cannot be empty.";
@@ -1036,7 +1002,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         nodes: nodesToSave,
         edges,
         viewport,
-        manuallySelectedEdges,
         lastModified: new Date().toISOString(),
       };
 
@@ -1066,7 +1031,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           nodes: workflowData.nodes || [],
           edges: workflowData.edges || [],
           viewport: workflowData.viewport || { x: 0, y: 0, zoom: 1 },
-          manuallySelectedEdges: workflowData.manuallySelectedEdges || {},
           isLoading: false, 
           loadError: null,
           lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,

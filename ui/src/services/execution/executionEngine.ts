@@ -19,6 +19,7 @@ import { EDGE_STATES } from '../../types/edge';
 import { getNodeExecutor } from './nodeExecutors';
 import { ExecutionContext } from './nodeExecutorTypes';
 import { hasValidEdgeData } from '../../utils/edgeUtils';
+import type { ConditionExecutionResult } from './nodeExecutors/conditionNodeExecutor';
 
 /**
  * 실행 콜백 인터페이스
@@ -37,8 +38,6 @@ export interface ExecutionCallbacks {
   onWorkflowComplete: (success: boolean, errorNodes?: string[]) => void;
   /** 노드 데이터 업데이트 시 호출 */
   onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => void;
-  /** 수동 선택 엣지 설정 시 호출 */
-  onManualEdgeSelect: (nodeId: string, edgeId: string | null) => void;
   /** 노드 출력 설정 시 호출 */
   onNodeOutputSet: (nodeId: string, output: any) => void;
   /** 노드 ID로 노드 조회 */
@@ -49,8 +48,6 @@ export interface ExecutionCallbacks {
   getNodes: () => Node<NodeData>[];
   /** Condition convergence 노드 확인 */
   isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => boolean;
-  /** 수동 선택 엣지 조회 */
-  getManuallySelectedEdge: (nodeId: string) => string | null;
 }
 
 /**
@@ -134,30 +131,18 @@ export async function executeNode(
         console.warn(`🔀 [executeNode] No valid data found in any incoming edges`);
       }
     } else {
-      // 일반 노드의 기존 로직
-      // 수동으로 선택된 edge가 있는지 확인
-      const manuallySelectedEdgeId = callbacks.getManuallySelectedEdge(nodeId);
+      // 일반 노드: 가장 최근에 실행된 엣지의 데이터 사용
+      const edgesWithTimestamps = incomingEdges
+        .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+        .map(edge => ({
+          edge,
+          timestamp: edge.data?.timestamp || 0,
+          output: edge.data.output
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
 
-      if (manuallySelectedEdgeId) {
-        // 수동으로 선택된 edge의 데이터 사용
-        const selectedEdge = incomingEdges.find(edge => edge.id === manuallySelectedEdgeId);
-        if (selectedEdge && selectedEdge.data?.output && typeof selectedEdge.data.output === 'object') {
-          input = selectedEdge.data.output;
-        }
-      } else {
-        // 수동 선택이 없으면 가장 최근에 실행된 노드의 데이터 사용
-        const edgesWithTimestamps = incomingEdges
-          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-          .map(edge => ({
-            edge,
-            timestamp: edge.data?.timestamp || 0,
-            output: edge.data.output
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
-
-        if (edgesWithTimestamps.length > 0) {
-          input = edgesWithTimestamps[0].output;
-        }
+      if (edgesWithTimestamps.length > 0) {
+        input = edgesWithTimestamps[0].output;
       }
     }
   }
@@ -189,6 +174,14 @@ export async function executeNode(
     let output = result.output;
     const hasError = !result.success;
 
+    // Condition 노드: 각 엣지별 출력을 store에 반영 (분기된 엣지에만 값 전달)
+    const conditionResult = result as ConditionExecutionResult;
+    if (node.type === 'conditionNode' && conditionResult.edgeOutputs) {
+      conditionResult.edgeOutputs.forEach((edgeOutput, edgeId) => {
+        callbacks.onEdgeUpdate(edgeId, edgeOutput);
+      });
+    }
+
     // 노드 출력 설정
     callbacks.onNodeOutputSet(nodeId, output);
 
@@ -198,17 +191,6 @@ export async function executeNode(
     // 성공/실패에 따라 나가는 엣지들의 상태 설정
     const currentEdges = callbacks.getEdges();
     const currentOutgoingEdges = currentEdges.filter(edge => edge.source === nodeId);
-
-    // 성공적으로 실행된 경우, 연결된 타겟 노드들의 입력 소스를 자동으로 이 노드로 설정
-    // 단, merge 노드는 예외 (여러 입력을 합치는 역할이므로 특정 입력 소스를 표시하지 않음)
-    if (!hasError) {
-      currentOutgoingEdges.forEach(edge => {
-        const targetNode = callbacks.getNodeById(edge.target);
-        if (targetNode?.type !== 'mergeNode') {
-          callbacks.onManualEdgeSelect(edge.target, edge.id);
-        }
-      });
-    }
 
     if (node.type === 'conditionNode') {
       // 조건 노드: 실제로 데이터가 전달된 엣지만 성공 처리, 나머지는 기본 상태 유지
@@ -254,9 +236,68 @@ export async function executeNode(
   }
 }
 
+/** 완료된 노드의 하류 중 지금 실행 가능한 노드 ID 목록을 반환 (Merge: 전부 준비, 그 외: 1개 이상 준비) */
+function getRunnableDownstream(
+  completedNodeId: string,
+  callbacks: ExecutionCallbacks
+): string[] {
+  const latestEdges = callbacks.getEdges();
+  const nodes = callbacks.getNodes();
+  const outgoingEdges = latestEdges.filter(edge => edge.source === completedNodeId);
+  const result: string[] = [];
+
+  for (const edge of outgoingEdges) {
+    if (edge.data?.output === null || edge.data?.output === undefined) continue;
+    const targetNodeId = edge.target;
+    const targetNode = callbacks.getNodeById(targetNodeId);
+    if (!targetNode) continue;
+
+    if (targetNode.type === 'mergeNode') {
+      const allIncoming = latestEdges.filter(e => e.target === targetNodeId);
+      const ready = allIncoming.filter(hasValidEdgeData);
+      if (ready.length === allIncoming.length) {
+        result.push(targetNodeId);
+      }
+    } else if (callbacks.isConditionConvergenceNode(targetNodeId, nodes, latestEdges)) {
+      const allIncoming = latestEdges.filter(e => e.target === targetNodeId);
+      const ready = allIncoming.filter(hasValidEdgeData);
+      if (ready.length > 0) result.push(targetNodeId);
+    } else {
+      result.push(targetNodeId);
+    }
+  }
+  return result;
+}
+
+/** 노드가 실행 제한(실행 횟수, merge 대기 횟수)을 통과하는지 */
+function canStartNode(
+  nodeId: string,
+  nodeExecutionCount: Map<string, number>,
+  mergeNodeWaitCount: Map<string, number>,
+  callbacks: ExecutionCallbacks,
+  MAX_NODE_EXECUTIONS: number,
+  MAX_MERGE_WAIT_ATTEMPTS: number
+): boolean {
+  const executionCount = nodeExecutionCount.get(nodeId) || 0;
+  const node = callbacks.getNodeById(nodeId);
+  if (!node) return false;
+
+  if (node.type !== 'mergeNode') {
+    return executionCount < MAX_NODE_EXECUTIONS;
+  }
+
+  const waitCount = mergeNodeWaitCount.get(nodeId) || 0;
+  const canExecute = executionCount < MAX_NODE_EXECUTIONS && waitCount < MAX_MERGE_WAIT_ATTEMPTS;
+  if (!canExecute && waitCount >= MAX_MERGE_WAIT_ATTEMPTS) {
+    return executionCount < MAX_NODE_EXECUTIONS;
+  }
+  return canExecute;
+}
+
 /**
  * 워크플로우 전체를 실행합니다.
- * 
+ * 완료 시점 기반 스케줄링: 노드가 끝나면 그 하류만 검사해 즉시 실행 대기열에 넣고, 동일 레벨 전체 완료를 기다리지 않습니다.
+ *
  * @param callbacks - 실행 콜백
  * @param chatId - 채팅 ID (선택적)
  */
@@ -264,20 +305,16 @@ export async function runWorkflow(
   callbacks: ExecutionCallbacks,
   chatId?: string
 ): Promise<void> {
-  console.log('🚀 [RunWorkflow] Starting workflow execution');
+  console.log('🚀 [RunWorkflow] Starting workflow execution (completion-triggered scheduling)');
 
   const nodes = callbacks.getNodes();
   const edges = callbacks.getEdges();
 
-  // 워크플로 시작 시 모든 edge를 PENDING 상태로 초기화 (순환 구조 지원)
-  console.log("🔄 [RunWorkflow] Initializing all edges to PENDING state");
   edges.forEach(edge => {
     callbacks.onEdgeUpdate(edge.id, EDGE_STATES.PENDING);
   });
 
-  // 워크플로우 실행 시작 알림
   callbacks.onNodeStart('workflow', 'Workflow');
-
   console.log("🚀 워크플로우 실행 시작");
   console.log("=========================================");
 
@@ -290,145 +327,85 @@ export async function runWorkflow(
   }
   console.log(`➡️ 시작 노드 발견: ${startNode.data.label} (ID: ${startNode.id})`);
 
-  // 순환 구조 지원을 위한 실행 로직
-  const nodeExecutionCount = new Map<string, number>(); // 각 노드의 실행 횟수 추적
-  const mergeNodeWaitCount = new Map<string, number>(); // merge 노드 대기 횟수 추적
-  const MAX_NODE_EXECUTIONS = 10; // 무한 루프 방지를 위한 최대 실행 횟수
-  const MAX_MERGE_WAIT_ATTEMPTS = 10; // merge 노드 최대 대기 시도 횟수
-  let frontier: string[] = [startNode.id];
+  const nodeExecutionCount = new Map<string, number>();
+  const mergeNodeWaitCount = new Map<string, number>();
+  const MAX_NODE_EXECUTIONS = 100;
+  const MAX_MERGE_WAIT_ATTEMPTS = 100;
+  const MAX_TOTAL_ITERATIONS = 1000;
   const errorNodes: string[] = [];
-  let totalIterations = 0;
-  const MAX_TOTAL_ITERATIONS = 100; // 전체 실행 반복 제한
 
-  while (frontier.length > 0) {
+  const runnable = new Set<string>([startNode.id]);
+  const running = new Map<string, Promise<{ nodeId: string; output: any }>>();
+  let totalIterations = 0;
+
+  while (true) {
     totalIterations++;
     if (totalIterations > MAX_TOTAL_ITERATIONS) {
-      console.warn("⚠️ 워크플로우가 최대 반복 횟수에 도달했습니다. 무한 루프를 방지하기 위해 중단합니다.");
+      console.warn("⚠️ 워크플로우 최대 반복 횟수 도달. 중단합니다.");
       break;
     }
 
-    // 실행 가능한 노드만 필터링 (최대 실행 횟수 및 merge 대기 제한 체크)
-    const executableNodes = Array.from(new Set(frontier)).filter(nodeId => {
-      const executionCount = nodeExecutionCount.get(nodeId) || 0;
-      const node = callbacks.getNodeById(nodeId);
-
-      // 일반 노드: 최대 실행 횟수만 체크
-      if (node?.type !== 'mergeNode') {
-        return executionCount < MAX_NODE_EXECUTIONS;
-      }
-
-      // merge 노드: 실행 횟수와 대기 시도 횟수 모두 체크
-      const waitCount = mergeNodeWaitCount.get(nodeId) || 0;
-      const canExecute = executionCount < MAX_NODE_EXECUTIONS && waitCount < MAX_MERGE_WAIT_ATTEMPTS;
-
-      if (!canExecute && waitCount >= MAX_MERGE_WAIT_ATTEMPTS) {
-        console.warn(`⚠️ [MergeNode] ${node.data.label} (${nodeId}) 최대 대기 횟수 초과 - 강제 실행`);
-        // 최대 대기 횟수 초과 시 강제로 실행 허용
-        return executionCount < MAX_NODE_EXECUTIONS;
-      }
-
-      return canExecute;
+    // runnable → running: 실행 가능하고 제한 통과한 노드만 시작
+    const toStart: string[] = [];
+    runnable.forEach(nodeId => {
+      if (running.has(nodeId)) return;
+      if (!canStartNode(nodeId, nodeExecutionCount, mergeNodeWaitCount, callbacks, MAX_NODE_EXECUTIONS, MAX_MERGE_WAIT_ATTEMPTS)) return;
+      toStart.push(nodeId);
     });
+    toStart.forEach(nodeId => {
+      runnable.delete(nodeId);
+      const node = callbacks.getNodeById(nodeId);
+      if (!node) return;
 
-    if (executableNodes.length === 0) {
-      console.log("➡️ 더 이상 실행할 수 있는 노드가 없습니다. (최대 실행 횟수 도달)");
-      break;
-    }
-
-    console.log(`➡️ Parallel executing level (iteration ${totalIterations}):`, executableNodes);
-    console.log(`➡️ Node execution counts:`, Object.fromEntries(nodeExecutionCount));
-
-    // 현재 레벨 병렬 실행
-    await Promise.all(executableNodes.map(async (nodeId) => {
-      const nodeToExecute = callbacks.getNodeById(nodeId);
-      if (!nodeToExecute) {
-        console.warn(`⚠️ 실행 중 ID ${nodeId}를 가진 노드를 찾을 수 없습니다. 건너뜁니다.`);
-        return;
-      }
-
-      // 실행 횟수 증가
       const currentCount = nodeExecutionCount.get(nodeId) || 0;
       nodeExecutionCount.set(nodeId, currentCount + 1);
-      console.log(`🔄 노드 ${nodeToExecute.data.label} (${nodeId}) 실행 횟수: ${currentCount + 1}/${MAX_NODE_EXECUTIONS}`);
+      console.log(`🔄 [Schedule] 노드 ${node.data.label} (${nodeId}) 실행 시작 (${currentCount + 1}/${MAX_NODE_EXECUTIONS})`);
 
-      try {
-        await executeNode(nodeId, callbacks, chatId, true);
-      } catch (e) {
-        // 내부에서 상태 처리됨
-      }
-    }));
+      const promise = executeNode(nodeId, callbacks, chatId)
+        .then(output => ({ nodeId, output: output ?? (node.data?.output ?? null) }))
+        .catch(err => {
+          console.error(`Error in node ${nodeId}:`, err);
+          return { nodeId, output: { error: 'Execution failed' } };
+        });
+      running.set(nodeId, promise);
+    });
 
-    // 다음 레벨 수집
-    const next: string[] = [];
-    for (const nodeId of executableNodes) {
-      const executedNode = callbacks.getNodeById(nodeId);
-      const output = executedNode?.data.output;
-      if (output && typeof output === 'object' && output.error) {
-        errorNodes.push(executedNode?.data.label || nodeId);
-      }
-
-      const latestEdges = callbacks.getEdges();
-      const outgoingEdges = latestEdges.filter(edge => edge.source === nodeId);
-      outgoingEdges.forEach(edge => {
-        if (edge.data?.output !== null && edge.data?.output !== undefined) {
-          const targetNodeId = edge.target;
-          const targetNode = callbacks.getNodeById(targetNodeId);
-
-          // merge 노드인 경우 모든 incoming edge가 준비되었는지 사전 체크
-          if (targetNode?.type === 'mergeNode') {
-            const allIncomingEdges = latestEdges.filter(e => e.target === targetNodeId);
-            const readyEdges = allIncomingEdges.filter(hasValidEdgeData);
-
-            const allEdgesReady = readyEdges.length === allIncomingEdges.length;
-
-            if (allEdgesReady) {
-              console.log(`[Frontier] Merge 노드 ${targetNode.data.label} 준비 완료 - 실행 큐 추가`);
-              next.push(targetNodeId);
-            } else {
-              console.log(`[Frontier] Merge 노드 ${targetNode.data.label} 대기 (${readyEdges.length}/${allIncomingEdges.length})`);
-            }
-          } else if (callbacks.isConditionConvergenceNode(targetNodeId, callbacks.getNodes(), latestEdges)) {
-            // condition convergence 노드는 하나의 edge라도 데이터가 있으면 실행 가능
-            const allIncomingEdges = latestEdges.filter(e => e.target === targetNodeId);
-            const readyEdges = allIncomingEdges.filter(hasValidEdgeData);
-
-            if (readyEdges.length > 0) {
-              console.log(`🔀 [Frontier] Condition convergence 노드 ${targetNode?.data.label} 준비 완료 (${readyEdges.length}/${allIncomingEdges.length} edges ready) - 실행 큐 추가`);
-              next.push(targetNodeId);
-            } else {
-              console.log(`🔀 [Frontier] Condition convergence 노드 ${targetNode?.data.label} 대기 중 - 아직 데이터가 없음`);
-            }
-          } else {
-            // 일반 노드는 기존 로직대로
-            next.push(targetNodeId);
-          }
-        }
-      });
-
-      // mergeNode가 대기 상태면 동일 노드를 재시도 대상으로 유지
-      const isMergeWaiting = executedNode?.type === 'mergeNode' && output && (output as any).status === 'waiting';
-      if (isMergeWaiting) {
-        // merge 노드 대기 횟수 증가
-        const currentWaitCount = mergeNodeWaitCount.get(nodeId) || 0;
-        mergeNodeWaitCount.set(nodeId, currentWaitCount + 1);
-
-        // 대기 중인 merge 노드는 다음 반복에서 재시도
-        next.push(nodeId);
-        console.log(`🔄 [MergeNode] ${executedNode.data.label} (${nodeId}) 대기 중 (${currentWaitCount + 1}/${MAX_MERGE_WAIT_ATTEMPTS}) - 다음 반복에서 재시도`);
-        console.log(`🔄 [MergeNode] 대기 이유:`, (output as any).message);
-        console.log(`🔄 [MergeNode] 완료 대기 중인 노드들:`, (output as any).waitingFor);
-      } else if (executedNode?.type === 'mergeNode' && output && (output as any).status !== 'waiting') {
-        // merge 노드가 성공적으로 완료된 경우 - 대기 카운트 리셋
-        mergeNodeWaitCount.set(nodeId, 0);
-        console.log(`✅ [MergeNode] ${executedNode.data.label} (${nodeId}) 완료 - 다음 노드들로 진행`);
-      }
+    if (running.size === 0) {
+      if (runnable.size === 0) break;
+      console.log("➡️ 실행 가능 노드는 있으나 제한으로 시작 불가. 종료합니다.");
+      break;
     }
 
-    // 순환 구조 지원: visited Set 제거, 실행 횟수만으로 제한
-    frontier = next;
+    // 완료 하나 나올 때까지 대기 (먼저 끝난 노드부터 처리)
+    const completed = await Promise.race(
+      Array.from(running.entries()).map(([nid, p]) =>
+        p.then(out => ({ nodeId: nid, output: out.output }))
+      )
+    );
+    const { nodeId: completedNodeId, output } = completed;
+
+    running.delete(completedNodeId);
+    const executedNode = callbacks.getNodeById(completedNodeId);
+    if (output && typeof output === 'object' && output.error) {
+      errorNodes.push(executedNode?.data?.label || completedNodeId);
+    }
+
+    getRunnableDownstream(completedNodeId, callbacks).forEach(downId => {
+      if (!running.has(downId)) runnable.add(downId);
+    });
+
+    // Merge 노드 대기 시 재시도
+    const isMergeWaiting = executedNode?.type === 'mergeNode' && output && (output as any).status === 'waiting';
+    if (isMergeWaiting) {
+      const currentWaitCount = mergeNodeWaitCount.get(completedNodeId) || 0;
+      mergeNodeWaitCount.set(completedNodeId, currentWaitCount + 1);
+      runnable.add(completedNodeId);
+      console.log(`🔄 [MergeNode] ${executedNode.data.label} (${completedNodeId}) 대기 (${currentWaitCount + 1}/${MAX_MERGE_WAIT_ATTEMPTS}) - 재시도 대기열에 추가`);
+    } else if (executedNode?.type === 'mergeNode' && output && (output as any).status !== 'waiting') {
+      mergeNodeWaitCount.set(completedNodeId, 0);
+    }
   }
 
-  // 워크플로우 완료 알림
   const success = errorNodes.length === 0;
   callbacks.onWorkflowComplete(success, errorNodes);
 }

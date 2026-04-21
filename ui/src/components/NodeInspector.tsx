@@ -24,7 +24,7 @@ interface NodeInspectorProps {
 }
 
 const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onClose }) => {
-  const { nodes, edges, updateNodeData, updateEdgeData, setManuallySelectedEdge, manuallySelectedEdges } = useFlowStore();
+  const { nodes, edges, updateNodeData, updateEdgeData } = useFlowStore();
   const [activeTab, setActiveTab] = useState<'input_data' | 'code' | 'settings' | 'edge_data'>('input_data');
   const [currentNode, setCurrentNode] = useState<Node<NodeData> | null>(null);
   const [code, setCode] = useState<string>('');
@@ -39,7 +39,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
   const [mergedInputData, setMergedInputData] = useState<Record<string, VariableValue>>({});
   const [hasValidInputData, setHasValidInputData] = useState<boolean>(false);
   const [selectedEdgeInfo, setSelectedEdgeInfo] = useState<{edgeId: string, sourceNodeId: string, timestamp: number} | null>(null);
-  const [manuallySelectedEdgeId, setManuallySelectedEdgeId] = useState<string | null>(null);
   
   // JSON 팝업 상태
   const [isJsonPopupOpen, setIsJsonPopupOpen] = useState<boolean>(false);
@@ -154,50 +153,28 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
       setIncomingEdges(currentIncomingEdges);
 
-      // store에서 수동 선택된 edge 정보 가져오기
-      const storeSelectedEdgeId = manuallySelectedEdges[nodeId];
-      setManuallySelectedEdgeId(storeSelectedEdgeId || null);
-
-      // input data 선택 로직
+      // input data 선택: 항상 가장 최근 엣지 기준
       let currentMergedInputData: Record<string, VariableValue> = {};
       let selectedEdge: {edgeId: string, sourceNodeId: string, timestamp: number} | null = null;
       
       if (currentIncomingEdges.length > 0) {
-        // 1) 수동 선택된 엣지가 있으면 그 엣지를 우선 표시 (출력이 없어도 비어있는 상태로 보여줌)
-        if (storeSelectedEdgeId) {
-          const manualEdge = currentIncomingEdges.find(e => e.id === storeSelectedEdgeId);
-          if (manualEdge) {
-            const out = manualEdge.data?.output;
-            const hasObject = out && typeof out === 'object' && Object.keys(out || {}).length > 0;
-            currentMergedInputData = hasObject ? out : {};
-            selectedEdge = {
-              edgeId: manualEdge.id,
-              sourceNodeId: manualEdge.source as string,
-              timestamp: (manualEdge.data?.timestamp as number) || 0
-            };
-          }
-        }
+        const edgesWithTimestamps = currentIncomingEdges
+          .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
+          .map(edge => ({
+            edge,
+            timestamp: edge.data?.timestamp || 0,
+            output: edge.data.output
+          }))
+          .sort((a, b) => b.timestamp - a.timestamp);
 
-        // 2) 수동 선택이 없는 경우에만 자동 선택 (수동 선택이 있으면 비어 있어도 자동 대체 금지)
-        if (!selectedEdge) {
-          const edgesWithTimestamps = currentIncomingEdges
-            .filter(edge => edge.data?.output && typeof edge.data.output === 'object')
-            .map(edge => ({
-              edge,
-              timestamp: edge.data?.timestamp || 0,
-              output: edge.data.output
-            }))
-            .sort((a, b) => b.timestamp - a.timestamp);
-
-          if (edgesWithTimestamps.length > 0) {
-            const targetEdge = edgesWithTimestamps[0];
-            currentMergedInputData = targetEdge.output;
-            selectedEdge = {
-              edgeId: targetEdge.edge.id,
-              sourceNodeId: targetEdge.edge.source,
-              timestamp: targetEdge.timestamp
-            };
-          }
+        if (edgesWithTimestamps.length > 0) {
+          const targetEdge = edgesWithTimestamps[0];
+          currentMergedInputData = targetEdge.output;
+          selectedEdge = {
+            edgeId: targetEdge.edge.id,
+            sourceNodeId: targetEdge.edge.source,
+            timestamp: targetEdge.timestamp
+          };
         }
       }
       setMergedInputData(currentMergedInputData);
@@ -262,7 +239,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         setActiveTab(newDefaultTab);
       }
     }
-  }, [nodeId, activeTab, manuallySelectedEdges]); // edges 의존성 제거
+  }, [nodeId, activeTab, edges]);
 
   // 현재 노드의 데이터가 변경될 때만 코드 동기화 (임시로 비활성화)
   // useEffect(() => {
@@ -375,10 +352,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         ...currentNode.data,
         inputData: null
       });
-      
-      // 수동 선택 정보 초기화
-      setManuallySelectedEdge(nodeId, null);
-      setManuallySelectedEdgeId(null);
       
       // 모든 incoming edge의 output 초기화
       incomingEdges.forEach(edge => {
@@ -636,12 +609,9 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                 )}
                 <button
                   onClick={() => {
-                    // 강제로 input data 새로고침
+                    // 강제로 input data 새로고침 (항상 최신 엣지 기준)
                     const currentIncomingEdges = edges.filter((edge: Edge) => edge.target === nodeId);
                     setIncomingEdges(currentIncomingEdges);
-                    
-                    const storeSelectedEdgeId = manuallySelectedEdges[nodeId];
-                    setManuallySelectedEdgeId(storeSelectedEdgeId || null);
                     
                     if (currentIncomingEdges.length > 0) {
                       const edgesWithTimestamps = currentIncomingEdges
@@ -654,19 +624,14 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         .sort((a, b) => b.timestamp - a.timestamp);
 
                       if (edgesWithTimestamps.length > 0) {
-                        const targetEdge = storeSelectedEdgeId 
-                          ? edgesWithTimestamps.find(e => e.edge.id === storeSelectedEdgeId) || edgesWithTimestamps[0]
-                          : edgesWithTimestamps[0];
-                        
+                        const targetEdge = edgesWithTimestamps[0];
                         setMergedInputData(targetEdge.output);
                         setSelectedEdgeInfo({
                           edgeId: targetEdge.edge.id,
                           sourceNodeId: targetEdge.edge.source,
                           timestamp: targetEdge.timestamp
                         });
-                        
-                        const currentHasValidInputData = targetEdge.output && Object.keys(targetEdge.output).length > 0;
-                        setHasValidInputData(currentHasValidInputData);
+                        setHasValidInputData(targetEdge.output && Object.keys(targetEdge.output).length > 0);
                       }
                     }
                   }}
@@ -826,7 +791,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                       const sourceNode = nodes.find(n => n.id === edge.source);
                       const hasData = edge.data?.output && typeof edge.data.output === 'object' && Object.keys(edge.data.output).length > 0;
                       const hasError = hasData && edge.data.output.error;
-                      const isSelected = manuallySelectedEdgeId === edge.id;
+                      const isSelected = selectedEdgeInfo?.edgeId === edge.id;
                       
                       return (
                         <div 
@@ -981,7 +946,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                         hasError 
                           ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
                           : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
-                      } ${manuallySelectedEdgeId === selectedEdgeInfo.edgeId ? 'border-2 border-blue-500' : ''}`}
+                      } ${selectedEdgeInfo?.edgeId ? 'border-2 border-blue-500' : ''}`}
                       title="Read-only preview"
                     >
                       <div className="flex items-center justify-between mb-2">

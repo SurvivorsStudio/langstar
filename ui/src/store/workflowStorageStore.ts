@@ -35,19 +35,8 @@ export const useWorkflowStorageStore = create<WorkflowStorageState>((set, get) =
       const workflows = await storageService.getAllWorkflows();
       console.log('[WorkflowStorageStore/fetch] ✅ MongoDB에서 가져온 워크플로우:', workflows);
 
-      // 마이그레이션: manuallySelectedEdges가 없는 워크플로우에 빈 객체 추가
-      const migratedWorkflows = workflows.map(workflow => {
-        if (!workflow.manuallySelectedEdges) {
-          return {
-            ...workflow,
-            manuallySelectedEdges: {}
-          };
-        }
-        return workflow;
-      });
-
-      set({ availableWorkflows: migratedWorkflows, isLoading: false, loadError: null });
-      console.log(`[WorkflowStorageStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, migratedWorkflows);
+      set({ availableWorkflows: workflows, isLoading: false, loadError: null });
+      console.log(`[WorkflowStorageStore/fetch] ✅ 상태 업데이트 완료. 최종 워크플로우 목록:`, workflows);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ loadError: errorMessage || 'Failed to fetch workflows', isLoading: false });

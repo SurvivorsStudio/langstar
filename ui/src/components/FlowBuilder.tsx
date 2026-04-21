@@ -14,11 +14,13 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import { useFlowStore } from '../store/flowStore';
+import { useUserNodeStore } from '../store/userNodeStore';
 import { useThemeStore } from '../store/themeStore';
 import NodeSidebar from './NodeSidebar';
 import NodeInspector from './NodeInspector';
 import ExecutionToast from './ExecutionToast';
 import ConnectionToast from './ConnectionToast';
+import FlowAssistantChatPanel from './FlowAssistantChatPanel';
 import { nodeTypes } from './nodes/nodeTypes';
 import CustomEdge, { handleEdgeDelete } from './edges/CustomEdge';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -27,9 +29,13 @@ const edgeTypes = {
   default: CustomEdge,
 };
 
-const FlowBuilder: React.FC = () => {
+export interface FlowBuilderComponentProps {
+  aiPanelOpen: boolean;
+}
+
+const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, setManuallySelectedEdge, isWorkflowRunning } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, isWorkflowRunning } = useFlowStore();
   
   // 다른 노드가 실행 중인지 확인
   const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
@@ -207,9 +213,7 @@ const FlowBuilder: React.FC = () => {
     setSelectedEdge(edge); // 선택된 엣지 정보 저장
     setShowInspector(true);
     setFocusedElement('edge', edge.id); // 엣지 포커스 설정
-    // 엣지 클릭 시 해당 노드의 입력 소스로 설정
-    setManuallySelectedEdge(edge.target, edge.id);
-  }, [setFocusedElement, setSelectedNode, setManuallySelectedEdge]);
+  }, [setFocusedElement, setSelectedNode]);
 
   // 전역 이벤트 리스너 - NodeInspector 활성화
   useEffect(() => {
@@ -227,12 +231,6 @@ const FlowBuilder: React.FC = () => {
       setSelectedEdge(edge);
       setShowInspector(true);
       setFocusedElement('edge', edge.id);
-      // 엣지를 클릭했을 때 해당 타겟 노드의 수동 선택 인풋으로 지정하여
-      // NodeInspector가 새로 연결된 엣지의 인풋(없음)을 정확히 반영하도록 함
-      if (edge?.target && edge?.id) {
-        setManuallySelectedEdge(edge.target, edge.id);
-      }
-      
       console.log(`[FlowBuilder] Inspector state updated`);
     };
 
@@ -340,21 +338,20 @@ const FlowBuilder: React.FC = () => {
 
   const onDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-  
-    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+
     const data = event.dataTransfer.getData('application/reactflow');
-    if (!data || !reactFlowBounds) return;
+    if (!data) return;
 
     const { type, label } = JSON.parse(data);
-    const position = reactFlowInstance.project({
-      x: event.clientX - reactFlowBounds.left,
-      y: event.clientY - reactFlowBounds.top,
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
     });
 
     // UserNode인 경우 특별한 처리
     if (type === 'userNode') {
-      // UserNode 정보를 가져와서 노드 생성
-      const userNodes = useFlowStore.getState().userNodes;
+      // UserNode 정보는 userNodeStore에 있음 (NodeSidebar와 동일 소스)
+      const userNodes = useUserNodeStore.getState().userNodes;
       const userNode = userNodes.find(node => node.name === label);
       
       console.log('FlowBuilder - UserNode drag:', { type, label });
@@ -405,12 +402,13 @@ const FlowBuilder: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full min-h-0">
       {showNodeSidebar && (
         <NodeSidebar onClose={() => setShowNodeSidebar(false)} />
       )}
-      <div className="flex-grow h-full" ref={reactFlowWrapper}>
-        <ReactFlow
+      <div className="flex min-h-0 min-w-0 flex-1 flex-row">
+        <div className="relative min-h-0 min-w-0 flex-1" ref={reactFlowWrapper}>
+          <ReactFlow
             onInit={inst => setRfInstance(inst)}
             nodes={nodes}
             edges={edges}
@@ -509,6 +507,17 @@ const FlowBuilder: React.FC = () => {
           }}
         />
       )}
+
+      <div
+        className={`shrink-0 overflow-hidden border-l border-transparent transition-[width] duration-300 ease-out dark:border-transparent ${
+          aiPanelOpen ? 'w-[min(100vw,420px)] border-slate-200 dark:border-slate-700' : 'w-0 border-l-0'
+        }`}
+      >
+        <div className="flex h-full w-[min(100vw,420px)] shrink-0 flex-col bg-white shadow-lg dark:bg-slate-950">
+          <FlowAssistantChatPanel panelOpen={aiPanelOpen} />
+        </div>
+      </div>
+      </div>
       
       {/* 실행 상태 표시 컴포넌트들 */}
       <ExecutionToast />
