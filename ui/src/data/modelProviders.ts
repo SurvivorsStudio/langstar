@@ -287,6 +287,7 @@ export const LANGUAGE_MODEL_PROVIDERS: ModelProvider[] = [
       { id: 'anthropic.claude-opus-4-1-20250805-v1:0', name: 'anthropic.claude-opus-4-1-20250805-v1:0', displayName: 'Claude Opus 4.1', description: 'Next generation Opus model', maxTokens: 200000, maxOutputTokens: 32000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Opus', '4.1', 'NextGen'], regions: [] },
       { id: 'anthropic.claude-opus-4-20250514-v1:0', name: 'anthropic.claude-opus-4-20250514-v1:0', displayName: 'Claude Opus 4', description: 'Next generation Opus model', maxTokens: 200000, maxOutputTokens: 32000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Opus', '4', 'NextGen'], regions: [] },
       { id: 'anthropic.claude-sonnet-4-20250514-v1:0', name: 'anthropic.claude-sonnet-4-20250514-v1:0', displayName: 'Claude Sonnet 4', description: 'Next generation Sonnet model', maxTokens: 200000, maxOutputTokens: 64000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Sonnet', '4', 'NextGen'], regions: [] },
+      { id: 'us.anthropic.claude-sonnet-4-6', name: 'us.anthropic.claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6 (US inference profile)', description: 'Amazon Bedrock cross-region inference profile for Claude Sonnet 4.6', maxTokens: 200000, maxOutputTokens: 64000, capabilities: ['텍스트', '이미지'], tags: ['Anthropic', 'Claude', 'Sonnet', '4.6', 'Bedrock', 'InferenceProfile', 'CrossRegion'] },
       
       // OpenAI Series Models
       { id: 'openai.gpt-oss-120b-1:0', name: 'openai.gpt-oss-120b-1:0', displayName: 'GPT-OSS-120B', description: 'OpenAI Series 120B parameter model', maxTokens: 128000, capabilities: ['텍스트'], tags: ['OpenAI', 'OSS', '120B', 'Large'], regions: ['us-west-2'] },
@@ -501,7 +502,7 @@ export const PROVIDER_CARDS = [
     id: 'aws',
     name: 'AWS',
     logo: '☁️',
-    description: 'Nova, Claude 3/3.5/3.7/4, GPT-OSS via Bedrock',
+    description: 'Nova, Claude 3/3.5/3.7/4 (Sonnet 4.6 US profile), GPT-OSS via Bedrock',
     modelCount: 17,
     color: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
     textColor: 'text-yellow-700',

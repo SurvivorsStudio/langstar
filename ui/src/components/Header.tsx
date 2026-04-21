@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Play, Loader2, FileJson, Copy, X, Rocket } from 'lucide-react';
+import { Save, Play, Loader2, FileJson, Copy, X, Rocket, Sparkles } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { useWorkflowStorageStore } from '../store/workflowStorageStore';
 import { useThemeStore } from '../store/themeStore';
@@ -13,7 +13,13 @@ import DeploymentSuccessModal from './deployment/DeploymentSuccessModal';
 
 import CodeEditor from './CodeEditor';
 
-const Header: React.FC = () => {
+export interface HeaderProps {
+  /** 챗플로우 편집기 AI 사이드 패널 (FlowBuilder에서만 전달) */
+  aiPanelOpen?: boolean;
+  onToggleAiPanel?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ aiPanelOpen = false, onToggleAiPanel }) => {
   const navigate = useNavigate();
   const { isDarkMode } = useThemeStore();
   const { t } = useTranslation();
@@ -265,6 +271,21 @@ const Header: React.FC = () => {
           {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
           {isSaving ? t('header.saving') : t('header.save')}
         </button>
+        {onToggleAiPanel && (
+          <button
+            type="button"
+            onClick={onToggleAiPanel}
+            className={`hidden sm:flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white shadow-sm transition-colors ${
+              aiPanelOpen
+                ? 'bg-violet-800 ring-2 ring-violet-300/80 ring-offset-2 ring-offset-gray-50 hover:bg-violet-900 dark:bg-violet-700 dark:ring-violet-200/50 dark:ring-offset-gray-900 dark:hover:bg-violet-800'
+                : 'bg-violet-600 hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600'
+            }`}
+            title={aiPanelOpen ? 'AI 패널 닫기' : 'AI 어시스턴트'}
+          >
+            <Sparkles className="h-4 w-4 mr-1 shrink-0" />
+            AI
+          </button>
+        )}
         <button
           onClick={() => setIsDeploymentModalOpen(true)}
           disabled={nodes.length === 0 || isDeploying}
