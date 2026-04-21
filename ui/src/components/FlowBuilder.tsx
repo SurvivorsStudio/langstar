@@ -35,12 +35,16 @@ export interface FlowBuilderComponentProps {
 
 const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
   const { id } = useParams<{ id: string }>();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, isWorkflowRunning } = useFlowStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, loadWorkflow, projectName, viewport, setProjectName, isLoading, removeNode, setFocusedElement, selectedNode, setSelectedNode, focusedElement, removeEdge, isWorkflowRunning, buildDemoCanvasHidden } = useFlowStore();
   
   // 다른 노드가 실행 중인지 확인
   const isAnyNodeExecuting = nodes.some(node => node.data?.isExecuting);
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const { isDarkMode } = useThemeStore();
+  const chatflowBackgroundLineColor = isDarkMode ? '#374151' : '#e5e7eb';
+  /** FlowBuilder 페이지(bg-gray-50/900)와 맞는 빈 캔버스 바탕 */
+  const chatflowBackgroundPaneColor = isDarkMode ? '#111827' : '#f9fafb';
+  const CHATFLOW_BACKGROUND_GAP = 15;
   const [showNodeSidebar, setShowNodeSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
@@ -191,16 +195,26 @@ const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
     };
   }, [isDragging, showTrashZone]);
 
-  const onNodeClick = useCallback((_: unknown, node: Node) => {
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     console.log(`[FlowBuilder] Node clicked: ${node.id}, type: ${node.type}, label: ${node.data.label}`);
     console.log(`[FlowBuilder] Node data:`, node.data);
-    // 클릭 시에는 휴지통을 반드시 숨김
     setShowTrashZone(false);
     setIsOverTrashZone(false);
+
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      const rawLabel = node.data?.label;
+      const displayName =
+        typeof rawLabel === 'string' && rawLabel.trim() !== '' ? rawLabel.trim() : String(node.id);
+      useFlowStore.getState().queueAssistantChatInsert(displayName);
+      return;
+    }
+
     setSelectedNode(node.id);
-    setSelectedEdge(null); // 엣지 상태 초기화
+    setSelectedEdge(null);
     setShowInspector(true);
-    setFocusedElement('node', node.id); // 노드 클릭 시 노드만 포커스 (엣지 포커스 해제)
+    setFocusedElement('node', node.id);
   }, [setFocusedElement, setSelectedNode]);
 
   const onEdgeClick = useCallback((_: unknown, edge: any) => {
@@ -433,10 +447,10 @@ const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
             elementsSelectable={true}
             selectNodesOnDrag={false}
         >
-          <Background 
-            color={isDarkMode ? '#374151' : '#e5e7eb'} 
-            gap={15} 
-            variant={BackgroundVariant.Lines} 
+          <Background
+            color={chatflowBackgroundLineColor}
+            gap={CHATFLOW_BACKGROUND_GAP}
+            variant={BackgroundVariant.Lines}
           />
           
           {/* 휴지통 영역 */}
@@ -494,6 +508,17 @@ const FlowBuilder: React.FC<FlowBuilderComponentProps> = ({ aiPanelOpen }) => {
           </Panel>
 
         </ReactFlow>
+        {buildDemoCanvasHidden && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+            style={{
+              backgroundColor: chatflowBackgroundPaneColor,
+              backgroundImage: `linear-gradient(to right, ${chatflowBackgroundLineColor} 1px, transparent 1px), linear-gradient(to bottom, ${chatflowBackgroundLineColor} 1px, transparent 1px)`,
+              backgroundSize: `${CHATFLOW_BACKGROUND_GAP}px ${CHATFLOW_BACKGROUND_GAP}px`,
+            }}
+            aria-hidden
+          />
+        )}
       </div>
       {showInspector && (selectedNode || selectedEdge) && (
         <NodeInspector

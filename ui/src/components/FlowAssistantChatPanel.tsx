@@ -16,6 +16,30 @@ const RUN_WELCOME =
 const BUILD_WELCOME =
   '이 모드에서는 **채팅만으로 챗플로를 설계·구성**하는 기능을 쓸 수 있습니다. (노드 추가·연결 제안 등) 서버 API가 연결되면 이곳에서 바로 반영될 예정입니다. 지금은 요구사항을 적어 두면 이후 구현 시 참고할 수 있습니다.';
 
+/** '수정해줘' 트리거 시 데모용으로 채워 넣는 시스템 프롬프트 초안 */
+const BUILD_EDIT_PROMPT_REPLY = `[역할]
+너는 미식가이자 영양 밸런스를 고려한 메뉴 추천 전문가야. 나의 현재 상황과 취향을 분석하여 최적의 메뉴를 추천해 줘.
+
+[상황 정보]
+
+현재 시간 및 식사 종류: [예: 4월 21일 오후 3시, 점심 혹은 이른 저녁]
+
+함께하는 사람: [예: 혼자, 직장 동료, 친구 등]
+
+선호 메뉴/카테고리: [예: 한식, 일식, 가벼운 것, 기름진 것 등]
+
+피해야 할 음식: [예: 알레르기, 특정 재료, 너무 매운 것 등]
+
+현재 날씨/기분: [예: 비가 와서 따뜻한 국물이 당김, 스트레스받아서 자극적인 것 등]
+
+[요청 사항]
+
+위 조건에 맞는 메뉴 3가지를 추천해 줘.
+
+각 메뉴별로 추천하는 이유(영양학적 관점 혹은 분위기)를 1문장으로 짧게 설명해 줘.
+
+마지막에 이 데이터 해석을 바탕으로 한 한줄요약을 반드시 포함해 줘.`;
+
 const parseBasicMarkdown = (text: string) => {
   try {
     return text
@@ -47,6 +71,43 @@ const SafeMarkdown: React.FC<{ content: string }> = ({ content }) => {
 
 const isMarkdownContent = (content: string) => /(\*\*|__|\*|_|`|\[|\]|#)/.test(content);
 
+/** 노드 언급 칩 — 일반 채팅 텍스트와 시각적으로 구분 (동화 DS 그린) */
+const ASSISTANT_NODE_CHIP_CLASS =
+  'assistant-node-chip mx-0.5 inline-flex max-w-[min(220px,100%)] shrink-0 align-baseline rounded border border-[#00694D] bg-[#E8F5EF] px-1.5 py-0.5 text-xs font-medium text-[#00694D] shadow-sm dark:border-[#00AD50] dark:bg-[#0C3A27]/50 dark:text-[#C2D6BE]';
+
+function getComposerPlainText(root: HTMLElement | null): string {
+  if (!root) return '';
+  return root.innerText.replace(/\u200b/g, '').replace(/\ufeff/g, '').trim();
+}
+
+function clearComposer(root: HTMLElement | null) {
+  if (!root) return;
+  root.innerHTML = '';
+}
+
+function insertNodeChipAtEnd(editor: HTMLElement, label: string) {
+  const span = document.createElement('span');
+  span.className = ASSISTANT_NODE_CHIP_CLASS;
+  span.contentEditable = 'false';
+  span.dataset.nodeMention = 'true';
+  span.textContent = label;
+
+  const raw = editor.innerText.replace(/\u200b/g, '');
+  if (raw.length > 0 && !/\s$/.test(raw)) {
+    editor.appendChild(document.createTextNode(' '));
+  }
+  editor.appendChild(span);
+  editor.appendChild(document.createTextNode('\u200b'));
+
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  editor.focus();
+}
+
 interface FlowAssistantChatPanelProps {
   /** 캔버스 AI 버튼으로 패널이 닫힐 때 false — 이때 채팅 메모리 정리 */
   panelOpen: boolean;
@@ -58,12 +119,24 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
   const chatIdRef = useRef(chatId);
   chatIdRef.current = chatId;
   const wasPanelOpenRef = useRef(false);
-  const { nodes, updateNodeData, runWorkflow, projectName } = useFlowStore((s) => ({
+  const { nodes, updateNodeData, runWorkflow, projectName, setBuildDemoCanvasHidden } = useFlowStore((s) => ({
     nodes: s.nodes,
     updateNodeData: s.updateNodeData,
     runWorkflow: s.runWorkflow,
     projectName: s.projectName,
+    setBuildDemoCanvasHidden: s.setBuildDemoCanvasHidden,
   }));
+  const assistantChatInsertSeq = useFlowStore((s) => s.assistantChatInsertSeq);
+  const assistantChatInsertText = useFlowStore((s) => s.assistantChatInsertText);
+
+  /** 홍보 영상용: 채팅으로 제작 전환 시 캔버스 숨김, 챗플로 실행이면 항상 표시 */
+  useEffect(() => {
+    if (mode === 'build') {
+      setBuildDemoCanvasHidden(true);
+    } else {
+      setBuildDemoCanvasHidden(false);
+    }
+  }, [mode, setBuildDemoCanvasHidden]);
 
   const [runMessages, setRunMessages] = useState<Message[]>([
     { type: 'bot', content: RUN_WELCOME, timestamp: new Date() },
@@ -72,11 +145,25 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
     { type: 'bot', content: BUILD_WELCOME, timestamp: new Date() },
   ]);
   const messages = mode === 'run' ? runMessages : buildMessages;
-  const [input, setInput] = useState('');
+  const [composerTick, setComposerTick] = useState(0);
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
   const [buildLoading, setBuildLoading] = useState(false);
   const panelLoading = mode === 'run' ? runLoading : buildLoading;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const assistantInputRef = useRef<HTMLDivElement>(null);
+  const lastAssistantInsertSeq = useRef(0);
+
+  useEffect(() => {
+    if (assistantChatInsertSeq <= lastAssistantInsertSeq.current) return;
+    lastAssistantInsertSeq.current = assistantChatInsertSeq;
+    const snippet = assistantChatInsertText;
+    if (!snippet) return;
+    const ed = assistantInputRef.current;
+    if (!ed) return;
+    insertNodeChipAtEnd(ed, snippet);
+    setComposerTick((n) => n + 1);
+  }, [assistantChatInsertSeq, assistantChatInsertText]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,17 +191,19 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
   }, [panelOpen]);
 
   const handleSendRun = async () => {
-    if (!input.trim()) return;
+    const ed = assistantInputRef.current;
+    const sentText = getComposerPlainText(ed);
+    if (!sentText) return;
 
     const userMessage: Message = {
       type: 'user',
-      content: input,
+      content: sentText,
       timestamp: new Date(),
     };
 
     setRunMessages((prev) => [...prev, userMessage]);
-    const sentText = input;
-    setInput('');
+    clearComposer(ed);
+    setComposerTick((n) => n + 1);
     setRunLoading(true);
 
     try {
@@ -195,19 +284,29 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
   };
 
   const handleSendBuild = async () => {
-    if (!input.trim()) return;
+    const ed = assistantInputRef.current;
+    const sentText = getComposerPlainText(ed);
+    if (!sentText) return;
 
     const userMessage: Message = {
       type: 'user',
-      content: input,
+      content: sentText,
       timestamp: new Date(),
     };
     setBuildMessages((prev) => [...prev, userMessage]);
-    const sentText = input;
-    setInput('');
+    clearComposer(ed);
+    setComposerTick((n) => n + 1);
     setBuildLoading(true);
 
-    await new Promise((r) => setTimeout(r, 350));
+    const revealCanvas = sentText.includes('만들어줘');
+    const editPromptReply = sentText.includes('수정해줘');
+    /** 홍보용: 수정해줘 3초, 만들어줘 5초 */
+    const thinkingMs = editPromptReply ? 3000 : revealCanvas ? 5000 : 350;
+    await new Promise((r) => setTimeout(r, thinkingMs));
+
+    if (revealCanvas) {
+      setBuildDemoCanvasHidden(false);
+    }
 
     const snapshot = {
       프로젝트: projectName ?? '(이름 없음)',
@@ -215,10 +314,19 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
       엣지수: useFlowStore.getState().edges.length,
     };
 
-    const botContent =
-      `지금 캔버스 상태: 프로젝트 **${snapshot.프로젝트}**, 노드 ${snapshot.노드수}개, 연결 ${snapshot.엣지수}개.\n\n` +
-      `적어 주신 내용:\n> ${sentText.replace(/\n/g, '\n> ')}\n\n` +
-      `요구를 반영해 노드 구성·연결을 제작하였습니다.`;
+    let botContent: string;
+    if (editPromptReply) {
+      botContent = BUILD_EDIT_PROMPT_REPLY;
+    } else if (revealCanvas) {
+      botContent =
+        `요청하신 대로 챗플로를 화면에 표시했습니다.\n\n` +
+        `현재 캔버스: 프로젝트 **${snapshot.프로젝트}**, 노드 ${snapshot.노드수}개, 연결 ${snapshot.엣지수}개.`;
+    } else {
+      botContent =
+        `지금 캔버스 상태: 프로젝트 **${snapshot.프로젝트}**, 노드 ${snapshot.노드수}개, 연결 ${snapshot.엣지수}개.\n\n` +
+        `적어 주신 내용:\n> ${sentText.replace(/\n/g, '\n> ')}\n\n` +
+        `요구를 반영해 노드 구성·연결을 제작하였습니다.`;
+    }
 
     setBuildMessages((prev) => [...prev, { type: 'bot', content: botContent, timestamp: new Date() }]);
     setBuildLoading(false);
@@ -229,12 +337,24 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
     else void handleSendBuild();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
+
+  const handleComposerPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    if (!text) return;
+    document.execCommand('insertText', false, text);
+    setComposerTick((n) => n + 1);
+  };
+
+  const composerPlain = getComposerPlainText(assistantInputRef.current);
+  const composerEmpty = composerPlain === '';
+  const canSend = !panelLoading && composerPlain.length > 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-950">
@@ -315,22 +435,32 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
 
       <div className="shrink-0 border-t border-slate-200 bg-white/90 p-4 dark:border-slate-800 dark:bg-slate-900/60">
         <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              mode === 'run'
-                ? '실행할 입력을 보내세요…'
-                : '만들고 싶은 플로우를 설명해 보세요…'
-            }
-            className="min-h-[40px] flex-1 resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400"
-            rows={1}
-          />
+          <div className="relative min-h-[40px] flex-1">
+            {composerEmpty && !isComposerFocused && (
+              <span className="pointer-events-none absolute left-3 top-2 z-0 text-sm text-slate-400 dark:text-slate-500">
+                {mode === 'run' ? '실행할 입력을 보내세요…' : '만들고 싶은 플로우를 설명해 보세요…'}
+              </span>
+            )}
+            <div
+              ref={assistantInputRef}
+              data-flow-assistant-input
+              contentEditable={!panelLoading}
+              suppressContentEditableWarning
+              role="textbox"
+              aria-multiline="true"
+              aria-label={mode === 'run' ? '챗플로 실행 입력' : '채팅으로 제작 입력'}
+              onInput={() => setComposerTick((n) => n + 1)}
+              onKeyDown={handleComposerKeyDown}
+              onPaste={handleComposerPaste}
+              onFocus={() => setIsComposerFocused(true)}
+              onBlur={() => setIsComposerFocused(false)}
+              className="relative z-[1] min-h-[40px] w-full whitespace-pre-wrap break-words rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400"
+            />
+          </div>
           <button
             type="button"
             onClick={handleSend}
-            disabled={!input.trim() || panelLoading}
+            disabled={!canSend}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
             title="전송"
           >

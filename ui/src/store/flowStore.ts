@@ -133,6 +133,15 @@ export interface FlowState {
 
 
   // ??�� ??��??edge ??��
+  /** 홍보 영상용 임시: 채팅으로 제작 모드에서 캔버스 숨김, '…만들어줘' 입력 시 표시 */
+  buildDemoCanvasHidden: boolean;
+  setBuildDemoCanvasHidden: (hidden: boolean) => void;
+
+  /** AI 채팅 입력에 문자열 삽입(노드 Ctrl+클릭 등) — seq 증가로 패널에서 감지 */
+  assistantChatInsertSeq: number;
+  assistantChatInsertText: string;
+  queueAssistantChatInsert: (text: string) => void;
+
 }
 
 export const initialNodes: Node<NodeData>[] = [
@@ -241,6 +250,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   
   // ��Ŀ�� ���� �ʱ� ����
   focusedElement: { type: null, id: null },
+
+
+  buildDemoCanvasHidden: false,
+  setBuildDemoCanvasHidden: (hidden: boolean) => set({ buildDemoCanvasHidden: hidden }),
+
+  assistantChatInsertSeq: 0,
+  assistantChatInsertText: '',
+  queueAssistantChatInsert: (text: string) =>
+    set((s) => ({
+      assistantChatInsertSeq: s.assistantChatInsertSeq + 1,
+      assistantChatInsertText: text,
+    })),
 
 
   // ??�� ??��??edge ??��
