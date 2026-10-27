@@ -268,7 +268,7 @@ export const importChatflow = async (file: File): Promise<{ success: boolean; me
 };
 
 // 간단한 워크플로우만 import (테스트용)
-export const importWorkflowOnly = async (file: File): Promise<{ success: boolean; message: string }> => {
+export const importWorkflowOnly = async (file: File): Promise<{ success: boolean; message: string; importedNames?: string[] }> => {
   try {
     console.log('Starting simple workflow import...');
     const text = await file.text();
@@ -291,10 +291,12 @@ export const importWorkflowOnly = async (file: File): Promise<{ success: boolean
 
     // 워크플로우 데이터만 import
     let importedCount = 0;
+    const importedNames: string[] = [];
     for (const workflow of importData.workflows) {
       try {
         await storageService.updateWorkflow(workflow.projectName, workflow);
         importedCount++;
+        importedNames.push(workflow.projectName);
         console.log(`Imported workflow: ${workflow.projectName}`);
       } catch (error) {
         console.warn(`Failed to import workflow: ${workflow.projectName}`, error);
@@ -304,7 +306,8 @@ export const importWorkflowOnly = async (file: File): Promise<{ success: boolean
     
     return {
       success: true,
-      message: `Successfully imported ${importedCount} workflows`
+      message: `Successfully imported ${importedCount} workflows`,
+      importedNames
     };
   } catch (error) {
     console.error('Simple workflow import failed:', error);

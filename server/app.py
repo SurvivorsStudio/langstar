@@ -16,7 +16,7 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 # Import structured modules
 from server.utils.logger import setup_logger
-from server.routes import health, workflow, deployment, execution, schedule, storage
+from server.routes import health, workflow, deployment, execution, schedule, storage, workflow_run
 from server.services.schedule_service import schedule_service
 from server.config.database import mongodb, init_database
 
@@ -69,6 +69,7 @@ app.include_router(health.router, tags=["health"])
 app.include_router(workflow.router, tags=["workflow"])
 app.include_router(deployment.router, prefix="/api", tags=["deployment"])
 app.include_router(execution.router, prefix="/api", tags=["execution"])
+app.include_router(workflow_run.router, prefix="/api", tags=["workflow-run"])
 app.include_router(schedule.router, prefix="/api", tags=["schedule"])
 app.include_router(storage.router, tags=["storage"])
 

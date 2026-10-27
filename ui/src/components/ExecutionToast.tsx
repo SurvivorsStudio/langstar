@@ -61,7 +61,7 @@ const ExecutionToast: React.FC = () => {
     };
 
     const handleExecutionCompleteEvent = (event: CustomEvent) => {
-      const { nodeId, success = true, nodeName, failedNodeName } = event.detail;
+      const { nodeId, success = true, nodeName, failedNodeName, cancelled, detached } = event.detail;
       
       // ref에서 시작 시간 가져오기 (즉시 접근 가능)
       const startTime = executionStartTimesRef.current.get(nodeId);
@@ -77,7 +77,10 @@ const ExecutionToast: React.FC = () => {
       
       // 실행 중 토스트 제거
       setToasts(prev => prev.filter(toast => toast.id !== `executing-${nodeId}`));
-      
+
+      // 화면만 떠난 경우 (서버 실행은 계속됨): 완료 토스트 없이 종료
+      if (detached) return;
+
       // 실행 시점에 전달받은 노드 이름 사용 (가장 정확함)
       const nodeLabel = nodeName || 'Node';
       
@@ -99,8 +102,10 @@ const ExecutionToast: React.FC = () => {
       let message;
       const timeText = executionTime > 0 ? ` (${formatExecutionTime(executionTime)})` : '';
       
-      if (success) {
-        message = isWorkflow 
+      if (isWorkflow && cancelled) {
+        message = `**${nodeLabel}** execution was stopped${timeText}.`;
+      } else if (success) {
+        message = isWorkflow
           ? `**${nodeLabel}** has been executed successfully${timeText}.`
           : `**${nodeLabel}** node has been executed successfully${timeText}.`;
       } else {
@@ -113,9 +118,9 @@ const ExecutionToast: React.FC = () => {
       
       const completeToast: ToastMessage = {
         id: `complete-${nodeId}-${Date.now()}`,
-        type: success ? 'success' : 'error',
-        title: isWorkflow 
-          ? (success ? 'Workflow Execution Completed' : 'Workflow Execution Failed')
+        type: cancelled ? 'info' : success ? 'success' : 'error',
+        title: isWorkflow
+          ? (cancelled ? 'Workflow Execution Stopped' : success ? 'Workflow Execution Completed' : 'Workflow Execution Failed')
           : (success ? 'Node Execution Completed' : 'Node Execution Failed'),
         message,
         duration: 3000,

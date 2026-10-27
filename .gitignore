@@ -438,3 +438,6 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,intellij,visualstudiocode,node,python,react
+
+# Workflow run history (server-side builder runs)
+workflow_runs/

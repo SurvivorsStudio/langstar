@@ -8,8 +8,10 @@ from server.config.database import (
     get_ai_connections_collection,
     get_user_nodes_collection,
     get_deployments_collection,
-    get_deployment_versions_collection
+    get_deployment_versions_collection,
+    get_workflow_folders_collection
 )
+import uuid
 
 class StorageService:
     """Service for managing workflow storage in MongoDB"""
@@ -62,8 +64,13 @@ class StorageService:
         """Delete workflow by project name"""
         collection = get_workflows_collection()
         result = collection.delete_one({'projectName': project_name})
+        if result.deleted_count > 0:
+            # 폴더 소속 정보도 함께 제거
+            folders = get_workflow_folders_collection()
+            if folders is not None:
+                folders.update_many({'workflowNames': project_name}, {'$pull': {'workflowNames': project_name}})
         return result.deleted_count > 0
-    
+
     def rename_workflow(self, old_name: str, new_name: str) -> bool:
         """Rename workflow"""
         collection = get_workflows_collection()
@@ -84,9 +91,82 @@ class StorageService:
         # Delete old and insert new (rename operation)
         collection.delete_one({'projectName': old_name})
         collection.insert_one(old_workflow)
-        
+
+        # 폴더 소속 정보를 새 이름으로 갱신
+        folders = get_workflow_folders_collection()
+        if folders is not None:
+            folders.update_many(
+                {'workflowNames': old_name},
+                {'$set': {'workflowNames.$': new_name}}
+            )
+
         return True
-    
+
+    # ==================== Workflow Folders ====================
+
+    def get_all_workflow_folders(self) -> List[Dict[str, Any]]:
+        """Get all workflow folders"""
+        collection = get_workflow_folders_collection()
+        if collection is None:
+            raise Exception("MongoDB not connected. Please install and start MongoDB.")
+        return list(collection.find({}, {'_id': 0}).sort('name', 1))
+
+    def create_workflow_folder(self, name: str) -> Dict[str, Any]:
+        """Create new workflow folder"""
+        collection = get_workflow_folders_collection()
+        name = name.strip()
+        if not name:
+            raise ValueError("Folder name is required")
+        if collection.find_one({'name': name}):
+            raise ValueError(f"Folder '{name}' already exists")
+        now = datetime.utcnow().isoformat()
+        folder = {
+            'id': str(uuid.uuid4()),
+            'name': name,
+            'workflowNames': [],
+            'createdAt': now,
+            'updatedAt': now,
+        }
+        collection.insert_one(folder)
+        folder.pop('_id', None)
+        return folder
+
+    def rename_workflow_folder(self, folder_id: str, name: str) -> Dict[str, Any]:
+        """Rename workflow folder"""
+        collection = get_workflow_folders_collection()
+        name = name.strip()
+        if not name:
+            raise ValueError("Folder name is required")
+        if collection.find_one({'name': name, 'id': {'$ne': folder_id}}):
+            raise ValueError(f"Folder '{name}' already exists")
+        result = collection.update_one(
+            {'id': folder_id},
+            {'$set': {'name': name, 'updatedAt': datetime.utcnow().isoformat()}}
+        )
+        if result.matched_count == 0:
+            raise LookupError(f"Folder '{folder_id}' not found")
+        return collection.find_one({'id': folder_id}, {'_id': 0})
+
+    def delete_workflow_folder(self, folder_id: str) -> bool:
+        """Delete workflow folder (workflows inside are kept and move back to root)"""
+        collection = get_workflow_folders_collection()
+        result = collection.delete_one({'id': folder_id})
+        return result.deleted_count > 0
+
+    def move_workflow_to_folder(self, project_name: str, folder_id: Optional[str]) -> bool:
+        """Move workflow into a folder (None = root)"""
+        collection = get_workflow_folders_collection()
+        if folder_id and not collection.find_one({'id': folder_id}):
+            raise LookupError(f"Folder '{folder_id}' not found")
+        collection.update_many({'workflowNames': project_name}, {'$pull': {'workflowNames': project_name}})
+        if folder_id:
+            collection.update_one(
+                {'id': folder_id},
+                {'$addToSet': {'workflowNames': project_name},
+                 '$set': {'updatedAt': datetime.utcnow().isoformat()}}
+            )
+        return True
+
     # ==================== AI Connections ====================
     
     def get_all_ai_connections(self) -> List[Dict[str, Any]]:
