@@ -73,6 +73,7 @@ AI_CONNECTIONS_COLLECTION = "ai_connections"
 USER_NODES_COLLECTION = "user_nodes"
 DEPLOYMENTS_COLLECTION = "deployments"
 DEPLOYMENT_VERSIONS_COLLECTION = "deployment_versions"
+WORKFLOW_FOLDERS_COLLECTION = "workflow_folders"
 
 def get_database() -> Optional[Database]:
     """Get MongoDB database instance"""
@@ -97,6 +98,10 @@ def get_deployments_collection() -> Optional[Collection]:
 def get_deployment_versions_collection() -> Optional[Collection]:
     """Get deployment versions collection"""
     return mongodb.get_collection(DEPLOYMENT_VERSIONS_COLLECTION)
+
+def get_workflow_folders_collection() -> Optional[Collection]:
+    """Get workflow folders collection"""
+    return mongodb.get_collection(WORKFLOW_FOLDERS_COLLECTION)
 
 def init_database():
     """Initialize database with indexes"""
@@ -137,7 +142,12 @@ def init_database():
         deployment_versions.create_index("deploymentId")
         deployment_versions.create_index("version")
         deployment_versions.create_index("createdAt")
-        
+
+        # Workflow Folders collection indexes
+        workflow_folders = get_workflow_folders_collection()
+        workflow_folders.create_index("id", unique=True)
+        workflow_folders.create_index("workflowNames")
+
         print("[OK] Database indexes created successfully")
     except Exception as e:
         print(f"[WARNING] Error creating database indexes: {e}")

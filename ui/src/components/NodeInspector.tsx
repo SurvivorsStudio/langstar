@@ -1027,7 +1027,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
                     value={code}
                     onChange={handleCodeChange}
                     language="python"
-                    readOnly={isUserNode}
                   />
                 </div>
               </div>
@@ -1333,7 +1332,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
         edgeData={mergedInputData}
         sourceNode={selectedEdgeInfo ? nodes.find(n => n.id === selectedEdgeInfo.sourceNodeId) : null}
         availableVariables={Object.keys(mergedInputData)}
-        readOnly={isUserNode}
       />
 
       {/* JSON Popup Modal */}

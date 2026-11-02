@@ -77,6 +77,69 @@ async def rename_workflow(request: RenameWorkflowRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Workflow Folders ====================
+
+class WorkflowFolderRequest(BaseModel):
+    name: str
+
+class MoveWorkflowRequest(BaseModel):
+    projectName: str
+    folderId: Optional[str] = None
+
+@router.get("/workflow-folders", response_model=List[Dict[str, Any]])
+async def get_all_workflow_folders():
+    """Get all workflow folders"""
+    try:
+        return storage_service.get_all_workflow_folders()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/workflow-folders", response_model=Dict[str, Any])
+async def create_workflow_folder(request: WorkflowFolderRequest):
+    """Create new workflow folder"""
+    try:
+        return storage_service.create_workflow_folder(request.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/workflow-folders/move")
+async def move_workflow_to_folder(request: MoveWorkflowRequest):
+    """Move workflow into a folder (folderId null = root)"""
+    try:
+        storage_service.move_workflow_to_folder(request.projectName, request.folderId)
+        return {"message": f"Workflow '{request.projectName}' moved"}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/workflow-folders/{folder_id}", response_model=Dict[str, Any])
+async def rename_workflow_folder(folder_id: str, request: WorkflowFolderRequest):
+    """Rename workflow folder"""
+    try:
+        return storage_service.rename_workflow_folder(folder_id, request.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/workflow-folders/{folder_id}")
+async def delete_workflow_folder(folder_id: str):
+    """Delete workflow folder (workflows inside are kept and move to root)"""
+    try:
+        success = storage_service.delete_workflow_folder(folder_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Folder '{folder_id}' not found")
+        return {"message": f"Folder '{folder_id}' deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== AI Connections ====================
 
 @router.get("/ai-connections", response_model=List[Dict[str, Any]])

@@ -61,6 +61,55 @@ export async function renameWorkflow(oldName: string, newName: string): Promise<
   return handleResponse(response);
 }
 
+// ==================== Workflow Folders ====================
+
+export interface WorkflowFolder {
+  id: string;
+  name: string;
+  workflowNames: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function getAllWorkflowFolders(): Promise<WorkflowFolder[]> {
+  const response = await fetch(`${API_BASE_URL}/workflow-folders`);
+  return handleResponse(response);
+}
+
+export async function createWorkflowFolder(name: string): Promise<WorkflowFolder> {
+  const response = await fetch(`${API_BASE_URL}/workflow-folders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  return handleResponse(response);
+}
+
+export async function renameWorkflowFolder(folderId: string, name: string): Promise<WorkflowFolder> {
+  const response = await fetch(`${API_BASE_URL}/workflow-folders/${encodeURIComponent(folderId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  return handleResponse(response);
+}
+
+export async function deleteWorkflowFolder(folderId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/workflow-folders/${encodeURIComponent(folderId)}`, {
+    method: 'DELETE'
+  });
+  return handleResponse(response);
+}
+
+export async function moveWorkflowToFolder(projectName: string, folderId: string | null): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/workflow-folders/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectName, folderId })
+  });
+  return handleResponse(response);
+}
+
 // ==================== AI Connections ====================
 
 export async function getAllAIConnections(): Promise<any[]> {

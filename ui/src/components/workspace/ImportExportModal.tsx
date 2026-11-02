@@ -6,7 +6,7 @@ import {
 interface ImportExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImportSuccess?: () => void;
+  onImportSuccess?: (importedNames: string[]) => void | Promise<void>;
 }
 
 const ImportExportModal: React.FC<ImportExportModalProps> = ({
@@ -44,7 +44,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({
        
        if (result.success) {
          setMessage({ type: 'success', text: result.message });
-         onImportSuccess?.();
+         await onImportSuccess?.(result.importedNames ?? []);
          // 파일 선택 초기화
          setSelectedFile(null);
          if (fileInputRef.current) {

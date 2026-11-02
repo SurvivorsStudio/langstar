@@ -20,6 +20,7 @@ import Footer from '../components/Footer';
 import { AIConnection, AIConnectionForm as AIConnectionFormType } from '../types/aiConnection';
 import { Deployment } from '../types/deployment';
 import { useTranslation } from '../hooks/useTranslation';
+import { moveWorkflowToFolder } from '../services/storageService';
 
 const mockRagConfigs = [
   {
@@ -112,6 +113,8 @@ const WorkspacePage: React.FC = () => {
     embeddingModel: 'OpenAI Ada 002'
   });
   const [showImportExportModal, setShowImportExportModal] = React.useState(false);
+  // 가져오기를 연 폴더 (루트면 null)
+  const importTargetFolderIdRef = React.useRef<string | null>(null);
 
   const defaultProjectName = DEFAULT_PROJECT_NAME;
 
@@ -258,7 +261,18 @@ const WorkspacePage: React.FC = () => {
     }
   };
 
-  const handleImportSuccess = () => {
+  const handleImportSuccess = async (importedNames: string[]) => {
+    // 폴더 안에서 가져오기를 했으면 가져온 워크플로우를 그 폴더로 이동
+    const targetFolderId = importTargetFolderIdRef.current;
+    if (targetFolderId) {
+      for (const name of importedNames) {
+        try {
+          await moveWorkflowToFolder(name, targetFolderId);
+        } catch (error) {
+          console.error(`WorkspacePage: Failed to move imported workflow ${name} to folder:`, error);
+        }
+      }
+    }
     // import 성공 후 워크플로우 목록 새로고침
     if (activeMenu === 'chatflows') {
       fetchAvailableWorkflows();
@@ -319,7 +333,10 @@ const WorkspacePage: React.FC = () => {
             handleNewWorkflow={handleNewWorkflow}
             handleWorkflowClick={handleWorkflowClick}
             handleDeleteWorkflow={handleDeleteWorkflow}
-            onImportExport={() => setShowImportExportModal(true)}
+            onImportExport={(folderId) => {
+              importTargetFolderIdRef.current = folderId;
+              setShowImportExportModal(true);
+            }}
             deployments={deployments}
             isLoadingDeployments={isLoadingDeployments}
           />

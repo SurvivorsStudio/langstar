@@ -66,6 +66,8 @@ import {
 // Execution engine imports
 import * as executionEngine from '../services/execution/executionEngine';
 import type { ExecutionCallbacks } from '../services/execution/executionEngine';
+import * as workflowRunApi from '../services/workflowRunApi';
+import type { WorkflowRun } from '../services/workflowRunApi';
 
 // Re-exports for backward compatibility
 export { EDGE_STATES };
@@ -98,9 +100,16 @@ export interface FlowState {
   resetAllEdgeStatuses: (excludeEdgeIds?: string[]) => void; // ��� ???? ??�� �ʱ�??(??�� ��� ??��)
 
   setNodeExecuting: (nodeId: string, isExecuting: boolean, success?: boolean, nodeName?: string, isWorkflowExecution?: boolean) => void;
-  runWorkflow: (chatId?: string) => Promise<void>; // chatId ??����� ��??
+  /** resumeFromRunId 를 주면 해당 실패/중지 Run 의 성공 노드를 재사용하고 이어서 실행 */
+  runWorkflow: (chatId?: string, resumeFromRunId?: string) => Promise<void>; // chatId ??����� ��??
   isWorkflowRunning: boolean;
   setWorkflowRunning: (isRunning: boolean) => void;
+  /** 서버에서 실행 중인 워크플로우 Run ID (추적 중일 때만) */
+  currentRunId: string | null;
+  trackWorkflowRun: (runId: string) => Promise<void>;
+  cancelWorkflowRun: () => Promise<void>;
+  resumeActiveWorkflowRun: () => Promise<void>;
+  applyWorkflowRunToCanvas: (run: WorkflowRun) => void;
   viewport: Viewport; // viewport ??�� ��??
   setViewport: (viewport: Viewport) => void; // viewport ??��??Ʈ ??�� ��??
   
@@ -208,6 +217,12 @@ export const initialEdges: Edge[] = [];
 // MongoDB Storage ??�� (IndexedDB ??��??
 export const DEFAULT_PROJECT_NAME = 'New Workflow'; // �⺻ ??��??Ʈ ??�� ??��??
 
+// 서버 실행 추적 상태 (동시에 하나의 Run 만 폴링)
+let trackingRunId: string | null = null;
+const RUN_POLL_INTERVAL_MS = 1000;
+const RUN_POLL_MAX_FAILURES = 30;
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: initialNodes,
   edges: initialEdges,
@@ -215,6 +230,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   viewport: { x: 0, y: 0, zoom: 1 }, // viewport �ʱ�??
   isWorkflowRunning: false,
   setWorkflowRunning: (isRunning: boolean) => set({ isWorkflowRunning: isRunning }),
+  currentRunId: null,
   
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -896,83 +912,166 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     await executionEngine.executeNode(nodeId, callbacks, chatId);
   },
 
-  runWorkflow: async (chatId?: string) => {
-    // �ߺ� ���� ����
+  runWorkflow: async (chatId?: string, resumeFromRunId?: string) => {
+    // 중복 실행 방지
     if (get().isWorkflowRunning) {
-      console.log('?? [RunWorkflow] Workflow is already running, skipping...');
+      console.log('[RunWorkflow] Workflow is already running, skipping...');
       return;
     }
-    
-    get().setWorkflowRunning(true);
-    
-    // ���� ���� ����� ���� �ݹ� ����
-    const callbacks: ExecutionCallbacks = {
-      onNodeStart: (nodeId: string, nodeName: string) => {
-        // ��ũ�÷ο� ���� �˸��� Ư�� ó��
-        if (nodeId === 'workflow') {
-          window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
-            detail: { nodeId: 'workflow', nodeName: 'Workflow' }
-          }));
-        } else {
-          get().setNodeExecuting(nodeId, true, true, nodeName, true); // isWorkflowExecution = true
-        }
-      },
-      onNodeComplete: (nodeId: string, output: any, success: boolean, nodeName: string) => {
-        if (nodeId !== 'workflow') {
-          get().setNodeExecuting(nodeId, false, success, nodeName, true); // isWorkflowExecution = true
-        }
-      },
-      onEdgeUpdate: (edgeId: string, output: any) => {
-        get().setEdgeOutput(edgeId, output);
-      },
-      onEdgeStatusUpdate: (edgeId: string, status: 'executing' | 'success' | 'failure') => {
-        if (status === 'executing') {
-          get().setEdgeExecuting(edgeId, true);
-        } else if (status === 'success') {
-          get().setEdgeSuccess(edgeId, true);
-        } else if (status === 'failure') {
-          get().setEdgeFailure(edgeId, true);
-        }
-      },
-      onWorkflowComplete: (success: boolean, errorNodes?: string[]) => {
-        get().setWorkflowRunning(false);
-        
-        // �Ϸ� �佺Ʈ
-        if (errorNodes && errorNodes.length > 0) {
-          window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
-            detail: { nodeId: 'workflow', success: false, nodeName: 'Workflow', failedNodeName: errorNodes[0] }
-          }));
-        } else {
-          window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
-            detail: { nodeId: 'workflow', success: true, nodeName: 'Workflow' }
-          }));
-        }
-      },
-      onNodeDataUpdate: (nodeId: string, dataUpdate: Partial<NodeData>) => {
-        get().updateNodeData(nodeId, dataUpdate);
-      },
-      onNodeOutputSet: (nodeId: string, output: any) => {
-        get().setNodeOutput(nodeId, output);
-      },
-      getNodeById: (nodeId: string) => {
-        return get().getNodeById(nodeId);
-      },
-      getEdges: () => {
-        return get().edges;
-      },
-      getNodes: () => {
-        return get().nodes;
-      },
-      isConditionConvergenceNode: (nodeId: string, nodes: Node<NodeData>[], edges: Edge[]) => {
-        return get().isConditionConvergenceNode(nodeId, nodes, edges);
-      }
-    };
-    
-    // ��ü ���� ���� �ʱ�ȭ
+
+    const { projectName, nodes, edges } = get();
+    if (!nodes.some(n => n.type === 'startNode')) {
+      alert("워크플로우 실행 실패: 워크플로우에 시작 노드가 없습니다.");
+      return;
+    }
+
+    set({ isWorkflowRunning: true });
     get().resetAllEdgeStatuses([]);
-    
-    // ���� ���� ȣ��
-    await executionEngine.runWorkflow(callbacks, chatId);
+
+    // 서버에서 실행하므로 현재 캔버스 스냅샷을 그대로 전달 (icon 등 직렬화 불가 필드 제외)
+    const nodesToSend = nodes.map(node => {
+      const { icon, ...restOfData } = node.data;
+      return { ...node, data: restOfData };
+    });
+
+    try {
+      const run = await workflowRunApi.startWorkflowRun({
+        workflow_name: projectName,
+        nodes: JSON.parse(JSON.stringify(nodesToSend, getCircularReplacer())),
+        edges: JSON.parse(JSON.stringify(edges, getCircularReplacer())),
+        chat_id: chatId,
+        resume_from: resumeFromRunId,
+      });
+      // 서버 실행은 창을 닫아도 계속되며, 여기서는 완료될 때까지 상태만 추적
+      await get().trackWorkflowRun(run.id);
+    } catch (error) {
+      set({ isWorkflowRunning: false });
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[RunWorkflow] Failed to start workflow run:', error);
+      alert(`워크플로우 실행 실패: ${message}`);
+      // 다른 창에서 이미 실행 중인 경우 해당 실행을 이어서 추적
+      get().resumeActiveWorkflowRun();
+    }
+  },
+
+  trackWorkflowRun: async (runId: string) => {
+    if (trackingRunId === runId) return;
+    trackingRunId = runId;
+    set({ currentRunId: runId, isWorkflowRunning: true });
+    window.dispatchEvent(new CustomEvent('nodeExecutionStarted', {
+      detail: { nodeId: 'workflow', nodeName: 'Workflow' }
+    }));
+
+    const stopTracking = (detail: Record<string, any>) => {
+      trackingRunId = null;
+      set({ currentRunId: null, isWorkflowRunning: false });
+      window.dispatchEvent(new CustomEvent('nodeExecutionCompleted', {
+        detail: { nodeId: 'workflow', nodeName: 'Workflow', ...detail }
+      }));
+    };
+
+    let lastVersion = -1;
+    let failures = 0;
+    while (trackingRunId === runId) {
+      let run: WorkflowRun;
+      try {
+        run = await workflowRunApi.getWorkflowRun(runId);
+        failures = 0;
+      } catch (error) {
+        failures++;
+        console.warn(`[RunWorkflow] Failed to fetch run ${runId} (${failures}/${RUN_POLL_MAX_FAILURES})`, error);
+        if (failures >= RUN_POLL_MAX_FAILURES) {
+          stopTracking({ success: false });
+          return;
+        }
+        await sleep(RUN_POLL_INTERVAL_MS);
+        continue;
+      }
+      if (trackingRunId !== runId) return;
+
+      // 다른 워크플로우로 이동한 경우 추적만 중단 (서버 실행은 계속됨)
+      if (run.workflow_name !== get().projectName) {
+        stopTracking({ detached: true });
+        return;
+      }
+
+      if (run.version !== lastVersion) {
+        lastVersion = run.version;
+        get().applyWorkflowRunToCanvas(run);
+      }
+
+      if (workflowRunApi.isTerminalRunStatus(run.status)) {
+        stopTracking({
+          success: run.status === 'succeeded',
+          cancelled: run.status === 'cancelled',
+          failedNodeName: run.error_nodes?.[0],
+        });
+        return;
+      }
+      await sleep(RUN_POLL_INTERVAL_MS);
+    }
+  },
+
+  cancelWorkflowRun: async () => {
+    const runId = get().currentRunId;
+    if (!runId) return;
+    try {
+      await workflowRunApi.cancelWorkflowRun(runId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[RunWorkflow] Failed to cancel run:', error);
+      alert(`워크플로우 중지 실패: ${message}`);
+    }
+  },
+
+  resumeActiveWorkflowRun: async () => {
+    const { projectName } = get();
+    if (!projectName || trackingRunId) return;
+    try {
+      const runs = await workflowRunApi.listWorkflowRuns({ workflowName: projectName, limit: 5 });
+      const active = runs.find(run => !workflowRunApi.isTerminalRunStatus(run.status));
+      if (active && get().projectName === projectName) {
+        await get().trackWorkflowRun(active.id);
+      }
+    } catch (error) {
+      console.warn('[RunWorkflow] Failed to check active runs:', error);
+    }
+  },
+
+  applyWorkflowRunToCanvas: (run: WorkflowRun) => {
+    set(state => ({
+      nodes: state.nodes.map(node => {
+        const nodeState = run.node_states[node.id];
+        if (!nodeState) return node;
+        if (nodeState.exec_count === 0) {
+          return node.data.isExecuting ? { ...node, data: { ...node.data, isExecuting: false } } : node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isExecuting: nodeState.is_executing,
+            output: nodeState.output,
+            inputData: nodeState.input,
+          }
+        };
+      }),
+      edges: state.edges.map(edge => {
+        const edgeState = run.edge_states[edge.id];
+        if (!edgeState) return edge;
+        return {
+          ...edge,
+          data: {
+            ...edge.data,
+            output: edgeState.output,
+            timestamp: edgeState.timestamp,
+            isExecuting: edgeState.status === 'executing',
+            isSuccess: edgeState.status === 'success',
+            isFailure: edgeState.status === 'failure',
+          }
+        };
+      }),
+    }));
   },
 
   saveWorkflow: async () => {
@@ -1036,6 +1135,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           lastSaved: workflowData.lastModified ? new Date(workflowData.lastModified) : null,
         });
         console.log(`FlowStore: Workflow "${projectName}" loaded successfully.`);
+        // 서버에서 실행 중인 Run 이 있으면 이어서 추적
+        get().resumeActiveWorkflowRun();
       } else {
         const errorMsg = `Workflow "${projectName}" not found.`;
         set({ isLoading: false, loadError: errorMsg });

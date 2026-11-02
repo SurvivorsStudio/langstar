@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Play, Loader2, FileJson, Copy, X, Rocket, Sparkles } from 'lucide-react';
+import { Save, Play, Loader2, FileJson, Copy, X, Rocket, Sparkles, Square, History } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import { useWorkflowStorageStore } from '../store/workflowStorageStore';
 import { useThemeStore } from '../store/themeStore';
@@ -10,6 +10,7 @@ import { apiService } from '../services/apiService';
 import { DeploymentFormData, Deployment } from '../types/deployment';
 import DeploymentModal from './deployment/DeploymentModal';
 import DeploymentSuccessModal from './deployment/DeploymentSuccessModal';
+import WorkflowRunHistoryModal from './execution/WorkflowRunHistoryModal';
 
 import CodeEditor from './CodeEditor';
 
@@ -32,9 +33,25 @@ const Header: React.FC<HeaderProps> = ({ aiPanelOpen = false, onToggleAiPanel })
     isSaving,
     getWorkflowAsJSONString,
     nodes,
-  } = useFlowStore(state => ({ 
-    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes
+    currentRunId,
+    cancelWorkflowRun,
+  } = useFlowStore(state => ({
+    projectName: state.projectName, setProjectName: state.setProjectName, runWorkflow: state.runWorkflow, isWorkflowRunning: state.isWorkflowRunning, saveWorkflow: state.saveWorkflow, isSaving: state.isSaving, getWorkflowAsJSONString: state.getWorkflowAsJSONString, nodes: state.nodes,
+    currentRunId: state.currentRunId, cancelWorkflowRun: state.cancelWorkflowRun
   }));
+
+  const [isRunHistoryOpen, setIsRunHistoryOpen] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+
+  React.useEffect(() => {
+    if (!isWorkflowRunning) setIsStopping(false);
+  }, [isWorkflowRunning]);
+
+  const handleStopRun = async () => {
+    if (!window.confirm(t('workflowRun.stopConfirm'))) return;
+    setIsStopping(true);
+    await cancelWorkflowRun();
+  };
 
   const { renameWorkflow } = useWorkflowStorageStore();
 
@@ -317,7 +334,30 @@ const Header: React.FC<HeaderProps> = ({ aiPanelOpen = false, onToggleAiPanel })
             </>
           )}
         </button>
+        {isWorkflowRunning && currentRunId && (
+          <button
+            onClick={handleStopRun}
+            disabled={isStopping}
+            className="flex items-center px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={t('workflowRun.stop')}
+          >
+            <Square className="h-4 w-4 mr-1" />
+            {isStopping ? t('header.stopping') : t('header.stop')}
+          </button>
+        )}
+        <button
+          onClick={() => setIsRunHistoryOpen(true)}
+          className="flex items-center px-2 py-1.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-sm"
+          title={t('header.runHistory')}
+        >
+          <History className="h-4 w-4" />
+        </button>
       </div>
+      <WorkflowRunHistoryModal
+        isOpen={isRunHistoryOpen}
+        onClose={() => setIsRunHistoryOpen(false)}
+        workflowName={projectName}
+      />
       {apiResponseModalContent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">

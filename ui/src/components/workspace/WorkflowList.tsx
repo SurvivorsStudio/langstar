@@ -1,7 +1,9 @@
 import React from 'react';
-import { PlusCircle, Trash2, Loader2, Download, Upload } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Download, Upload, Folder, FolderPlus, Pencil, ChevronRight, CornerLeftUp } from 'lucide-react';
 import { Workflow } from '../../store/flowStore';
 import { exportWorkflowOnly } from '../../utils/exportImport';
+import * as storageService from '../../services/storageService';
+import { WorkflowFolder } from '../../services/storageService';
 import { Deployment, DeploymentEnvironment, DeploymentStatus } from '../../types/deployment';
 import { useTranslation } from '../../hooks/useTranslation';
 
@@ -12,7 +14,7 @@ interface WorkflowListProps {
   handleNewWorkflow: () => void;
   handleWorkflowClick: (workflowName: string) => void;
   handleDeleteWorkflow: (workflowName: string, event: React.MouseEvent) => void;
-  onImportExport?: () => void;
+  onImportExport?: (folderId: string | null) => void;
   deployments?: Deployment[];
   isLoadingDeployments?: boolean;
 }
@@ -29,6 +31,127 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
   isLoadingDeployments = false,
 }) => {
   const { t } = useTranslation();
+
+  // 폴더 상태 (MongoDB workflow_folders 컬렉션)
+  const [folders, setFolders] = React.useState<WorkflowFolder[]>([]);
+  const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
+  const [isCreatingFolder, setIsCreatingFolder] = React.useState(false);
+  const [newFolderName, setNewFolderName] = React.useState('');
+  const [editingFolderId, setEditingFolderId] = React.useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = React.useState('');
+  const [draggingWorkflow, setDraggingWorkflow] = React.useState<string | null>(null);
+  // 드래그 오버 중인 대상: 폴더 id 또는 'root'
+  const [dragOverTarget, setDragOverTarget] = React.useState<string | null>(null);
+
+  const fetchFolders = React.useCallback(async () => {
+    try {
+      setFolders(await storageService.getAllWorkflowFolders());
+    } catch (error) {
+      console.error('[WorkflowList] Failed to load folders:', error);
+    }
+  }, []);
+
+  // 워크플로우 목록이 바뀌면(삭제/이름 변경 등) 폴더 소속도 다시 불러온다
+  React.useEffect(() => {
+    fetchFolders();
+  }, [fetchFolders, availableWorkflows]);
+
+  const currentFolder = folders.find(folder => folder.id === currentFolderId) || null;
+
+  // 폴더가 삭제되었으면 루트로 복귀
+  React.useEffect(() => {
+    if (currentFolderId && !folders.some(folder => folder.id === currentFolderId)) {
+      setCurrentFolderId(null);
+    }
+  }, [folders, currentFolderId]);
+
+  const workflowNames = new Set(availableWorkflows.map(workflow => workflow.projectName));
+  const folderedNames = new Set(folders.flatMap(folder => folder.workflowNames));
+  const visibleWorkflows = currentFolder
+    ? availableWorkflows.filter(workflow => currentFolder.workflowNames.includes(workflow.projectName))
+    : availableWorkflows.filter(workflow => !folderedNames.has(workflow.projectName));
+
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) {
+      setIsCreatingFolder(false);
+      return;
+    }
+    try {
+      await storageService.createWorkflowFolder(name);
+      setIsCreatingFolder(false);
+      setNewFolderName('');
+      fetchFolders();
+    } catch (error) {
+      console.error('[WorkflowList] Failed to create folder:', error);
+      alert(`${t('workflowFolder.createFailed')}: ${(error as Error).message}`);
+    }
+  };
+
+  const handleRenameFolder = async (folderId: string) => {
+    const name = editingFolderName.trim();
+    const folder = folders.find(f => f.id === folderId);
+    setEditingFolderId(null);
+    if (!name || !folder || folder.name === name) return;
+    try {
+      await storageService.renameWorkflowFolder(folderId, name);
+      fetchFolders();
+    } catch (error) {
+      console.error('[WorkflowList] Failed to rename folder:', error);
+      alert(`${t('workflowFolder.renameFailed')}: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeleteFolder = async (folder: WorkflowFolder, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!window.confirm(t('workflowFolder.deleteConfirm', { name: folder.name }))) return;
+    try {
+      await storageService.deleteWorkflowFolder(folder.id);
+      fetchFolders();
+    } catch (error) {
+      console.error('[WorkflowList] Failed to delete folder:', error);
+      alert(`${t('workflowFolder.deleteFailed')}: ${(error as Error).message}`);
+    }
+  };
+
+  const moveWorkflow = async (projectName: string, folderId: string | null) => {
+    const sourceFolder = folders.find(folder => folder.workflowNames.includes(projectName));
+    if ((sourceFolder?.id ?? null) === folderId) return;
+    // 낙관적 업데이트 후 서버 반영
+    setFolders(prev => prev.map(folder => {
+      const names = folder.workflowNames.filter(name => name !== projectName);
+      return { ...folder, workflowNames: folder.id === folderId ? [...names, projectName] : names };
+    }));
+    try {
+      await storageService.moveWorkflowToFolder(projectName, folderId);
+    } catch (error) {
+      console.error('[WorkflowList] Failed to move workflow:', error);
+      alert(`${t('workflowFolder.moveFailed')}: ${(error as Error).message}`);
+    }
+    fetchFolders();
+  };
+
+  const dropTargetProps = (target: string, folderId: string | null) => ({
+    onDragOver: (event: React.DragEvent) => {
+      if (!draggingWorkflow) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      if (dragOverTarget !== target) setDragOverTarget(target);
+    },
+    onDragLeave: (event: React.DragEvent) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+        setDragOverTarget(prev => (prev === target ? null : prev));
+      }
+    },
+    onDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      const projectName = event.dataTransfer.getData('application/x-langstar-workflow') || draggingWorkflow;
+      setDragOverTarget(null);
+      setDraggingWorkflow(null);
+      if (projectName) moveWorkflow(projectName, folderId);
+    },
+  });
+
   // 워크플로우의 배포 상태 확인
   const getWorkflowDeploymentStatuses = (workflowName: string) => {
     // 배포 데이터가 로딩 중인 경우
@@ -176,11 +299,36 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
   return (
   <div className="p-8">
     <div className="flex justify-between items-center mb-6">
-      <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">{t('workspace.chatflows')}</h1>
+      <h1 className="flex items-center text-2xl font-semibold text-gray-800 dark:text-gray-100 min-w-0">
+        {currentFolder ? (
+          <>
+            <button
+              onClick={() => setCurrentFolderId(null)}
+              className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            >
+              {t('workspace.chatflows')}
+            </button>
+            <ChevronRight className="w-5 h-5 mx-1 text-gray-400 flex-shrink-0" />
+            <Folder className="w-5 h-5 mr-2 text-amber-500 flex-shrink-0" />
+            <span className="truncate">{currentFolder.name}</span>
+          </>
+        ) : (
+          t('workspace.chatflows')
+        )}
+      </h1>
       <div className="flex gap-2">
+        {!currentFolder && (
+          <button
+            onClick={() => { setIsCreatingFolder(true); setNewFolderName(''); }}
+            className="flex items-center px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+          >
+            <FolderPlus className="w-5 h-5 mr-2" />
+            {t('workflowFolder.newFolder')}
+          </button>
+        )}
                  {onImportExport && (
            <button
-             onClick={onImportExport}
+             onClick={() => onImportExport(currentFolderId)}
              className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
            >
              <Upload className="w-5 h-5 mr-2" />
@@ -207,22 +355,131 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
         {t('common.error')}: {loadError}
       </div>
     )}
-    {!isLoading && !loadError && availableWorkflows.length === 0 && (
+    {!isLoading && !loadError && availableWorkflows.length === 0 && folders.length === 0 && !isCreatingFolder && (
       <div className="text-center text-gray-500 dark:text-gray-400 py-10">
         <p>{t('workflow.noWorkflows')}</p>
         <p>{t('workflow.createFirst')}</p>
       </div>
     )}
-    {!isLoading && !loadError && availableWorkflows.length > 0 && (
+    {!isLoading && !loadError && (availableWorkflows.length > 0 || folders.length > 0 || isCreatingFolder) && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableWorkflows.map((workflow) => {
+        {currentFolder && (
+          <div
+            {...dropTargetProps('root', null)}
+            onClick={() => setCurrentFolderId(null)}
+            className={`flex items-center p-6 rounded-lg border-2 border-dashed transition-all cursor-pointer ${
+              dragOverTarget === 'root'
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
+            }`}
+          >
+            <CornerLeftUp className="w-5 h-5 mr-2 text-gray-400 dark:text-gray-500" />
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {draggingWorkflow ? t('workflowFolder.dropToRoot') : t('workflowFolder.backToRoot')}
+            </span>
+          </div>
+        )}
+        {!currentFolder && isCreatingFolder && (
+          <div className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-blue-300 dark:border-blue-500 flex items-center">
+            <Folder className="w-5 h-5 mr-2 text-amber-500 flex-shrink-0" />
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateFolder();
+                if (e.key === 'Escape') setIsCreatingFolder(false);
+              }}
+              onBlur={handleCreateFolder}
+              placeholder={t('workflowFolder.folderNamePlaceholder')}
+              className="flex-1 min-w-0 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+        {!currentFolder && folders.map((folder) => {
+          const count = folder.workflowNames.filter(name => workflowNames.has(name)).length;
+          const isEditing = editingFolderId === folder.id;
+          return (
+            <div
+              key={folder.id}
+              {...dropTargetProps(folder.id, folder.id)}
+              onClick={() => !isEditing && setCurrentFolderId(folder.id)}
+              className={`p-6 rounded-lg border transition-all cursor-pointer relative ${
+                dragOverTarget === folder.id
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                  : 'bg-amber-50/60 dark:bg-gray-700 border-amber-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md'
+              }`}
+            >
+              <div className="flex items-center mb-2 pr-12">
+                <Folder className="w-5 h-5 mr-2 text-amber-500 flex-shrink-0" />
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={editingFolderName}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setEditingFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRenameFolder(folder.id);
+                      if (e.key === 'Escape') setEditingFolderId(null);
+                    }}
+                    onBlur={() => handleRenameFolder(folder.id)}
+                    className="flex-1 min-w-0 px-2 py-0.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate" title={folder.name}>{folder.name}</h3>
+                )}
+              </div>
+              <div className="flex gap-1 absolute top-2 right-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingFolderId(folder.id);
+                    setEditingFolderName(folder.name);
+                  }}
+                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-opacity"
+                  title={t('workflowFolder.rename')}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={(e) => handleDeleteFolder(folder, e)}
+                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
+                  title={t('workflowFolder.delete')}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <span className="px-2 py-0.5 text-xs rounded-full border bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300">
+                {t('workflowFolder.workflowCount', { count })}
+              </span>
+            </div>
+          );
+        })}
+        {currentFolder && visibleWorkflows.length === 0 && (
+          <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-10">
+            {t('workflowFolder.emptyFolder')}
+          </div>
+        )}
+        {visibleWorkflows.map((workflow) => {
           const deploymentStatuses = getWorkflowDeploymentStatuses(workflow.projectName);
-          
+
           return (
             <div
               key={workflow.projectId}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-langstar-workflow', workflow.projectName);
+                e.dataTransfer.effectAllowed = 'move';
+                setDraggingWorkflow(workflow.projectName);
+              }}
+              onDragEnd={() => {
+                setDraggingWorkflow(null);
+                setDragOverTarget(null);
+              }}
               onClick={() => handleWorkflowClick(workflow.projectName)}
-              className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
+              className={`bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative ${
+                draggingWorkflow === workflow.projectName ? 'opacity-50' : ''
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div>
