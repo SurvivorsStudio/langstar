@@ -164,14 +164,14 @@ docker-compose up backend
 ### 🌐 Access Information
 
 #### Development Environment
-- **Frontend**: http://localhost:5173
-- **Backend**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+- **Frontend**: http://localhost:7828
+- **Backend**: http://localhost:7827
+- **API Documentation**: http://localhost:7827/docs
 
 #### Production Environment
 - **Frontend**: http://localhost:80 (or http://localhost)
-- **Backend**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+- **Backend**: http://localhost:7827
+- **API Documentation**: http://localhost:7827/docs
 
 ---
 
@@ -191,8 +191,8 @@ In development environment, `docker-compose.override.yml` is automatically appli
 #### Port Conflicts
 ```bash
 # Check port usage
-lsof -i :5173
-lsof -i :8000
+lsof -i :7828
+lsof -i :7827
 lsof -i :80
 
 # Clean up ports
@@ -238,11 +238,11 @@ docker-compose ps
 #### Frontend Image
 - **Base**: node:18-alpine
 - **Production**: nginx:alpine
-- **Ports**: 5173 (development), 80 (production)
+- **Ports**: 7828 (development), 80 (production)
 
 #### Backend Image
 - **Base**: python:3.12-slim
-- **Port**: 8000
+- **Port**: 7827
 - **Health Check**: /health endpoint
 
 ---
@@ -387,10 +387,10 @@ ENVIRONMENT=production
 services:
   frontend:
     ports:
-      - "3000:5173"  # Custom frontend port
+      - "3000:7828"  # Custom frontend port
   backend:
     ports:
-      - "9000:8000"  # Custom backend port
+      - "9000:7827"  # Custom backend port
 ```
 
 #### Custom Networks
@@ -597,14 +597,14 @@ docker-compose up backend
 ### 🌐 접속 정보
 
 #### 개발 환경
-- **프론트엔드**: http://localhost:5173
-- **백엔드**: http://localhost:8000
-- **API 문서**: http://localhost:8000/docs
+- **프론트엔드**: http://localhost:7828
+- **백엔드**: http://localhost:7827
+- **API 문서**: http://localhost:7827/docs
 
 #### 프로덕션 환경
 - **프론트엔드**: http://localhost:80 (또는 http://localhost)
-- **백엔드**: http://localhost:8000
-- **API 문서**: http://localhost:8000/docs
+- **백엔드**: http://localhost:7827
+- **API 문서**: http://localhost:7827/docs
 
 ---
 
@@ -624,8 +624,8 @@ docker-compose up backend
 #### 포트 충돌
 ```bash
 # 포트 사용 확인
-lsof -i :5173
-lsof -i :8000
+lsof -i :7828
+lsof -i :7827
 lsof -i :80
 
 # 포트 정리
@@ -671,11 +671,11 @@ docker-compose ps
 #### 프론트엔드 이미지
 - **기본**: node:18-alpine
 - **프로덕션**: nginx:alpine
-- **포트**: 5173 (개발), 80 (프로덕션)
+- **포트**: 7828 (개발), 80 (프로덕션)
 
 #### 백엔드 이미지
 - **기본**: python:3.12-slim
-- **포트**: 8000
+- **포트**: 7827
 - **헬스 체크**: /health 엔드포인트
 
 ---
@@ -820,10 +820,10 @@ ENVIRONMENT=production
 services:
   frontend:
     ports:
-      - "3000:5173"  # 커스텀 프론트엔드 포트
+      - "3000:7828"  # 커스텀 프론트엔드 포트
   backend:
     ports:
-      - "9000:8000"  # 커스텀 백엔드 포트
+      - "9000:7827"  # 커스텀 백엔드 포트
 ```
 
 #### 커스텀 네트워크

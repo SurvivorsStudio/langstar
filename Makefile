@@ -57,7 +57,7 @@ health:
 	@echo "Checking frontend health..."
 	@curl -f http://localhost/health 2>/dev/null || echo "Frontend is not healthy"
 	@echo "Checking backend health..."
-	@curl -f http://localhost:8000/health 2>/dev/null || echo "Backend is not healthy"
+	@curl -f http://localhost:7827/health 2>/dev/null || echo "Backend is not healthy"
 
 # Install dependencies (for local development)
 install:

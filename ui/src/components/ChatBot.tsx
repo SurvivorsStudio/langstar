@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Loader, Minimize2, Maximize2 } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore'; // flowStore import
+import { API_BASE_URL } from '../config/api';
 
 interface Message {
   type: 'user' | 'bot';
@@ -384,7 +385,7 @@ const ChatBot: React.FC = () => {
               
               if (chatId) {
                 try {
-                  const response = await fetch('http://localhost:8000/workflow/memory/clear-chat', {
+                  const response = await fetch(`${API_BASE_URL}/workflow/memory/clear-chat`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

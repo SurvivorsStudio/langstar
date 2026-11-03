@@ -6,7 +6,9 @@
  * 실행 상태와 이력은 이 API로 조회/중지할 수 있습니다.
  */
 
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE_URL as BACKEND_BASE_URL } from '../config/api';
+
+const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
 
 export type WorkflowRunStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type NodeRunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'waiting' | 'cancelled';

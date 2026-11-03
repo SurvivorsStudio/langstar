@@ -233,8 +233,9 @@ MongoDB serves as the primary data store for:
    npm run dev
    ```
    The following servers will be running:
-   - **Frontend server** (React): `http://localhost:5173`
-   - **Backend server** (FastAPI): `http://localhost:8000`
+   - **Frontend server** (React): `http://localhost:7828`
+   - **Backend server** (FastAPI): `http://localhost:7827`
+   - Ports are fixed so they do not collide with common tools (8000/5173). To change them, edit `ui/src/config/ports.ts` and the `--port` in `scripts/dev.*`; if the frontend should call a different backend URL, set `VITE_API_BASE_URL`. A port that is already in use fails with an error instead of moving to another port.
 
 #### Safely Stop Server
 
@@ -254,7 +255,7 @@ npm run clean-ports
 
 # Check port usage
 npm run clean-ports:win32  # Windows
-lsof -i:8000 -i:5173       # macOS/Linux
+lsof -i:7827 -i:7828       # macOS/Linux
 ```
 
 #### Individual Execution Commands
@@ -326,7 +327,7 @@ python --version
 **3. Port already in use:**
 ```bash
 # Check port usage
-lsof -i:8000 -i:5173
+lsof -i:7827 -i:7828
 
 # Kill processes using those ports
 npm run clean-ports
@@ -700,8 +701,9 @@ MongoDB는 다음 데이터를 저장하는 주요 데이터 저장소 역할을
    npm run dev
    ```
    다음 서버들이 실행됩니다:
-   - **프론트엔드 서버** (React): `http://localhost:5173`
-   - **백엔드 서버** (FastAPI): `http://localhost:8000`
+   - **프론트엔드 서버** (React): `http://localhost:7828`
+   - **백엔드 서버** (FastAPI): `http://localhost:7827`
+   - 다른 도구(8000/5173)와 겹치지 않도록 고정 포트를 씁니다. 바꾸려면 `ui/src/config/ports.ts`와 `scripts/dev.*`의 `--port`를 수정하고, 프론트가 다른 백엔드 주소를 호출해야 하면 `VITE_API_BASE_URL`을 설정하세요. 포트가 이미 사용 중이면 다른 포트로 넘어가지 않고 에러로 실패합니다.
 
 ### 서버 안전하게 중지하기
 
@@ -721,7 +723,7 @@ npm run clean-ports
 
 # 포트 사용 상황 확인
 npm run clean-ports:win32  # Windows
-lsof -i:8000 -i:5173       # macOS/Linux
+lsof -i:7827 -i:7828       # macOS/Linux
 ```
 
 ### 개별 실행 명령어
@@ -795,7 +797,7 @@ python --version
 **3. 포트가 이미 사용 중:**
 ```bash
 # 포트 사용 상황 확인
-lsof -i:8000 -i:5173
+lsof -i:7827 -i:7828
 
 # 해당 포트 사용 프로세스 종료
 npm run clean-ports

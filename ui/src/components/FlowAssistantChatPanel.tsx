@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader, MessageSquare, Wrench } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
+import { API_BASE_URL } from '../config/api';
 
 interface Message {
   type: 'user' | 'bot';
@@ -90,7 +91,7 @@ const FlowAssistantChatPanel: React.FC<FlowAssistantChatPanelProps> = ({ panelOp
     if (wasPanelOpenRef.current && !panelOpen) {
       const id = chatIdRef.current;
       if (id) {
-        void fetch('http://localhost:8000/workflow/memory/clear-chat', {
+        void fetch(`${API_BASE_URL}/workflow/memory/clear-chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: id }),

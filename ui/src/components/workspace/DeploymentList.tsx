@@ -6,6 +6,7 @@ import DeploymentPlayground from '../deployment/DeploymentPlayground';
 import Editor from '@monaco-editor/react';
 import { apiService } from '../../services/apiService';
 import { useTranslation } from '../../hooks/useTranslation';
+import { API_BASE_URL } from '../../config/api';
 
 interface DeploymentListProps {
   deployments: Deployment[];
@@ -251,10 +252,7 @@ const DeploymentList: React.FC<DeploymentListProps> = ({
   };
 
   const generateApiExampleCode = (deployment: Deployment, language: 'javascript' | 'python' | 'curl'): string => {
-    // 백엔드 API URL 생성 (포트 8000 사용)
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const baseUrl = `${protocol}//${hostname}:8000`;
+    const baseUrl = API_BASE_URL;
     const deploymentId = deployment.id;
     
     // Start 노드의 설정에서 샘플 입력 데이터 생성
