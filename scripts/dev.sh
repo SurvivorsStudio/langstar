@@ -21,8 +21,8 @@ check_port() {
 }
 
 # 포트 체크
-check_port 5173 "Frontend" || echo -e "${YELLOW}Frontend port (5173) check required${NC}"
-check_port 8000 "Backend" || echo -e "${YELLOW}Backend port (8000) check required${NC}"
+check_port 7828 "Frontend" || echo -e "${YELLOW}Frontend port (7828) check required${NC}"
+check_port 7827 "Backend" || echo -e "${YELLOW}Backend port (7827) check required${NC}"
 
 # 에러 핸들러 함수
 cleanup() {
@@ -35,8 +35,8 @@ cleanup() {
     pkill -f "node.*dev" 2>/dev/null || true
     
     # 포트 정리
-    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-    lsof -ti:5173 | xargs kill -9 2>/dev/null || true
+    lsof -ti:7827 | xargs kill -9 2>/dev/null || true
+    lsof -ti:7828 | xargs kill -9 2>/dev/null || true
     
     echo -e "${GREEN}✅ Cleanup completed.${NC}"
     exit 1
@@ -48,13 +48,13 @@ cleanup_port_conflict() {
     echo -e "${YELLOW}📋 Currently running services:${NC}"
     
     # 현재 실행 중인 프로세스 확인
-    echo -e "${BLUE}Frontend (Port 5173):${NC}"
-    lsof -ti:5173 2>/dev/null | while read pid; do
+    echo -e "${BLUE}Frontend (Port 7828):${NC}"
+    lsof -ti:7828 2>/dev/null | while read pid; do
         ps -p $pid -o pid,ppid,command --no-headers 2>/dev/null || echo "  Unable to get process information."
     done
     
-    echo -e "${BLUE}Backend (Port 8000):${NC}"
-    lsof -ti:8000 2>/dev/null | while read pid; do
+    echo -e "${BLUE}Backend (Port 7827):${NC}"
+    lsof -ti:7827 2>/dev/null | while read pid; do
         ps -p $pid -o pid,ppid,command --no-headers 2>/dev/null || echo "  Unable to get process information."
     done
     
@@ -77,12 +77,12 @@ concurrently \
     --prefix-colors "bgBlue.bold,bgGreen.bold" \
     --success "first" \
     "npm run dev --prefix ui" \
-    "source server/venv/bin/activate && uvicorn server.app:app --reload --log-level info --timeout-keep-alive 5"
+    "source server/venv/bin/activate && uvicorn server.app:app --reload --port 7827 --log-level info --timeout-keep-alive 5"
 
 # concurrently가 실패한 경우
 if [ $? -ne 0 ]; then
     # 포트 충돌인지 확인
-    if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1 || lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if lsof -Pi :7828 -sTCP:LISTEN -t >/dev/null 2>&1 || lsof -Pi :7827 -sTCP:LISTEN -t >/dev/null 2>&1; then
         cleanup_port_conflict
     else
         cleanup

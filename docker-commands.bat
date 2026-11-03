@@ -85,7 +85,7 @@ goto end
 echo Checking frontend health...
 powershell -Command "try { Invoke-WebRequest -Uri http://localhost/health -UseBasicParsing | Out-Null; Write-Host 'Frontend is healthy' } catch { Write-Host 'Frontend is not healthy' }"
 echo Checking backend health...
-powershell -Command "try { Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing | Out-Null; Write-Host 'Backend is healthy' } catch { Write-Host 'Backend is not healthy' }"
+powershell -Command "try { Invoke-WebRequest -Uri http://localhost:7827/health -UseBasicParsing | Out-Null; Write-Host 'Backend is healthy' } catch { Write-Host 'Backend is not healthy' }"
 goto end
 
 :install

@@ -29,7 +29,8 @@ export class NodeApiError extends Error {
 /**
  * API 기본 URL
  */
-export const API_BASE_URL = 'http://localhost:8000';
+export { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 /**
  * 공통 API 오류 처리 함수

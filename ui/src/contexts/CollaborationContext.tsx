@@ -9,6 +9,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { WS_BASE_URL } from '../config/api';
 import {
   CollaborationProviderProps,
   CollaborationState,
@@ -228,7 +229,7 @@ export const CollaborationProvider: React.FC<CollaborationProviderProps> = ({
    */
   useEffect(() => {
     // Get WebSocket URL from environment or use default
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/collaboration';
+    const wsUrl = import.meta.env.VITE_WS_URL || `${WS_BASE_URL}/ws/collaboration`;
     const fullUrl = `${wsUrl}/${workflowId}`;
 
     const config: WebSocketConfig = {

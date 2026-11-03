@@ -36,14 +36,14 @@ RUN adduser --disabled-password --gecos '' appuser \
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 7827
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:7827/health || exit 1
 
 # Start the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7827"]
 
 # Development image
 FROM base AS development
@@ -64,7 +64,7 @@ RUN adduser --disabled-password --gecos '' appuser \
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 7827
 
 # Start the application with reload
-CMD ["uvicorn", "app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "app:app", "--reload", "--host", "0.0.0.0", "--port", "7827"] 

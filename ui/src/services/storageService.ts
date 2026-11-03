@@ -3,7 +3,9 @@
  * IndexedDB 대신 Backend MongoDB API를 사용합니다
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/storage';
+import { API_BASE_URL as BACKEND_BASE_URL } from '../config/api';
+
+const API_BASE_URL = `${BACKEND_BASE_URL}/api/storage`;
 
 // ==================== Helper Functions ====================
 

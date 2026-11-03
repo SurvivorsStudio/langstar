@@ -6,6 +6,7 @@ import {
   DeploymentEnvironment 
 } from '../types/deployment';
 import { Workflow } from '../store/flowStore';
+import { API_BASE_URL } from '../config/api';
 import {
   Schedule,
   CreateScheduleRequest,
@@ -46,9 +47,6 @@ interface DeploymentCodeResponse {
   deploymentUrl?: string;
   message: string;
 }
-
-// API 기본 설정
-const API_BASE_URL = 'http://localhost:8000';
 
 class ApiService {
   private baseUrl: string;

@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
       target: production
     ports:
-      - "8000:8000"
+      - "7827:7827"
     environment:
       - PYTHONPATH=/app
       - ENVIRONMENT=production
@@ -36,7 +36,7 @@ services:
       - langstar-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7827/health"]
       interval: 30s
       timeout: 10s
       retries: 3

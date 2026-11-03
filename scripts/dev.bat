@@ -21,4 +21,4 @@ echo [SUCCESS] Virtual environment activated.
 
 :: Start services with concurrently
 echo [INFO] Starting frontend and backend services...
-npx concurrently --names "FRONTEND,BACKEND" --prefix-colors "bgBlue.bold,bgGreen.bold" --success "first" "npm run dev --prefix ui" "uvicorn server.app:app --reload --log-level info --timeout-keep-alive 5" 
+npx concurrently --kill-others-on-fail --names "FRONTEND,BACKEND" --prefix-colors "bgBlue.bold,bgGreen.bold" --success "first" "npm run dev --prefix ui" "uvicorn server.app:app --reload --port 7827 --log-level info --timeout-keep-alive 5" 
