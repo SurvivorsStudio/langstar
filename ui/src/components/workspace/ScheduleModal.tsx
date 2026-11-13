@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useScheduleStore } from '../../store/scheduleStore';
 import { useDeploymentStore } from '../../store/deploymentZustandStore';
 import { useWorkflowStorageStore } from '../../store/workflowStorageStore';
+import { apiService } from '../../services/apiService';
 import {
   Schedule,
   ScheduleTargetType,
@@ -40,6 +41,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 저장 전에 이 설정으로 언제 실행되는지 미리보기
+  const [nextRuns, setNextRuns] = useState<string[] | null>(null);
+  const [previewError, setPreviewError] = useState<string>('');
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        setNextRuns(await apiService.previewSchedule(formData.scheduleType, scheduleConfig));
+        setPreviewError('');
+      } catch {
+        setNextRuns(null);
+        setPreviewError('설정을 확인해주세요');
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData.scheduleType, scheduleConfig]);
   const [validationError, setValidationError] = useState<string>('');
 
   useEffect(() => {
@@ -451,6 +468,27 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
                 />
               </div>
+            )}
+          </div>
+
+          {/* Next Run Preview */}
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-sm">
+            <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">다음 실행 예정</div>
+            {formData.scheduleType === ScheduleType.INTERVAL && (
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">
+                반복은 &quot;지금부터 설정한 간격마다&quot; 실행됩니다. 매일 정해진 시각에 실행하려면 Cron, 한 번만 실행하려면 1회를 선택하세요.
+              </p>
+            )}
+            {previewError ? (
+              <p className="text-xs text-red-600 dark:text-red-400">{previewError}</p>
+            ) : nextRuns && nextRuns.length > 0 ? (
+              <ul className="text-blue-900 dark:text-blue-100 space-y-0.5">
+                {nextRuns.map((run, index) => (
+                  <li key={run}>{index + 1}. {new Date(run).toLocaleString('ko-KR')}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">예정된 실행이 없습니다</p>
             )}
           </div>
 

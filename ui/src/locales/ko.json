@@ -228,6 +228,8 @@
     "embeddingModel": "임베딩 모델"
   },
   "schedule": {
+    "viewProgress": "진행 상황 보기",
+    "viewRun": "실행 결과 보기",
     "chatflow": "챗플로우",
     "running": "실행 중",
     "skipped": "건너뜀 (이미 실행 중)",

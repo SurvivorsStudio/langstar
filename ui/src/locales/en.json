@@ -228,6 +228,8 @@
     "embeddingModel": "Embedding Model"
   },
   "schedule": {
+    "viewProgress": "View progress",
+    "viewRun": "View run",
     "chatflow": "Chatflow",
     "running": "Running",
     "skipped": "Skipped (already running)",

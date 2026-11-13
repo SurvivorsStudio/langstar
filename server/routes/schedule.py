@@ -4,7 +4,7 @@ import logging
 
 from server.models.schedule import (
     Schedule, CreateScheduleRequest, UpdateScheduleRequest,
-    ScheduleResponse, SchedulesListResponse, ScheduleTargetType
+    ScheduleResponse, SchedulesListResponse, ScheduleTargetType, ScheduleType
 )
 from server.services.schedule_service import schedule_service
 from server.services.deployment_service import deployment_service
@@ -63,6 +63,17 @@ def create_schedule(request: CreateScheduleRequest):
     except Exception as e:
         logger.error(f"Error creating schedule: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/schedules/preview')
+def preview_schedule(body: dict = Body(...)):
+    """스케줄 설정으로 다음 실행 시각을 미리 계산 (생성 전 확인용)"""
+    try:
+        runs = schedule_service.preview_next_runs(
+            ScheduleType(body.get('scheduleType')), body.get('scheduleConfig') or {}
+        )
+        return {"success": True, "nextRuns": runs}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid schedule config: {e}")
 
 @router.get('/schedules', response_model=SchedulesListResponse)
 def get_all_schedules():

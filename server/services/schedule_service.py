@@ -208,6 +208,17 @@ class ScheduleService:
         else:
             raise ValueError(f"Unsupported schedule type: {schedule_type}")
     
+    def preview_next_runs(self, schedule_type: ScheduleType, config: Dict[str, Any], count: int = 3) -> List[str]:
+        """저장하기 전에 이 설정으로 언제 실행되는지 미리 계산 (APScheduler 와 같은 규칙)"""
+        trigger = self._create_trigger(schedule_type, config)
+        now = datetime.now(self.scheduler.timezone)
+        runs: List[str] = []
+        fire_time = trigger.get_next_fire_time(None, now)
+        while fire_time and len(runs) < count:
+            runs.append(fire_time.isoformat())
+            fire_time = trigger.get_next_fire_time(fire_time, fire_time)
+        return runs
+
     def create_schedule(self, request: CreateScheduleRequest, deployment_name: str = "") -> Schedule:
         """새 스케줄 생성 (배포 또는 챗플로우 대상)"""
         try:
