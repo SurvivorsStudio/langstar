@@ -42,6 +42,7 @@
     "runHistory": "실행 이력"
   },
   "workflowRun": {
+    "scheduledTag": "⏰ 스케줄 실행 · {name}",
     "title": "실행 이력",
     "subtitle": "Run 은 서버에서 실행되어 창을 닫아도 끝까지 진행됩니다.",
     "empty": "실행 이력이 없습니다.",
@@ -227,6 +228,12 @@
     "embeddingModel": "임베딩 모델"
   },
   "schedule": {
+    "viewProgress": "진행 상황 보기",
+    "viewRun": "실행 결과 보기",
+    "chatflow": "챗플로우",
+    "running": "실행 중",
+    "skipped": "건너뜀 (이미 실행 중)",
+    "cancelled": "중지됨",
     "title": "스케줄 관리",
     "newSchedule": "새 스케줄",
     "noSchedules": "등록된 스케줄이 없습니다",

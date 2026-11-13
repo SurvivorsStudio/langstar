@@ -14,7 +14,8 @@ interface ScheduleStore {
   error: string | null;
 
   // Actions
-  fetchSchedules: () => Promise<void>;
+  /** silent 이면 로딩 표시 없이 목록만 갱신 (실행 진행 상황 폴링용) */
+  fetchSchedules: (silent?: boolean) => Promise<void>;
   fetchSchedulesByDeployment: (deploymentId: string) => Promise<void>;
   fetchSchedule: (scheduleId: string) => Promise<void>;
   createSchedule: (request: CreateScheduleRequest) => Promise<Schedule>;
@@ -32,8 +33,8 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchSchedules: async () => {
-    set({ isLoading: true, error: null });
+  fetchSchedules: async (silent = false) => {
+    if (!silent) set({ isLoading: true, error: null });
     try {
       const response = await apiService.getSchedules();
       set({ schedules: response.schedules, isLoading: false });

@@ -5,6 +5,13 @@ export enum ScheduleStatus {
   FAILED = 'failed',
 }
 
+export enum ScheduleTargetType {
+  /** 배포된 워크플로우 실행 */
+  DEPLOYMENT = 'deployment',
+  /** 배포 없이 저장된 챗플로우를 서버 Run 으로 실행 */
+  WORKFLOW = 'workflow',
+}
+
 export enum ScheduleType {
   CRON = 'cron',
   INTERVAL = 'interval',
@@ -34,8 +41,11 @@ export interface Schedule {
   id: string;
   name: string;
   description?: string;
+  targetType?: ScheduleTargetType;
   deploymentId: string;
   deploymentName: string;
+  /** targetType 이 workflow 일 때 실행할 챗플로우 이름 */
+  workflowName?: string;
   scheduleType: ScheduleType;
   scheduleConfig: ScheduleConfig;
   inputData?: Record<string, any>;
@@ -43,6 +53,8 @@ export interface Schedule {
   nextRunTime?: string;
   lastRunTime?: string;
   lastRunStatus?: string;
+  /** 챗플로우 스케줄의 마지막 Run ID (실행 이력에서 조회) */
+  lastRunId?: string;
   executionCount: number;
   createdAt: string;
   updatedAt: string;
@@ -52,7 +64,9 @@ export interface Schedule {
 export interface CreateScheduleRequest {
   name: string;
   description?: string;
-  deploymentId: string;
+  targetType?: ScheduleTargetType;
+  deploymentId?: string;
+  workflowName?: string;
   scheduleType: ScheduleType;
   scheduleConfig: ScheduleConfig;
   inputData?: Record<string, any>;

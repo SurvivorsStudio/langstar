@@ -241,6 +241,11 @@ const WorkflowRunHistoryModal: React.FC<WorkflowRunHistoryModalProps> = ({ isOpe
                       <span>{t('workflowRun.startedAt')}: {formatDateTime(run.started_at || run.created_at)}</span>
                       <span>{t('workflowRun.duration')}: {formatDuration(run.duration_ms, isActive ? run.started_at : null)}</span>
                       <span>{t('workflowRun.progress')}: {run.completed_node_count}/{run.node_count}</span>
+                      {run.triggered_by?.type === 'schedule' && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                          {t('workflowRun.scheduledTag', { name: run.triggered_by.schedule_name || '' })}
+                        </span>
+                      )}
                       {run.resumed_from && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
                           {t('workflowRun.resumedTag', { id: run.resumed_from.slice(0, 8), count: run.reused_node_count ?? 0 })}

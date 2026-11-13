@@ -288,8 +288,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     // 유효한 입력인 경우에만 노드 데이터 업데이트 및 lastValidNodeName 저장
     if (validateNodeName(value) && value.trim() && currentNode) {
       setLastValidNodeName(value);
+      // currentNode 는 인스펙터를 연 시점의 사본이라 전체 data 를 펼치면 그 사이 Settings 에서 바꾼 값이 되돌아감 → 바뀐 필드만 전달
       updateNodeData(nodeId, {
-        ...currentNode.data,
         label: value.trim()
       });
     }
@@ -301,7 +301,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
       setNodeName(lastValidNodeName);
       if (currentNode) {
         updateNodeData(nodeId, {
-          ...currentNode.data,
           label: lastValidNodeName
         });
       }
@@ -319,7 +318,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     
     if (currentNode) {
       updateNodeData(nodeId, {
-        ...currentNode.data,
         description: value
       });
     }
@@ -349,7 +347,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ nodeId, selectedEdge, onC
     if (currentNode) {
       // 노드의 inputData 초기화
       updateNodeData(nodeId, {
-        ...currentNode.data,
         inputData: null
       });
       

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useScheduleStore } from '../../store/scheduleStore';
 import { useDeploymentStore } from '../../store/deploymentZustandStore';
+import { useWorkflowStorageStore } from '../../store/workflowStorageStore';
+import { apiService } from '../../services/apiService';
 import {
   Schedule,
+  ScheduleTargetType,
   ScheduleType,
   ScheduleConfig,
   CreateScheduleRequest,
@@ -17,11 +20,15 @@ interface ScheduleModalProps {
 const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSuccess }) => {
   const { createSchedule, updateSchedule } = useScheduleStore();
   const { deployments, fetchDeployments } = useDeploymentStore();
+  const { availableWorkflows, fetchAvailableWorkflows } = useWorkflowStorageStore();
 
   const [formData, setFormData] = useState({
     name: schedule?.name || '',
     description: schedule?.description || '',
+    // 새 스케줄은 배포 없이 바로 실행할 수 있는 챗플로우를 기본 대상으로
+    targetType: schedule?.targetType || (schedule ? ScheduleTargetType.DEPLOYMENT : ScheduleTargetType.WORKFLOW),
     deploymentId: schedule?.deploymentId || '',
+    workflowName: schedule?.workflowName || '',
     scheduleType: schedule?.scheduleType || ScheduleType.INTERVAL,
   });
 
@@ -34,14 +41,35 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 저장 전에 이 설정으로 언제 실행되는지 미리보기
+  const [nextRuns, setNextRuns] = useState<string[] | null>(null);
+  const [previewError, setPreviewError] = useState<string>('');
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        setNextRuns(await apiService.previewSchedule(formData.scheduleType, scheduleConfig));
+        setPreviewError('');
+      } catch {
+        setNextRuns(null);
+        setPreviewError('설정을 확인해주세요');
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData.scheduleType, scheduleConfig]);
   const [validationError, setValidationError] = useState<string>('');
 
   useEffect(() => {
     fetchDeployments();
-  }, [fetchDeployments]);
+    fetchAvailableWorkflows();
+  }, [fetchDeployments, fetchAvailableWorkflows]);
 
   // 활성 상태인 배포만 필터링
   const activeDeployments = deployments.filter((d) => d.status === 'active');
+  const isChatflowTarget = formData.targetType === ScheduleTargetType.WORKFLOW;
+  const workflowNames = availableWorkflows
+    .map((w) => w.projectName)
+    .sort((a, b) => a.localeCompare(b));
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -58,7 +86,12 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
       return false;
     }
 
-    if (!formData.deploymentId) {
+    if (isChatflowTarget && !formData.workflowName) {
+      setValidationError('챗플로우를 선택해주세요.');
+      return false;
+    }
+
+    if (!isChatflowTarget && !formData.deploymentId) {
       setValidationError('배포를 선택해주세요.');
       return false;
     }
@@ -118,7 +151,10 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
         const request: CreateScheduleRequest = {
           name: formData.name,
           description: formData.description,
-          deploymentId: formData.deploymentId,
+          targetType: formData.targetType,
+          ...(isChatflowTarget
+            ? { workflowName: formData.workflowName }
+            : { deploymentId: formData.deploymentId }),
           scheduleType: formData.scheduleType,
           scheduleConfig,
           inputData: parsedInputData,
@@ -187,7 +223,56 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
             />
           </div>
 
-          {/* Deployment Selection */}
+          {/* Target Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              실행 대상 *
+            </label>
+            <div className="flex gap-4">
+              {[
+                { value: ScheduleTargetType.WORKFLOW, label: '챗플로우 (배포 없이 실행)' },
+                { value: ScheduleTargetType.DEPLOYMENT, label: '배포' },
+              ].map((option) => (
+                <label key={option.value} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    name="schedule-target"
+                    value={option.value}
+                    checked={formData.targetType === option.value}
+                    onChange={() => handleInputChange('targetType', option.value)}
+                    disabled={!!schedule}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {isChatflowTarget ? (
+          /* Chatflow Selection */
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              챗플로우 선택 *
+            </label>
+            <select
+              value={formData.workflowName}
+              onChange={(e) => handleInputChange('workflowName', e.target.value)}
+              disabled={!!schedule}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+            >
+              <option value="">챗플로우를 선택하세요</option>
+              {workflowNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              실행 시점에 저장된 챗플로우를 서버에서 실행합니다. 결과는 챗플로우의 실행 이력에서 볼 수 있습니다.
+            </p>
+          </div>
+          ) : (
+          /* Deployment Selection */
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               배포 선택 *
@@ -211,6 +296,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
               </p>
             )}
           </div>
+          )}
 
           {/* Schedule Type */}
           <div>
@@ -385,7 +471,29 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
             )}
           </div>
 
-          {/* Input Data */}
+          {/* Next Run Preview */}
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-sm">
+            <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">다음 실행 예정</div>
+            {formData.scheduleType === ScheduleType.INTERVAL && (
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">
+                반복은 &quot;지금부터 설정한 간격마다&quot; 실행됩니다. 매일 정해진 시각에 실행하려면 Cron, 한 번만 실행하려면 1회를 선택하세요.
+              </p>
+            )}
+            {previewError ? (
+              <p className="text-xs text-red-600 dark:text-red-400">{previewError}</p>
+            ) : nextRuns && nextRuns.length > 0 ? (
+              <ul className="text-blue-900 dark:text-blue-100 space-y-0.5">
+                {nextRuns.map((run, index) => (
+                  <li key={run}>{index + 1}. {new Date(run).toLocaleString('ko-KR')}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">예정된 실행이 없습니다</p>
+            )}
+          </div>
+
+          {/* Input Data (챗플로우는 Start 노드 기본값으로 실행하므로 배포 대상에서만 사용) */}
+          {!isChatflowTarget && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               입력 데이터 (JSON)
@@ -401,6 +509,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
               워크플로우 실행 시 전달할 입력 데이터를 JSON 형식으로 입력하세요
             </p>
           </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -414,7 +523,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ schedule, onClose, onSucc
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || activeDeployments.length === 0}
+            disabled={isSubmitting || (!isChatflowTarget && activeDeployments.length === 0)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? '저장 중...' : schedule ? '수정' : '생성'}

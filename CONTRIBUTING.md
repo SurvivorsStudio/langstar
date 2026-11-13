@@ -66,8 +66,8 @@ This project and everyone participating in it is governed by our [Code of Conduc
    npm run dev
    ```
    This starts:
-   - Frontend server (React): `http://localhost:5173`
-   - Backend server (FastAPI): `http://localhost:8000`
+   - Frontend server (React): `http://localhost:7828`
+   - Backend server (FastAPI): `http://localhost:7827`
 
 3. **Stop development server**
    ```bash
@@ -412,8 +412,8 @@ LangStar에 기여해주셔서 감사합니다! 모든 분의 기여를 환영�
    npm run dev
    ```
    다음 서버들이 실행됩니다:
-   - 프론트엔드 서버 (React): `http://localhost:5173`
-   - 백엔드 서버 (FastAPI): `http://localhost:8000`
+   - 프론트엔드 서버 (React): `http://localhost:7828`
+   - 백엔드 서버 (FastAPI): `http://localhost:7827`
 
 3. **개발 서버 중지**
    ```bash

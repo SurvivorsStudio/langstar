@@ -6,8 +6,10 @@ import {
   DeploymentEnvironment 
 } from '../types/deployment';
 import { Workflow } from '../store/flowStore';
+import { API_BASE_URL } from '../config/api';
 import {
   Schedule,
+  ScheduleConfig,
   CreateScheduleRequest,
   UpdateScheduleRequest,
   ScheduleResponse,
@@ -46,9 +48,6 @@ interface DeploymentCodeResponse {
   deploymentUrl?: string;
   message: string;
 }
-
-// API 기본 설정
-const API_BASE_URL = 'http://localhost:8000';
 
 class ApiService {
   private baseUrl: string;
@@ -380,6 +379,17 @@ class ApiService {
     }
 
     return response;
+  }
+
+  /**
+   * 스케줄 설정의 다음 실행 시각 미리보기 (저장 전 확인용)
+   */
+  async previewSchedule(scheduleType: string, scheduleConfig: ScheduleConfig): Promise<string[]> {
+    const response = await this.request<{ success: boolean; nextRuns: string[] }>('/api/schedules/preview', {
+      method: 'POST',
+      body: JSON.stringify({ scheduleType, scheduleConfig })
+    });
+    return response.nextRuns;
   }
 
   /**

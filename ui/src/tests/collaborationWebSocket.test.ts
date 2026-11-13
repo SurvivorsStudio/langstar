@@ -94,7 +94,7 @@ describe('CollaborationWebSocket', () => {
       const onStatusChange = vi.fn();
 
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         { onConnect, onStatusChange }
       );
 
@@ -112,7 +112,7 @@ describe('CollaborationWebSocket', () => {
       const onStatusChange = vi.fn();
 
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         { onDisconnect, onStatusChange }
       );
 
@@ -141,7 +141,7 @@ describe('CollaborationWebSocket', () => {
 
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           connectionTimeout: 50,
         },
         { onError }
@@ -186,7 +186,7 @@ describe('CollaborationWebSocket', () => {
 
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           initialReconnectDelay: 50,
         },
         { onStatusChange }
@@ -244,7 +244,7 @@ describe('CollaborationWebSocket', () => {
       const maxAttempts = 2;
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           initialReconnectDelay: 50,
           maxReconnectAttempts: maxAttempts,
         },
@@ -277,7 +277,7 @@ describe('CollaborationWebSocket', () => {
 
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           initialReconnectDelay: 100,
         },
         {}
@@ -304,7 +304,7 @@ describe('CollaborationWebSocket', () => {
   describe('Message Handling', () => {
     it('should send messages when connected', async () => {
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         {}
       );
 
@@ -319,7 +319,7 @@ describe('CollaborationWebSocket', () => {
 
     it('should queue messages when not connected', async () => {
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         {}
       );
 
@@ -339,7 +339,7 @@ describe('CollaborationWebSocket', () => {
       const onMessage = vi.fn();
 
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         { onMessage }
       );
 
@@ -360,7 +360,7 @@ describe('CollaborationWebSocket', () => {
       const onError = vi.fn();
 
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         { onError }
       );
 
@@ -382,7 +382,7 @@ describe('CollaborationWebSocket', () => {
     it('should send periodic ping messages', async () => {
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           heartbeatInterval: 100,
         },
         {}
@@ -404,7 +404,7 @@ describe('CollaborationWebSocket', () => {
     it('should stop heartbeat on disconnect', async () => {
       const ws = new CollaborationWebSocket(
         {
-          url: 'ws://localhost:8000',
+          url: 'ws://localhost:7827',
           heartbeatInterval: 100,
         },
         {}
@@ -428,7 +428,7 @@ describe('CollaborationWebSocket', () => {
       const onStatusChange = vi.fn((status) => statusChanges.push(status));
 
       const ws = new CollaborationWebSocket(
-        { url: 'ws://localhost:8000' },
+        { url: 'ws://localhost:7827' },
         { onStatusChange }
       );
 

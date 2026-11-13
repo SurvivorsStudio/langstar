@@ -307,7 +307,7 @@ def run_deployment(deployment_id: str, msg: dict = Body(...), request: Request =
         execution_source = "internal"
         if request and request.headers.get("referer"):
             referer = request.headers.get("referer", "")
-            if "localhost:5173" in referer or "127.0.0.1:5173" in referer:
+            if "localhost:7828" in referer or "127.0.0.1:7828" in referer:
                 execution_source = "internal"
             else:
                 execution_source = "external"

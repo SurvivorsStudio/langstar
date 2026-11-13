@@ -441,3 +441,5 @@ $RECYCLE.BIN/
 
 # Workflow run history (server-side builder runs)
 workflow_runs/
+# Schedule definitions (runtime data)
+schedules/

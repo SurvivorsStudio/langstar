@@ -9,9 +9,10 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
 import logging
+import time
 
 from server.models.schedule import (
-    Schedule, ScheduleStatus, ScheduleType,
+    Schedule, ScheduleStatus, ScheduleType, ScheduleTargetType,
     CreateScheduleRequest, UpdateScheduleRequest
 )
 
@@ -51,6 +52,97 @@ class ScheduleService:
         if file_path.exists():
             file_path.unlink()
     
+    def _run_schedule(self, schedule_id: str) -> None:
+        """APScheduler 작업 진입점: 스케줄 대상(배포/챗플로우)에 맞게 실행"""
+        schedule = self._load_schedule(schedule_id)
+        if not schedule:
+            logger.warning(f"Scheduled job fired but schedule not found: {schedule_id}")
+            return
+        if schedule.targetType == ScheduleTargetType.WORKFLOW:
+            self._execute_scheduled_chatflow(schedule)
+        else:
+            self._execute_scheduled_workflow(schedule_id, schedule.deploymentId, schedule.inputData)
+
+    def _add_job(self, schedule: Schedule):
+        """스케줄을 APScheduler 작업으로 등록"""
+        trigger = self._create_trigger(schedule.scheduleType, schedule.scheduleConfig)
+        return self.scheduler.add_job(
+            func=self._run_schedule,
+            trigger=trigger,
+            id=schedule.id,
+            args=[schedule.id],
+            name=schedule.name,
+            replace_existing=True,
+            max_instances=1,  # 이전 실행이 끝나지 않았으면 이번 실행은 건너뜀
+        )
+
+    def _record_run_result(self, schedule_id: str, status: str, run_id: Optional[str] = None) -> None:
+        """실행 결과를 스케줄에 기록 (다음 실행 시간 포함)"""
+        schedule = self._load_schedule(schedule_id)
+        if not schedule:
+            return
+        schedule.lastRunStatus = status
+        if run_id:
+            schedule.lastRunId = run_id
+        schedule.updatedAt = datetime.now().isoformat()
+        job = self.scheduler.get_job(schedule_id)
+        if job and job.next_run_time:
+            schedule.nextRunTime = job.next_run_time.isoformat()
+        elif schedule.status == ScheduleStatus.ACTIVE and status != "running":
+            schedule.nextRunTime = None
+            schedule.status = ScheduleStatus.COMPLETED
+        self._save_schedule(schedule)
+
+    def _execute_scheduled_chatflow(self, schedule: Schedule) -> None:
+        """배포 없이 저장된 챗플로우를 서버 Run 으로 실행하고 끝날 때까지 기다림"""
+        from server.services.storage_service import storage_service
+        from server.services.workflow_run_service import workflow_run_service, TERMINAL_STATUSES
+
+        name = schedule.workflowName
+        logger.info(f"Executing scheduled chatflow - Schedule: {schedule.id}, Workflow: {name}")
+        schedule.lastRunTime = datetime.now().isoformat()
+        schedule.executionCount += 1
+        self._save_schedule(schedule)
+
+        try:
+            workflow = storage_service.get_workflow_by_name(name) if name else None
+            if not workflow:
+                raise ValueError(f"Workflow not found: {name}")
+            run = workflow_run_service.start_run(
+                name, workflow.get("nodes") or [], workflow.get("edges") or [],
+                triggered_by={"type": "schedule", "schedule_id": schedule.id, "schedule_name": schedule.name},
+            )
+        except RuntimeError as e:
+            # 같은 챗플로우가 이미 실행 중 (사용자가 직접 Run 했거나 이전 스케줄 실행)
+            logger.warning(f"Scheduled chatflow skipped - {name}: {e}")
+            self._record_run_result(schedule.id, "skipped")
+            return
+        except Exception as e:
+            logger.error(f"Error starting scheduled chatflow {schedule.id}: {e}", exc_info=True)
+            self._record_run_result(schedule.id, "failed")
+            return
+
+        self._record_run_result(schedule.id, "running", run["id"])
+        status = "failed"
+        while True:
+            record = workflow_run_service.get_run(run["id"])
+            if not record:
+                break
+            if record["status"] in TERMINAL_STATUSES:
+                status = "success" if record["status"] == "succeeded" else record["status"]
+                break
+            time.sleep(5)
+        self._record_run_result(schedule.id, status, run["id"])
+        logger.info(f"Scheduled chatflow finished - Schedule: {schedule.id}, Run: {run['id']}, Status: {status}")
+
+    def rename_workflow(self, old_name: str, new_name: str) -> None:
+        """챗플로우 이름 변경 시 해당 챗플로우를 실행하는 스케줄도 함께 변경"""
+        for schedule in self.get_all_schedules():
+            if schedule.targetType == ScheduleTargetType.WORKFLOW and schedule.workflowName == old_name:
+                schedule.workflowName = new_name
+                schedule.updatedAt = datetime.now().isoformat()
+                self._save_schedule(schedule)
+
     def _execute_scheduled_workflow(self, schedule_id: str, deployment_id: str, input_data: Dict[str, Any]) -> None:
         """스케줄된 워크플로우 실행"""
         try:
@@ -116,40 +208,37 @@ class ScheduleService:
         else:
             raise ValueError(f"Unsupported schedule type: {schedule_type}")
     
-    def create_schedule(self, request: CreateScheduleRequest, deployment_name: str) -> Schedule:
-        """새 스케줄 생성"""
+    def preview_next_runs(self, schedule_type: ScheduleType, config: Dict[str, Any], count: int = 3) -> List[str]:
+        """저장하기 전에 이 설정으로 언제 실행되는지 미리 계산 (APScheduler 와 같은 규칙)"""
+        trigger = self._create_trigger(schedule_type, config)
+        now = datetime.now(self.scheduler.timezone)
+        runs: List[str] = []
+        fire_time = trigger.get_next_fire_time(None, now)
+        while fire_time and len(runs) < count:
+            runs.append(fire_time.isoformat())
+            fire_time = trigger.get_next_fire_time(fire_time, fire_time)
+        return runs
+
+    def create_schedule(self, request: CreateScheduleRequest, deployment_name: str = "") -> Schedule:
+        """새 스케줄 생성 (배포 또는 챗플로우 대상)"""
         try:
             schedule_id = str(uuid.uuid4())
             now = datetime.now().isoformat()
-            
-            # 트리거 생성
-            trigger = self._create_trigger(request.scheduleType, request.scheduleConfig)
-            
-            # APScheduler에 작업 추가
-            job = self.scheduler.add_job(
-                func=self._execute_scheduled_workflow,
-                trigger=trigger,
-                id=schedule_id,
-                args=[schedule_id, request.deploymentId, request.inputData],
-                name=request.name,
-                replace_existing=True
-            )
-            
-            # 다음 실행 시간 가져오기
-            next_run_time = job.next_run_time.isoformat() if job.next_run_time else None
-            
+
             # 스케줄 객체 생성
             schedule = Schedule(
                 id=schedule_id,
                 name=request.name,
                 description=request.description,
-                deploymentId=request.deploymentId,
+                targetType=request.targetType,
+                deploymentId=request.deploymentId or "",
                 deploymentName=deployment_name,
+                workflowName=request.workflowName,
                 scheduleType=request.scheduleType,
                 scheduleConfig=request.scheduleConfig,
                 inputData=request.inputData,
                 status=ScheduleStatus.ACTIVE,
-                nextRunTime=next_run_time,
+                nextRunTime=None,
                 lastRunTime=None,
                 lastRunStatus=None,
                 executionCount=0,
@@ -157,9 +246,12 @@ class ScheduleService:
                 updatedAt=now
             )
             
-            # 파일에 저장
+            # 작업이 실행될 때 스케줄 파일을 읽으므로 먼저 저장한 뒤 APScheduler 에 등록
             self._save_schedule(schedule)
-            
+            job = self._add_job(schedule)
+            schedule.nextRunTime = job.next_run_time.isoformat() if job.next_run_time else None
+            self._save_schedule(schedule)
+
             logger.info(f"Schedule created: {schedule_id}")
             return schedule
             
@@ -227,19 +319,12 @@ class ScheduleService:
             schedule.scheduleConfig = request.scheduleConfig
             
             # 기존 작업 제거
-            self.scheduler.remove_job(schedule_id)
-            
+            if self.scheduler.get_job(schedule_id):
+                self.scheduler.remove_job(schedule_id)
+
             # 새 트리거로 작업 재생성
-            trigger = self._create_trigger(schedule.scheduleType, schedule.scheduleConfig)
-            job = self.scheduler.add_job(
-                func=self._execute_scheduled_workflow,
-                trigger=trigger,
-                id=schedule_id,
-                args=[schedule_id, schedule.deploymentId, schedule.inputData],
-                name=schedule.name,
-                replace_existing=True
-            )
-            
+            job = self._add_job(schedule)
+                        
             schedule.nextRunTime = job.next_run_time.isoformat() if job.next_run_time else None
         
         # 상태 변경
@@ -297,19 +382,9 @@ class ScheduleService:
             for schedule in schedules:
                 if schedule.status == ScheduleStatus.ACTIVE:
                     try:
-                        # 트리거 재생성
-                        trigger = self._create_trigger(schedule.scheduleType, schedule.scheduleConfig)
-                        
                         # APScheduler에 작업 추가
-                        self.scheduler.add_job(
-                            func=self._execute_scheduled_workflow,
-                            trigger=trigger,
-                            id=schedule.id,
-                            args=[schedule.id, schedule.deploymentId, schedule.inputData],
-                            name=schedule.name,
-                            replace_existing=True
-                        )
-                        
+                        self._add_job(schedule)
+                                                
                         logger.info(f"Loaded schedule on startup: {schedule.id}")
                     except Exception as e:
                         logger.error(f"Error loading schedule {schedule.id}: {str(e)}")

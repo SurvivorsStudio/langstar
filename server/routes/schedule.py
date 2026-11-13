@@ -4,7 +4,7 @@ import logging
 
 from server.models.schedule import (
     Schedule, CreateScheduleRequest, UpdateScheduleRequest,
-    ScheduleResponse, SchedulesListResponse
+    ScheduleResponse, SchedulesListResponse, ScheduleTargetType, ScheduleType
 )
 from server.services.schedule_service import schedule_service
 from server.services.deployment_service import deployment_service
@@ -17,8 +17,25 @@ router = APIRouter()
 def create_schedule(request: CreateScheduleRequest):
     """새 스케줄 생성"""
     try:
+        if request.targetType == ScheduleTargetType.WORKFLOW:
+            # 배포 없이 저장된 챗플로우를 실행하는 스케줄
+            from server.services.storage_service import storage_service
+            if not request.workflowName:
+                raise HTTPException(status_code=400, detail="workflowName is required for a chatflow schedule")
+            if not storage_service.get_workflow_by_name(request.workflowName):
+                raise HTTPException(status_code=404, detail=f"Workflow not found: {request.workflowName}")
+            schedule = schedule_service.create_schedule(request)
+            logger.info(f"Chatflow schedule created successfully: {schedule.id}")
+            return ScheduleResponse(
+                success=True,
+                schedule=schedule,
+                message="Schedule created successfully"
+            )
+
         logger.info(f"Creating schedule for deployment: {request.deploymentId}")
-        
+        if not request.deploymentId:
+            raise HTTPException(status_code=400, detail="deploymentId is required for a deployment schedule")
+
         # 배포 존재 여부 확인
         deployment = deployment_service.get_deployment_by_id(request.deploymentId)
         if not deployment:
@@ -46,6 +63,17 @@ def create_schedule(request: CreateScheduleRequest):
     except Exception as e:
         logger.error(f"Error creating schedule: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/schedules/preview')
+def preview_schedule(body: dict = Body(...)):
+    """스케줄 설정으로 다음 실행 시각을 미리 계산 (생성 전 확인용)"""
+    try:
+        runs = schedule_service.preview_next_runs(
+            ScheduleType(body.get('scheduleType')), body.get('scheduleConfig') or {}
+        )
+        return {"success": True, "nextRuns": runs}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid schedule config: {e}")
 
 @router.get('/schedules', response_model=SchedulesListResponse)
 def get_all_schedules():

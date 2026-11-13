@@ -6,7 +6,9 @@
  * 실행 상태와 이력은 이 API로 조회/중지할 수 있습니다.
  */
 
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE_URL as BACKEND_BASE_URL } from '../config/api';
+
+const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
 
 export type WorkflowRunStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type NodeRunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'waiting' | 'cancelled';
@@ -24,6 +26,8 @@ export interface WorkflowRunSummary {
   cancel_requested: boolean;
   /** 이어서 실행한 경우 원본 Run ID */
   resumed_from?: string | null;
+  /** 스케줄로 실행된 경우 { type: 'schedule', schedule_id, schedule_name } */
+  triggered_by?: { type: string; schedule_id?: string; schedule_name?: string } | null;
   reused_node_count?: number;
   node_count: number;
   completed_node_count: number;

@@ -465,7 +465,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({
 
           return (
             <div
-              key={workflow.projectId}
+              key={workflow.projectName}
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData('application/x-langstar-workflow', workflow.projectName);
