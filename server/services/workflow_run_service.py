@@ -808,7 +808,7 @@ class WorkflowRunService:
     # 공개 API
     # ------------------------------------------------------------------
     def start_run(self, workflow_name: str, nodes: List[Dict], edges: List[Dict], chat_id: Optional[str] = None,
-                  resume_from: Optional[str] = None) -> Dict[str, Any]:
+                  resume_from: Optional[str] = None, triggered_by: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         prev = None
         reusable: Set[str] = set()
         if resume_from:
@@ -844,6 +844,8 @@ class WorkflowRunService:
                 "final_output": None,
                 "cancel_requested": False,
                 "resumed_from": resume_from,
+                # 실행 주체: None 이면 사용자가 Run 버튼으로 실행, {"type": "schedule", ...} 이면 스케줄 실행
+                "triggered_by": triggered_by,
                 "version": 0,
                 "node_states": {
                     n["id"]: {
@@ -956,6 +958,7 @@ class WorkflowRunService:
             "error_nodes": record.get("error_nodes") or [],
             "cancel_requested": record.get("cancel_requested", False),
             "resumed_from": record.get("resumed_from"),
+            "triggered_by": record.get("triggered_by"),
             "reused_node_count": sum(1 for s in node_states.values() if s.get("reused")),
             "node_count": len(node_states),
             "completed_node_count": sum(1 for s in node_states.values() if s.get("status") in ("succeeded", "failed")),

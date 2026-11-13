@@ -42,6 +42,7 @@
     "runHistory": "Run History"
   },
   "workflowRun": {
+    "scheduledTag": "⏰ Scheduled · {name}",
     "title": "Run History",
     "subtitle": "Runs execute on the server and keep going even if you close this window.",
     "empty": "No runs yet.",
@@ -227,6 +228,10 @@
     "embeddingModel": "Embedding Model"
   },
   "schedule": {
+    "chatflow": "Chatflow",
+    "running": "Running",
+    "skipped": "Skipped (already running)",
+    "cancelled": "Stopped",
     "title": "Schedule Management",
     "newSchedule": "New Schedule",
     "noSchedules": "No schedules registered",

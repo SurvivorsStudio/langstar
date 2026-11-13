@@ -71,6 +71,9 @@ async def rename_workflow(request: RenameWorkflowRequest):
     """Rename workflow"""
     try:
         storage_service.rename_workflow(request.oldName, request.newName)
+        # 이 챗플로우를 실행하는 스케줄도 새 이름을 따라가도록 갱신
+        from server.services.schedule_service import schedule_service
+        schedule_service.rename_workflow(request.oldName, request.newName)
         return {"message": f"Workflow renamed from '{request.oldName}' to '{request.newName}'"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

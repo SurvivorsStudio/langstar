@@ -26,6 +26,8 @@ export interface WorkflowRunSummary {
   cancel_requested: boolean;
   /** 이어서 실행한 경우 원본 Run ID */
   resumed_from?: string | null;
+  /** 스케줄로 실행된 경우 { type: 'schedule', schedule_id, schedule_name } */
+  triggered_by?: { type: string; schedule_id?: string; schedule_name?: string } | null;
   reused_node_count?: number;
   node_count: number;
   completed_node_count: number;

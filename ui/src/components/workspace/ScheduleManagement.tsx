@@ -206,9 +206,11 @@ const ScheduleManagement: React.FC = () => {
                   {/* Schedule Info */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">{t('schedule.deployment')}:</span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {schedule.targetType === 'workflow' ? t('schedule.chatflow') : t('schedule.deployment')}:
+                      </span>
                       <span className="ml-2 text-gray-900 dark:text-white">
-                        {schedule.deploymentName}
+                        {schedule.targetType === 'workflow' ? schedule.workflowName : schedule.deploymentName}
                       </span>
                     </div>
                     <div>
@@ -241,10 +243,19 @@ const ScheduleManagement: React.FC = () => {
                         className={`ml-2 text-sm font-medium ${
                           schedule.lastRunStatus === 'success'
                             ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            : schedule.lastRunStatus === 'running'
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : schedule.lastRunStatus === 'skipped' || schedule.lastRunStatus === 'cancelled'
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-red-600 dark:text-red-400'
                         }`}
                       >
-                        {schedule.lastRunStatus === 'success' ? t('schedule.success') : t('schedule.failed')}
+                        {({
+                          success: t('schedule.success'),
+                          running: t('schedule.running'),
+                          skipped: t('schedule.skipped'),
+                          cancelled: t('schedule.cancelled'),
+                        } as Record<string, string>)[schedule.lastRunStatus] || t('schedule.failed')}
                       </span>
                     </div>
                   )}
